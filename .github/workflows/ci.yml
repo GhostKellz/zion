@@ -1,32 +1,58 @@
-name: CI
+name: Build and Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: self-hosted
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Zig (latest dev)
-        run: |
-          set -eux
-          JSON=$(curl -sL https://ziglang.org/download/index.json)
-          ZIG_URL=$(echo "$JSON" | jq -r '.master."x86_64-linux".tarball')
-          curl -LO "$ZIG_URL"
-          TARBALL=$(basename "$ZIG_URL")
-          tar -xf "$TARBALL"
-          ZIG_DIR=$(tar -tf "$TARBALL" | head -1 | cut -f1 -d"/")
-          echo "$PWD/$ZIG_DIR" >> $GITHUB_PATH
-
-      - name: Build with Zig
-        run: zig build
-
-      - name: Run Zig tests
-        run: zig build test
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Verify Zig installation
+      run: |
+        zig version
+        zig env
+    
+    - name: Check dependencies
+      run: |
+        which curl
+        which tar
+        which git
+    
+    - name: Clean previous builds
+      run: |
+        rm -rf zig-out/ .zig-cache/
+    
+    - name: Build Zion (Debug)
+      run: |
+        zig build
+    
+    - name: Build Zion (Release)
+      run: |
+        zig build -Doptimize=ReleaseSafe
+    
+    - name: Test basic functionality
+      run: |
+        ./zig-out/bin/zion version
+        ./zig-out/bin/zion help
+    
+    - name: Test project initialization
+      run: |
+        mkdir test-project
+        cd test-project
+        ../zig-out/bin/zion init
+        ls -la
+        cat build.zig.zon
+        cd ..
+        rm -rf test-project
+    
+    - name: Run verification script
+      run: |
+        chmod +x scripts/verify-release.sh
+        ./scripts/verify-release.sh

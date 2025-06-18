@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.3.0)'
+        required: true
+        default: 'v0.3.0'
+
+jobs:
+  build-release:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Clean previous builds
+      run: |
+        rm -rf zig-out/ .zig-cache/
+    
+    - name: Verify Zig installation
+      run: |
+        zig version
+    
+    - name: Build Zion Release
+      run: |
+        zig build -Doptimize=ReleaseSafe
+        
+        # Verify the build
+        ./zig-out/bin/zion version
+        ./zig-out/bin/zion help > /dev/null
+        
+        # Test basic functionality
+        mkdir test && cd test
+        ../zig-out/bin/zion init
+        cd .. && rm -rf test
+    
+    - name: Create release archive
+      run: |
+        mkdir -p release-assets
+        
+        # Create binary archive
+        tar -czf release-assets/zion-linux-x86_64.tar.gz -C zig-out/bin zion
+        
+        # Create source archive
+        git archive --format=tar.gz --prefix=zion-${GITHUB_REF#refs/tags/}/ HEAD > release-assets/zion-source.tar.gz
+        
+        # Copy documentation
+        cp README.md CHANGELOG.md COMMANDS.md DOCS.md INSTALL.md release-assets/
+        
+        # Create checksums
+        cd release-assets
+        sha256sum * > SHA256SUMS
+        cd ..
+    
+    - name: Upload release assets
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-assets
+        path: release-assets/
+
+  create-release:
+    needs: build-release
+    runs-on: self-hosted
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download release assets
+      uses: actions/download-artifact@v3
+      with:
+        name: release-assets
+        path: release-assets/
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-assets/*
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body_path: RELEASE_NOTES.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
