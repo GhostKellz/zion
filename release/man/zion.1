@@ -1,0 +1,168 @@
+.TH ZION 1 "2024" "Zion 0.2.0-dev" "User Commands"
+
+.SH NAME
+zion \- A modern, cargo-inspired package manager for the Zig programming language
+
+.SH SYNOPSIS
+.B zion
+.RI [ COMMAND ]
+.RI [ OPTIONS ]
+
+.SH DESCRIPTION
+.B Zion
+is a modern package manager for the Zig programming language that provides seamless dependency management with automatic build integration. It supports GitHub repositories and provides reproducible builds through lock files.
+
+.SH COMMANDS
+
+.TP
+.B init
+Initialize a new Zig project with necessary file structure
+
+.TP
+.B add \fIPACKAGE\fR
+Add a dependency to your project. PACKAGE should be in the format "username/repo"
+
+.TP
+.B remove \fIPACKAGE\fR, rm \fIPACKAGE\fR
+Remove a dependency from your project with complete cleanup
+
+.TP
+.B update
+Update all dependencies to their latest versions
+
+.TP
+.B list, ls
+List all dependencies in the project with their installation status
+
+.TP
+.B info \fIPACKAGE\fR
+Show detailed information about a specific package dependency
+
+.TP
+.B fetch
+Fetch all dependencies specified in your build.zig.zon file
+
+.TP
+.B build
+Build the project using the Zig build system
+
+.TP
+.B clean
+Remove build artifacts and caches. Use --all to remove everything including lock files
+
+.TP
+.B lock
+Update or create the lock file based on your build.zig.zon dependencies
+
+.TP
+.B version
+Display the current version of Zion
+
+.TP
+.B help
+Display help information about available commands
+
+.SH OPTIONS
+
+.TP
+.B --json
+When used with the list command, outputs machine-readable JSON format
+
+.TP
+.B --all
+When used with the clean command, removes all build artifacts including lock files
+
+.SH EXAMPLES
+
+.TP
+Initialize a new project:
+.B zion init
+
+.TP
+Add a dependency:
+.B zion add mitchellh/libxev
+
+.TP
+List dependencies:
+.B zion list
+
+.TP
+Remove a dependency:
+.B zion remove libxev
+
+.TP
+Update all dependencies:
+.B zion update
+
+.TP
+Clean build artifacts:
+.B zion clean
+
+.TP
+Complete cleanup:
+.B zion clean --all
+
+.SH FILES
+
+.TP
+.I build.zig.zon
+Project manifest file containing metadata and dependencies
+
+.TP
+.I zion.lock
+Lock file ensuring reproducible builds with exact dependency versions
+
+.TP
+.I .zion/cache/
+Directory containing downloaded package tarballs
+
+.TP
+.I .zion/deps/
+Directory containing extracted package sources
+
+.SH ENVIRONMENT
+
+Zion doesn't currently use any environment variables.
+
+.SH EXIT STATUS
+
+.TP
+.B 0
+Success
+
+.TP
+.B 1
+General error
+
+.TP
+.B 2
+File not found
+
+.TP
+.B 3
+Invalid command usage
+
+.SH REQUIREMENTS
+
+.TP
+- Zig 0.15.0 or newer
+.TP
+- curl (for downloading packages)
+.TP
+- tar (for extracting packages)
+.TP
+- git (for some operations)
+
+.SH AUTHOR
+Written by the Zion development team.
+
+.SH REPORTING BUGS
+Report bugs to: https://github.com/ghostkellz/zion/issues
+
+.SH COPYRIGHT
+This is free software; see the source for copying conditions.
+
+.SH SEE ALSO
+.BR zig (1)
+
+Full documentation available at: https://github.com/ghostkellz/zion

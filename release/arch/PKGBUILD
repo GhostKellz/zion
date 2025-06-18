@@ -1,0 +1,47 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=zion
+pkgver=0.2.0.dev
+pkgrel=1
+pkgdesc="A modern, cargo-inspired package manager for the Zig programming language"
+arch=('x86_64' 'aarch64')
+url="https://github.com/ghostkellz/zion"
+license=('MIT')
+depends=('zig' 'curl' 'tar' 'git')
+makedepends=('git')
+source=("git+https://github.com/ghostkellz/zion.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$srcdir/$pkgname"
+    git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+build() {
+    cd "$srcdir/$pkgname"
+    zig build -Doptimize=ReleaseSafe
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+    
+    # Install binary
+    install -Dm755 "zig-out/bin/zion" "$pkgdir/usr/bin/zion"
+    
+    # Install documentation
+    install -Dm644 "README.md" "$pkgdir/usr/share/doc/zion/README.md"
+    install -Dm644 "COMMANDS.md" "$pkgdir/usr/share/doc/zion/COMMANDS.md"
+    install -Dm644 "DOCS.md" "$pkgdir/usr/share/doc/zion/DOCS.md"
+    
+    # Install man page
+    install -Dm644 "release/man/zion.1" "$pkgdir/usr/share/man/man1/zion.1"
+    
+    # Install shell completions
+    install -Dm644 "release/completions/zion.bash" "$pkgdir/usr/share/bash-completion/completions/zion"
+    install -Dm644 "release/completions/zion.zsh" "$pkgdir/usr/share/zsh/site-functions/_zion"
+    install -Dm644 "release/completions/zion.fish" "$pkgdir/usr/share/fish/vendor_completions.d/zion.fish"
+    
+    # Install license if it exists
+    if [ -f "LICENSE" ]; then
+        install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/zion/LICENSE"
+    fi
+}
