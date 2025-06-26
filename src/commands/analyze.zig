@@ -79,7 +79,7 @@ fn analyzeDependencies(allocator: Allocator) !void {
 
     // Count dependencies
     var dep_count: u32 = 0;
-    var lines = std.mem.split(u8, zon_content, "\n");
+    var lines = std.mem.splitScalar(u8, zon_content, '\n');
     var in_deps_section = false;
 
     std.debug.print("📦 Dependencies Overview:\n");

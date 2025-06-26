@@ -57,7 +57,15 @@ pub fn main() !void {
         }
         try commands.info(allocator, args[2]);
     } else if (std.mem.eql(u8, command, "fetch")) {
-        try commands.fetch(allocator);
+        try commands.fetch(allocator, args);
+    } else if (std.mem.eql(u8, command, "pin")) {
+        try commands.pin(allocator, args);
+    } else if (std.mem.eql(u8, command, "unpin")) {
+        try commands.unpin(allocator, args);
+    } else if (std.mem.eql(u8, command, "repair")) {
+        try commands.repair(allocator);
+    } else if (std.mem.eql(u8, command, "check")) {
+        try commands.check(allocator);
     } else if (std.mem.eql(u8, command, "build")) {
         try commands.build(allocator);
     } else if (std.mem.eql(u8, command, "clean")) {

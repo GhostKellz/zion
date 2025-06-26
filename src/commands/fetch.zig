@@ -4,9 +4,95 @@ const mem = std.mem;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
+const github = @import("../github.zig");
 
-/// Fetches dependencies specified in build.zig.zon
-pub fn fetch(allocator: mem.Allocator) !void {
+/// Fetches dependencies specified in build.zig.zon or a specific package with version
+pub fn fetch(allocator: mem.Allocator, args: [][:0]u8) !void {
+    // Check if we're fetching a specific package with version
+    if (args.len >= 3) {
+        const package_spec = args[2];
+        
+        // Check if it contains @version syntax
+        if (std.mem.indexOf(u8, package_spec, "@")) |at_index| {
+            const package_ref = package_spec[0..at_index];
+            const version = package_spec[at_index + 1..];
+            return fetchSpecificVersion(allocator, package_ref, version);
+        } else {
+            // Regular package reference without version - fetch latest
+            return fetchLatestVersion(allocator, package_spec);
+        }
+    }
+    
+    // No arguments - fetch all dependencies from build.zig.zon
+    return fetchAll(allocator);
+}
+
+/// Fetch a specific version of a package
+fn fetchSpecificVersion(allocator: mem.Allocator, package_ref: []const u8, version: []const u8) !void {
+    std.debug.print("📦 Fetching {s}@{s}...\n", .{ package_ref, version });
+    
+    // Find the specific version
+    var version_info = try github.findVersion(allocator, package_ref, version);
+    defer version_info.deinit(allocator);
+    
+    std.debug.print("✅ Found version {s}: {s}\n", .{ version_info.version, version_info.url });
+    
+    // Extract package name from reference
+    const slash_index = std.mem.lastIndexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
+    const package_name = package_ref[slash_index + 1..];
+    
+    // Download and hash
+    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-{s}.tar.gz", .{ package_name, version_info.version });
+    defer allocator.free(cache_path);
+    
+    try downloader.ensureCacheDir(allocator);
+    try downloader.downloadWithCurlImproved(allocator, version_info.url, cache_path);
+    
+    const hash = try downloader.calculateFileHash(allocator, cache_path);
+    defer allocator.free(hash);
+    
+    std.debug.print("🔐 Hash: {s}\n", .{hash[0..16]});
+    std.debug.print("📁 Cached at: {s}\n", .{cache_path});
+    
+    std.debug.print("💡 To add to your project:\n", .{});
+    std.debug.print("   zion add {s}  # (adds latest)\n", .{package_ref});
+    std.debug.print("   zion pin {s}@{s}  # (pins to this version)\n", .{ package_name, version_info.version });
+}
+
+/// Fetch the latest version of a package
+fn fetchLatestVersion(allocator: mem.Allocator, package_ref: []const u8) !void {
+    std.debug.print("📦 Fetching latest version of {s}...\n", .{package_ref});
+    
+    // Get the latest version
+    var latest_version = try github.getLatestVersion(allocator, package_ref);
+    defer latest_version.deinit(allocator);
+    
+    std.debug.print("✅ Latest version: {s}\n", .{latest_version.version});
+    std.debug.print("   URL: {s}\n", .{latest_version.url});
+    
+    // Extract package name from reference
+    const slash_index = std.mem.lastIndexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
+    const package_name = package_ref[slash_index + 1..];
+    
+    // Download and hash
+    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-latest.tar.gz", .{package_name});
+    defer allocator.free(cache_path);
+    
+    try downloader.ensureCacheDir(allocator);
+    try downloader.downloadWithCurlImproved(allocator, latest_version.url, cache_path);
+    
+    const hash = try downloader.calculateFileHash(allocator, cache_path);
+    defer allocator.free(hash);
+    
+    std.debug.print("🔐 Hash: {s}\n", .{hash[0..16]});
+    std.debug.print("📁 Cached at: {s}\n", .{cache_path});
+    
+    std.debug.print("💡 To add to your project:\n", .{});
+    std.debug.print("   zion add {s}  # (adds to dependencies)\n", .{package_ref});
+}
+
+/// Fetch all dependencies from build.zig.zon
+fn fetchAll(allocator: mem.Allocator) !void {
     const zon_path = "build.zig.zon";
     const cwd = fs.cwd();
 

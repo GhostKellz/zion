@@ -5,8 +5,10 @@ This document provides comprehensive information about Zion's architecture, adva
 ## Table of Contents
 
 - [Architecture](#architecture)
+- [v0.4.0 Features](#v040-features)
 - [File Formats](#file-formats)
 - [Dependency Resolution](#dependency-resolution)
+- [Version Management](#version-management)
 - [Build Integration](#build-integration)
 - [Configuration](#configuration)
 - [Development](#development)
@@ -30,16 +32,86 @@ src/
 │   ├── update.zig       # Update dependencies to latest versions
 │   ├── list.zig         # List all dependencies with status
 │   ├── info.zig         # Show detailed package information
-│   ├── fetch.zig        # Fetch all dependencies
+│   ├── fetch.zig        # Fetch dependencies with version support (v0.4.0)
+│   ├── pin.zig          # Pin dependencies to versions (v0.4.0)
+│   ├── unpin.zig        # Unpin dependencies (v0.4.0)
+│   ├── repair.zig       # Repair broken hashes (v0.4.0)
+│   ├── check.zig        # Health auditing (v0.4.0)
 │   ├── build.zig        # Build project
 │   ├── clean.zig        # Clean artifacts
 │   ├── lock.zig         # Lock file management
 │   ├── version.zig      # Version display
 │   └── help.zig         # Help text
+├── github.zig           # GitHub API integration (v0.4.0)
 ├── manifest.zig         # build.zig.zon parsing and manipulation
 ├── lockfile.zig         # zion.lock file handling
 └── downloader.zig       # HTTP downloads and caching
 ```
+
+## v0.4.0 Features
+
+### 🧠 Smart Manifest & Hash Automation
+
+v0.4.0 introduces **"Hands-Off Manifest"** management that eliminates manual hash editing forever:
+
+#### GitHub Integration (`github.zig`)
+
+The new GitHub integration module provides:
+- **Release Discovery**: Automatic detection of GitHub releases and tags
+- **Version Resolution**: Smart matching of version specifications (v1.0.0, 1.0.0, etc.)
+- **Tarball URL Generation**: Automatic URL construction for specific versions
+- **API Fallbacks**: Graceful fallback to main/master branch when no releases exist
+
+Key functions:
+```zig
+pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]PackageVersion
+pub fn getLatestVersion(allocator: Allocator, package_ref: []const u8) !PackageVersion
+pub fn findVersion(allocator: Allocator, package_ref: []const u8, target_version: []const u8) !PackageVersion
+```
+
+#### Pin/Unpin System
+
+**Version Pinning** provides reproducible builds:
+- Pin dependencies to specific tags/releases
+- Automatic version discovery and validation
+- Seamless switching between pinned and latest versions
+- Lock file integration with pinned version tracking
+
+**Workflow:**
+```bash
+zion add mitchellh/libxev      # Add latest version
+zion pin libxev@0.2.0         # Pin to specific version
+zion unpin libxev             # Switch back to latest
+```
+
+#### Repair System
+
+**Automatic Hash Repair** solves the most common Zig dependency problem:
+- Detects hash mismatches automatically
+- Re-downloads and recalculates hashes
+- Updates both manifest and lock files atomically
+- Provides detailed repair reports
+
+**Use cases:**
+- Upstream repository changes
+- Corrupted cache files
+- Manual manifest edits gone wrong
+- Package update conflicts
+
+#### Health Auditing
+
+**Comprehensive Dependency Health Checks**:
+- URL accessibility verification
+- Hash integrity validation
+- Package structure analysis
+- Lock file consistency checks
+- Update availability detection
+- Project structure validation
+
+**Health Status Levels:**
+- ✅ **Healthy**: All checks pass
+- ⚠️ **Warning**: Minor issues, project still functional
+- ❌ **Error**: Critical issues requiring attention
 
 ### Core Components
 
@@ -75,6 +147,68 @@ The add command includes:
 - Directory structure validation
 - Conflict resolution (overwrites existing packages)
 - Package structure validation (checks for build.zig, src/)
+
+## Version Management
+
+### v0.4.0 Version Resolution
+
+Zion v0.4.0 introduces sophisticated version management that automatically handles GitHub releases and tags:
+
+#### Version Specification Formats
+
+**Supported formats:**
+- `package@1.0.0` - Exact version match
+- `package@v1.0.0` - Version with v-prefix
+- `package@latest` - Latest release (default)
+- `package@main` - Main/master branch
+- `package` - Implies latest version
+
+#### Version Discovery Process
+
+1. **Release Check**: First checks GitHub releases API
+2. **Tag Fallback**: Falls back to tags API if no releases
+3. **Branch Fallback**: Uses main/master branch if no tags
+4. **Smart Matching**: Handles both `v1.0.0` and `1.0.0` formats
+
+#### Pin/Unpin Workflow
+
+**Pinning Process:**
+```bash
+zion pin libxev@0.2.0
+```
+1. Validates package exists in project
+2. Discovers available versions from GitHub
+3. Downloads and verifies specific version
+4. Updates manifest with new URL and hash
+5. Updates lock file with pin information
+6. Extracts package to deps directory
+
+**Unpinning Process:**
+```bash
+zion unpin libxev
+```
+1. Fetches latest version from GitHub
+2. Downloads and verifies latest version
+3. Updates manifest to track latest
+4. Removes pin from lock file
+5. Extracts latest package to deps directory
+
+#### Lock File Enhancements
+
+The lock file now tracks pinned versions:
+```json
+{
+  "version": "1.0",
+  "packages": {
+    "libxev": {
+      "url": "https://github.com/mitchellh/libxev/archive/refs/tags/v0.2.0.tar.gz",
+      "hash": "abc123...",
+      "pinned_version": "v0.2.0",
+      "updated": "2024-12-26T10:30:00Z"
+    }
+  }
+}
+```
 
 ## File Formats
 

@@ -17,7 +17,11 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    update      Update all dependencies to latest versions
         \\    list, ls    List all dependencies in the project
         \\    info        Show detailed information about a package
-        \\    fetch       Fetch all dependencies
+        \\    fetch       Fetch dependencies or specific packages with versions
+        \\    pin         Pin a dependency to a specific version
+        \\    unpin       Unpin a dependency to track latest version
+        \\    repair      Fix broken hashes and dependency issues
+        \\    check       Check dependency health and project status
         \\    build       Build the project
         \\    clean       Clean build artifacts and caches
         \\    lock        Update the lock file
@@ -35,6 +39,11 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\EXAMPLES:
         \\    zion init                   # Initialize a new project
         \\    zion add mitchellh/libxev   # Add a dependency
+        \\    zion fetch ghostkellz/zcrypto@0.2.0  # Fetch specific version
+        \\    zion pin libxev@0.1.5       # Pin dependency to version
+        \\    zion unpin libxev           # Unpin dependency
+        \\    zion repair                 # Fix hash mismatches
+        \\    zion check                  # Check project health
         \\    zion list                   # List dependencies
         \\    zion remove libxev          # Remove a dependency
         \\    zion update                 # Update all dependencies

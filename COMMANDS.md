@@ -44,6 +44,158 @@ zion add mitchellh/libxev  # Add libxev from GitHub
 zion add ziglang/zig-clap  # Add command-line parser
 ```
 
+### `zion fetch [package[@version]]` ⭐ **New in v0.4.0**
+
+Fetches dependencies or specific packages with optional version specification.
+
+```bash
+zion fetch                          # Fetch all dependencies from build.zig.zon
+zion fetch username/repo            # Fetch latest version of specific package
+zion fetch username/repo@1.0.0      # Fetch specific version
+```
+
+**What it does:**
+- **No arguments**: Fetches all dependencies listed in `build.zig.zon`
+- **Package only**: Fetches latest version from GitHub releases/tags
+- **Package@version**: Fetches specific version with automatic hash calculation
+- Automatically discovers GitHub releases and tags
+- Downloads and caches packages for later use
+- Provides suggestions for adding to project
+
+**Examples:**
+```bash
+zion fetch                             # Fetch all project dependencies
+zion fetch ghostkellz/zcrypto          # Fetch latest zcrypto
+zion fetch ghostkellz/zcrypto@0.2.0    # Fetch specific version
+zion fetch mitchellh/libxev@v0.1.5     # Works with v-prefixed tags
+```
+
+### `zion pin <package>@<version>` ⭐ **New in v0.4.0**
+
+Pins a dependency to a specific version for reproducible builds.
+
+```bash
+zion pin package@version
+```
+
+**What it does:**
+- Locks an existing dependency to a specific version/tag
+- Automatically discovers available versions from GitHub
+- Downloads and verifies the specified version
+- Updates `build.zig.zon` with new URL and hash
+- Updates lock file with pinned version information
+- Extracts package to deps directory
+
+**Examples:**
+```bash
+zion pin libxev@0.2.0         # Pin to exact version
+zion pin zcrypto@v1.0.1       # Pin to tagged version
+```
+
+**Requirements:**
+- Package must already be added to the project
+- Version must exist in GitHub releases or tags
+
+### `zion unpin <package>` ⭐ **New in v0.4.0**
+
+Unpins a dependency to track the latest version.
+
+```bash
+zion unpin package
+```
+
+**What it does:**
+- Removes version pin from an existing dependency
+- Switches to tracking latest release or main branch
+- Automatically fetches and updates to latest version
+- Updates `build.zig.zon` with new URL and hash
+- Updates lock file to remove pin information
+- Extracts latest version to deps directory
+
+**Examples:**
+```bash
+zion unpin libxev            # Track latest libxev version
+zion unpin zcrypto           # Switch to latest zcrypto
+```
+
+### `zion repair` ⭐ **New in v0.4.0**
+
+Automatically repairs broken hashes and dependency issues.
+
+```bash
+zion repair
+```
+
+**What it does:**
+- Scans all dependencies for hash mismatches
+- Re-downloads packages with broken hashes
+- Recalculates and updates hashes in `build.zig.zon`
+- Updates lock file with corrected information
+- Extracts repaired packages to deps directory
+- Provides detailed repair report
+
+**Use cases:**
+- Hash mismatch errors after upstream changes
+- Corrupted cache files
+- Missing or broken dependency files
+- Lock file inconsistencies
+
+**Example output:**
+```
+🔧 Repairing project dependencies...
+📋 Found 3 dependencies to check
+
+🔍 Checking libxev...
+  🔥 Hash mismatch!
+  ⬇️  Re-downloading...
+  🔧 Updating hash in manifest...
+  ✅ Hash updated: 1234abcd...
+
+🎉 All issues repaired successfully!
+```
+
+### `zion check` ⭐ **New in v0.4.0**
+
+Performs comprehensive dependency health auditing.
+
+```bash
+zion check
+```
+
+**What it does:**
+- Verifies URL accessibility for all dependencies
+- Checks hash integrity of cached packages
+- Validates package structure and build files
+- Compares lock file consistency
+- Checks for available updates
+- Analyzes project structure
+- Provides detailed health report
+
+**Health checks performed:**
+- ✅ URL accessibility
+- ✅ Hash verification
+- ✅ Package extraction status
+- ✅ Lock file consistency
+- ✅ Update availability
+- ✅ Project structure validation
+
+**Example output:**
+```
+🩺 Checking project health...
+📋 Analyzing 3 dependencies...
+
+🔍 Checking libxev...
+  ✅ URL accessible
+  ✅ Hash verified
+  ✅ Package structure looks good
+  ✅ Lock file consistent
+  📦 New version available: 0.3.0
+
+🎯 Overall Status: ⚠️  WARNINGS
+💡 Some issues found, but project should still work.
+   Consider running 'zion repair' or 'zion update' to fix them.
+```
+
 **Directory structure after adding:**
 ```
 your-project/

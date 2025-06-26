@@ -3,7 +3,7 @@
 [![Made with Zig](https://img.shields.io/badge/Made%20with-Zig-orange.svg)](https://ziglang.org)
 [![Zig 0.15+](https://img.shields.io/badge/Zig-0.15%2B-blue.svg)](https://ziglang.org/download)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-0.3.0-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
+[![Version](https://img.shields.io/badge/Version-0.4.0-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
 
 Zion is a modern, comprehensive development tool for the [Zig programming language](https://ziglang.org). Inspired by Cargo's elegance, Zion provides seamless package management, advanced security features, performance optimization, and powerful development tools - making Zig project development as smooth and professional as possible.
