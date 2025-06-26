@@ -31,6 +31,10 @@ pub fn add(allocator: Allocator, package_ref: []const u8) !void {
 
     // Extract package name from reference (last part after slash)
     const package_name = package_ref[slash_index.? + 1 ..];
+    if (package_name.len == 0) {
+        std.debug.print("Error: Invalid package name (empty string after slash)\n", .{});
+        return error.InvalidPackageName;
+    }
 
     // Step 1: Download and hash the package
     std.debug.print("Downloading {s}...\n", .{package_ref});
@@ -157,11 +161,15 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     child.stderr_behavior = .Pipe;
 
     try child.spawn();
-    const term = try child.wait();
-
-    // Read stderr for error messages
-    const stderr = try child.stderr.?.reader().readAllAlloc(allocator, 1024 * 1024);
+    
+    // Read stderr for error messages (must be done before wait)
+    const stderr = if (child.stderr) |stderr_pipe|
+        try stderr_pipe.reader().readAllAlloc(allocator, 1024 * 1024)
+    else
+        try allocator.dupe(u8, "No error output available");
     defer allocator.free(stderr);
+    
+    const term = try child.wait();
 
     switch (term) {
         .Exited => |code| {
@@ -256,6 +264,10 @@ fn modifyBuildZig(allocator: Allocator, package_name: []const u8, deps_path: []c
     defer allocator.free(build_content);
 
     // Check if dependency already exists
+    if (package_name.len == 0) {
+        std.debug.print("Error: Package name is empty\n", .{});
+        return error.InvalidPackageName;
+    }
     const search_pattern = try std.fmt.allocPrint(allocator, "const {s}_mod = b.addModule", .{package_name});
     defer allocator.free(search_pattern);
 
@@ -278,18 +290,28 @@ fn modifyBuildZig(allocator: Allocator, package_name: []const u8, deps_path: []c
 
 /// Inject dependency after the zion:deps marker
 fn injectAfterMarker(allocator: Allocator, content: []const u8, marker_pos: usize, package_name: []const u8, deps_path: []const u8) !void {
+    // Validate inputs
+    if (package_name.len == 0) {
+        std.debug.print("Error: Empty package name in injectAfterMarker\n", .{});
+        return error.InvalidPackageName;
+    }
+    if (deps_path.len == 0) {
+        std.debug.print("Error: Empty deps path in injectAfterMarker\n", .{});
+        return error.InvalidDepsPath;
+    }
+    
     // Find the end of the line with the marker
     const line_end = std.mem.indexOfScalarPos(u8, content, marker_pos, '\n') orelse content.len;
 
     // Create the dependency code to inject
     const dep_code = try std.fmt.allocPrint(allocator,
-        \\n        \\    // Added by zion add {s}
+        \\    // Added by zion add {s}
         \\    const {s}_mod = b.addModule("{s}", .{{
         \\        .root_source_file = b.path("{s}/src/root.zig"),
         \\        .target = target,
         \\        .optimize = optimize,
         \\    }});
-        \\n
+        \\
     , .{ package_name, package_name, package_name, deps_path });
     defer allocator.free(dep_code);
 
@@ -309,6 +331,16 @@ fn injectAfterMarker(allocator: Allocator, content: []const u8, marker_pos: usiz
 
 /// Try to inject at a reasonable location in build.zig
 fn injectAtBestLocation(allocator: Allocator, content: []const u8, package_name: []const u8, deps_path: []const u8) !void {
+    // Validate inputs
+    if (package_name.len == 0) {
+        std.debug.print("Error: Empty package name in injectAtBestLocation\n", .{});
+        return error.InvalidPackageName;
+    }
+    if (deps_path.len == 0) {
+        std.debug.print("Error: Empty deps path in injectAtBestLocation\n", .{});
+        return error.InvalidDepsPath;
+    }
+    
     // Look for a good insertion point - after the module creation but before exe creation
     const mod_creation = "const mod = b.addModule(";
     const exe_creation = "const exe = b.addExecutable(";
@@ -329,13 +361,13 @@ fn injectAtBestLocation(allocator: Allocator, content: []const u8, package_name:
 
     if (injection_pos) |pos| {
         const dep_code = try std.fmt.allocPrint(allocator,
-            \\n            \\    // Added by zion add {s}
+            \\    // Added by zion add {s}
             \\    const {s}_mod = b.addModule("{s}", .{{
             \\        .root_source_file = b.path("{s}/src/root.zig"),
             \\        .target = target,
             \\        .optimize = optimize,
             \\    }});
-            \\n
+            \\
         , .{ package_name, package_name, package_name, deps_path });
         defer allocator.free(dep_code);
 

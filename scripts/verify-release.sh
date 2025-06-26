@@ -115,11 +115,14 @@ COMMANDS=(
     "clean" "lock" "version" "help" "security" "performance" "debug"
 )
 
+# Get help output once
+HELP_OUTPUT=$(./zig-out/bin/zion help 2>/dev/null)
+
 for cmd in "${COMMANDS[@]}"; do
-    if ./zig-out/bin/zion help | grep -q "$cmd"; then
+    if echo "$HELP_OUTPUT" | grep -q "^\s*$cmd"; then
         echo -e "${GREEN}✅ Command available: $cmd${NC}"
     else
-        echo -e "${YELLOW}⚠️  Command might be missing: $cmd${NC}"
+        echo -e "${YELLOW}⚠️  Command not found in help: $cmd${NC}"
     fi
 done
 
