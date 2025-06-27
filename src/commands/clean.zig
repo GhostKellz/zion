@@ -137,7 +137,11 @@ fn cleanupBuildZig(allocator: Allocator) !bool {
                 const package_name = trimmed[package_start..];
                 
                 // Check if this package still exists in .zion/deps/
-                const deps_path = std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name}) catch continue;
+                const deps_path = std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name}) catch {
+                    try cleaned_content.appendSlice(line);
+                    try cleaned_content.append('\n');
+                    continue;
+                };
                 defer allocator.free(deps_path);
                 
                 const package_exists = blk: {

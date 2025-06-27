@@ -5,6 +5,14 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2025-06-27
+
+### Fixed
+- **Memory Management**
+  - Fixed GPA memory leak in `zion clean --all` command
+  - Resolved potential memory leak in `cleanupBuildZig` function where `std.fmt.allocPrint` could fail with early exit
+  - Improved error handling to prevent memory leaks during dependency cleanup
+
 ## [0.5.0] - 2024-12-27
 
 ### Fixed
