@@ -1,6 +1,19 @@
 .{
     .name = .zion,
+    .fingerprint = 0x2aaf547cce3f4848,
     .version = "0.5.1",
+    .minimum_zig_version = "0.13.0",
     .dependencies = .{
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "scripts",
+        "README.md",
+        "CHANGELOG.md",
+        "COMMANDS.md",
+        "DOCS.md",
+        "INSTALL.md",
     },
 }
