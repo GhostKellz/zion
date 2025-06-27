@@ -27,19 +27,33 @@ pub const clean = @import("clean.zig").clean;
 pub const lock = @import("lock.zig").lock;
 pub const version = @import("version.zig").version;
 pub const help = @import("help.zig").help;
+pub const hash = @import("hash.zig").hash;
+pub const config = @import("config.zig").config;
 pub const security = @import("security.zig").security;
 pub const performance = @import("performance.zig").performance;
 pub const debug = @import("debug.zig").debug;
+pub const run = @import("run.zig").run;
+pub const test_command = @import("test.zig").test_command;
+pub const tree = @import("tree.zig").tree;
+pub const doc = @import("doc.zig").doc;
+pub const outdated = @import("outdated.zig").outdated;
+pub const zig_manager = @import("zig_manager.zig").zig_manager;
+pub const nvim = @import("nvim.zig").nvim;
 
-// Placeholder functions for commands that don't exist yet
+// Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    _ = allocator;
-    _ = args;
-    std.debug.print("🔧 Zig version management (coming soon)\n", .{});
-    std.debug.print("This feature will allow you to:\n", .{});
-    std.debug.print("  • Install different Zig versions\n", .{});
-    std.debug.print("  • Switch between Zig versions\n", .{});
-    std.debug.print("  • Manage Zig installations\n", .{});
+    // Convert args to the format expected by zig_manager
+    var zig_args = std.ArrayList([:0]u8).init(allocator);
+    defer zig_args.deinit();
+    
+    try zig_args.append(try allocator.dupeZ(u8, "zion"));
+    try zig_args.append(try allocator.dupeZ(u8, "zig"));
+    
+    for (args) |arg| {
+        try zig_args.append(try allocator.dupeZ(u8, arg));
+    }
+    
+    return zig_manager(allocator, zig_args.items);
 }
 
 pub fn search(allocator: std.mem.Allocator, args: []const []const u8) !void {

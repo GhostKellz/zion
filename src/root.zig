@@ -3,7 +3,7 @@ const std = @import("std");
 pub const commands = @import("commands/mod.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "0.4.0";
+pub const ZION_VERSION = "0.5.1";
 
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {

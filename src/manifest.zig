@@ -80,50 +80,54 @@ pub const ZonFile = struct {
     }
 
     /// Parse ZON file content
-    fn parseZonContent(allocator: Allocator, content: []const u8) !ZonFile {
-        // Simple ZON parser - looks for key patterns
-        var zon_file = try ZonFile.init(allocator, "unknown", "0.1.0");
+    pub fn parseZonContent(allocator: Allocator, content: []const u8) !ZonFile {
+        // Parse name first to avoid "unknown" default
+        const project_name = parseZonName(content) orelse "zion"; // Use "zion" as fallback
+        const project_version = parseZonField(content, ".version") orelse "0.1.0";
+        
+        var zon_file = try ZonFile.init(allocator, project_name, project_version);
         errdefer zon_file.deinit();
 
-        // Parse name
-        if (parseZonField(content, ".name")) |name_field| {
-            allocator.free(zon_file.name);
-            zon_file.name = try allocator.dupe(u8, name_field);
-        }
-
-        // Parse version
-        if (parseZonField(content, ".version")) |version_field| {
-            allocator.free(zon_file.version);
-            zon_file.version = try allocator.dupe(u8, version_field);
-        }
-
-        // Parse dependencies - simplified implementation
-        // In a production version, you'd use a proper ZON parser
-        const deps_start = ".dependencies = .{";
-        if (std.mem.indexOf(u8, content, deps_start)) |start_pos| {
-            var pos = start_pos + deps_start.len;
-            while (pos < content.len) {
-                // Look for dependency entries
-                if (std.mem.indexOfPos(u8, content, pos, ".")) |dot_pos| {
-                    if (parseDependencyEntry(allocator, content[dot_pos..content.len])) |dep_entry| {
-                        try zon_file.addDependency(dep_entry.name, dep_entry.url, dep_entry.hash);
-                        allocator.free(dep_entry.name);
-                        allocator.free(dep_entry.url);
-                        allocator.free(dep_entry.hash);
-                        pos = dot_pos + 1;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
+        // Parse dependencies with improved parser
+        try parseDependencies(allocator, content, &zon_file);
 
         return zon_file;
     }
 
-    /// Parse a simple field from ZON content
+    /// Parse name field (handles both .name = .identifier and .name = "string" formats)
+    fn parseZonName(content: []const u8) ?[]const u8 {
+        // Try identifier format first: .name = .identifier
+        if (std.mem.indexOf(u8, content, ".name = .")) |start_pos| {
+            const value_start = start_pos + 9; // ".name = .".len
+            var end_pos = value_start;
+            
+            // Find end of identifier (alphanumeric + underscore)
+            while (end_pos < content.len) {
+                const c = content[end_pos];
+                if (!std.ascii.isAlphanumeric(c) and c != '_') break;
+                end_pos += 1;
+            }
+            
+            if (end_pos > value_start) {
+                return content[value_start..end_pos];
+            }
+        }
+        
+        // Fall back to quoted string format: .name = "string"
+        // But convert it to a valid identifier by replacing hyphens with underscores
+        if (parseZonField(content, ".name")) |quoted_name| {
+            // Convert hyphens to underscores to make it a valid identifier
+            var normalized_name = std.heap.page_allocator.alloc(u8, quoted_name.len) catch return quoted_name;
+            for (quoted_name, 0..) |c, i| {
+                normalized_name[i] = if (c == '-') '_' else c;
+            }
+            return normalized_name;
+        }
+        
+        return null;
+    }
+    
+    /// Parse a simple field from ZON content (quoted strings)
     fn parseZonField(content: []const u8, field_name: []const u8) ?[]const u8 {
         const search_pattern = std.fmt.allocPrint(std.heap.page_allocator, "{s} = \"", .{field_name}) catch return null;
         defer std.heap.page_allocator.free(search_pattern);
@@ -137,23 +141,85 @@ pub const ZonFile = struct {
         return null;
     }
 
-    /// Parse a dependency entry (simplified)
+    /// Parse dependencies section from ZON content
+    fn parseDependencies(allocator: Allocator, content: []const u8, zon_file: *ZonFile) !void {
+        const deps_start = ".dependencies = .{";
+        const deps_start_pos = std.mem.indexOf(u8, content, deps_start) orelse return;
+        
+        var pos = deps_start_pos + deps_start.len;
+        var brace_depth: u32 = 1;
+        
+        while (pos < content.len and brace_depth > 0) {
+            const c = content[pos];
+            if (c == '{') brace_depth += 1
+            else if (c == '}') brace_depth -= 1
+            else if (c == '.' and brace_depth == 1) {
+                // Found a dependency entry
+                if (parseDependencyEntry(allocator, content[pos..])) |dep_entry| {
+                    try zon_file.addDependency(dep_entry.name, dep_entry.url, dep_entry.hash);
+                    allocator.free(dep_entry.name);
+                    allocator.free(dep_entry.url);
+                    allocator.free(dep_entry.hash);
+                }
+            }
+            pos += 1;
+        }
+    }
+    
+    /// Parse a single dependency entry
     fn parseDependencyEntry(allocator: Allocator, content: []const u8) ?struct { name: []const u8, url: []const u8, hash: []const u8 } {
-        // This is a simplified parser - in production you'd use a proper ZON parser
-        _ = allocator;
-        _ = content;
-        return null; // TODO: Implement proper dependency parsing
+        // Look for pattern: .name = .{ .url = "...", .hash = "...", }
+        if (!std.mem.startsWith(u8, content, ".")) return null;
+        
+        // Extract dependency name
+        var name_end: usize = 1;
+        while (name_end < content.len) {
+            const c = content[name_end];
+            if (!std.ascii.isAlphanumeric(c) and c != '_') break;
+            name_end += 1;
+        }
+        
+        if (name_end <= 1) return null;
+        const dep_name = content[1..name_end];
+        
+        // Look for the dependency block
+        const block_start = std.mem.indexOf(u8, content[name_end..], ".{") orelse return null;
+        const block_content_start = name_end + block_start + 2;
+        
+        // Find matching closing brace
+        var brace_depth: u32 = 1;
+        var block_end = block_content_start;
+        while (block_end < content.len and brace_depth > 0) {
+            const c = content[block_end];
+            if (c == '{') brace_depth += 1
+            else if (c == '}') brace_depth -= 1;
+            block_end += 1;
+        }
+        
+        if (brace_depth > 0) return null;
+        
+        const block_content = content[block_content_start..block_end-1];
+        
+        // Extract URL and hash
+        const url = parseZonField(block_content, ".url") orelse return null;
+        const hash = parseZonField(block_content, ".hash") orelse return null;
+        
+        return .{
+            .name = allocator.dupe(u8, dep_name) catch return null,
+            .url = allocator.dupe(u8, url) catch return null,
+            .hash = allocator.dupe(u8, hash) catch return null,
+        };
     }
 
-    /// Save ZON file to disk
+    /// Save ZON file to disk with proper Zig identifier format
     pub fn saveToFile(self: *const ZonFile, file_path: []const u8) !void {
         const cwd = fs.cwd();
         const file = try cwd.createFile(file_path, .{ .truncate = true });
         defer file.close();
 
-        // Write ZON format
+        // Write ZON format with proper identifier syntax
         try file.writer().print(".{{\n", .{});
-        try file.writer().print("    .name = \"{s}\",\n", .{self.name});
+        try file.writer().print("    .name = .{s},\n", .{self.name}); // Use identifier format
         try file.writer().print("    .version = \"{s}\",\n", .{self.version});
         try file.writer().print("    .dependencies = .{{\n", .{});
 

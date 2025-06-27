@@ -75,6 +75,22 @@ pub fn main() !void {
         try commands.lock(allocator);
     } else if (std.mem.eql(u8, command, "version")) {
         try commands.version(allocator);
+    } else if (std.mem.eql(u8, command, "hash")) {
+        try commands.hash(allocator, args);
+    } else if (std.mem.eql(u8, command, "run")) {
+        try commands.run(allocator, args);
+    } else if (std.mem.eql(u8, command, "test")) {
+        try commands.test_command(allocator, args);
+    } else if (std.mem.eql(u8, command, "tree")) {
+        try commands.tree(allocator, args);
+    } else if (std.mem.eql(u8, command, "doc")) {
+        try commands.doc(allocator, args);
+    } else if (std.mem.eql(u8, command, "outdated")) {
+        try commands.outdated(allocator, args);
+    } else if (std.mem.eql(u8, command, "nvim")) {
+        try commands.nvim(allocator, args);
+    } else if (std.mem.eql(u8, command, "config")) {
+        try commands.config(allocator, args);
     } else if (std.mem.eql(u8, command, "help")) {
         try commands.help(allocator);
     } else if (std.mem.eql(u8, command, "security")) {
@@ -84,7 +100,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "debug")) {
         try commands.debug(allocator, args);
     } else if (std.mem.eql(u8, command, "zig")) {
-        try commands.zig(allocator, args);
+        try commands.zig_manager(allocator, args);
     } else if (std.mem.eql(u8, command, "search")) {
         try commands.search(allocator, args);
     } else if (std.mem.eql(u8, command, "template")) {

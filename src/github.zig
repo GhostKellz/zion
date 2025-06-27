@@ -189,10 +189,22 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
     const url = try std.fmt.allocPrint(allocator, "https://api.github.com/repos/{s}/{s}/releases", .{ owner, repo });
     defer allocator.free(url);
     
-    const json_data = try fetchJsonWithCurl(allocator, url);
+    const json_data = fetchJsonWithCurl(allocator, url) catch |err| {
+        std.debug.print("GitHub API error fetching releases for {s}/{s}: {}\n", .{ owner, repo, err });
+        return err;
+    };
     defer allocator.free(json_data);
     
-    var parsed = try json.parseFromSlice(json.Value, allocator, json_data, .{});
+    // Check if response is empty or has error
+    if (json_data.len == 0) {
+        return error.EmptyResponse;
+    }
+    
+    var parsed = json.parseFromSlice(json.Value, allocator, json_data, .{}) catch |err| {
+        std.debug.print("JSON parse error for releases: {}\n", .{err});
+        std.debug.print("Response: {s}\n", .{json_data});
+        return err;
+    };
     defer parsed.deinit();
     
     const releases_array = parsed.value.array;
@@ -226,10 +238,22 @@ fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHu
     const url = try std.fmt.allocPrint(allocator, "https://api.github.com/repos/{s}/{s}/tags", .{ owner, repo });
     defer allocator.free(url);
     
-    const json_data = try fetchJsonWithCurl(allocator, url);
+    const json_data = fetchJsonWithCurl(allocator, url) catch |err| {
+        std.debug.print("GitHub API error fetching tags for {s}/{s}: {}\n", .{ owner, repo, err });
+        return err;
+    };
     defer allocator.free(json_data);
     
-    var parsed = try json.parseFromSlice(json.Value, allocator, json_data, .{});
+    // Check if response is empty or has error
+    if (json_data.len == 0) {
+        return error.EmptyResponse;
+    }
+    
+    var parsed = json.parseFromSlice(json.Value, allocator, json_data, .{}) catch |err| {
+        std.debug.print("JSON parse error for tags: {}\n", .{err});
+        std.debug.print("Response: {s}\n", .{json_data});
+        return err;
+    };
     defer parsed.deinit();
     
     const tags_array = parsed.value.array;
@@ -258,7 +282,7 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
         "curl",
         "-s",
         "-H", "Accept: application/vnd.github.v3+json",
-        "-H", "User-Agent: Zion-Package-Manager/0.4.0",
+        "-H", "User-Agent: Zion-Package-Manager/0.5.0",
         url,
     };
     

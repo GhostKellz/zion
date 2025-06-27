@@ -5,15 +5,60 @@ const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
+const enhanced_config = @import("../enhanced_config.zig");
 
 /// Add a dependency to the project - COMPLETE IMPLEMENTATION
 pub fn add(allocator: Allocator, package_ref: []const u8) !void {
+    // Load config to check for aliases and shortcuts
+    var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
+    defer config.deinit();
+    
+    // Check if this is an alias first
+    if (config.expandAlias(package_ref)) |dependencies| {
+        std.debug.print("📦 Expanding alias '{s}' to {d} dependencies:\n", .{ package_ref, dependencies.len });
+        for (dependencies) |dep| {
+            std.debug.print("  • {s}\n", .{dep});
+        }
+        std.debug.print("\n", .{});
+        
+        // Add each dependency in the alias
+        for (dependencies) |dep| {
+            try addSingleDependency(allocator, dep, &config);
+        }
+        return;
+    }
+    
+    // Resolve short names like "zcrypto" -> "ghostkellz/zcrypto"
+    var resolved_package: []const u8 = package_ref;
+    var should_free_resolved = false;
+    
+    const slash_index = std.mem.indexOf(u8, package_ref, "/");
+    if (slash_index == null) {
+        // This is a short name, try to resolve it
+        if (config.resolvePackageName(package_ref)) |resolved| {
+            resolved_package = resolved;
+            should_free_resolved = true;
+            std.debug.print("🔍 Resolved '{s}' to '{s}'\n", .{ package_ref, resolved_package });
+        } else {
+            std.debug.print("❌ Cannot resolve '{s}'. Use format 'user/repo' or configure your GitHub username/orgs.\n", .{package_ref});
+            std.debug.print("💡 Run 'zion config set github_username your-username' to enable short names\n", .{});
+            return error.InvalidPackageReference;
+        }
+    }
+    defer if (should_free_resolved) allocator.free(resolved_package);
+    
+    try addSingleDependency(allocator, resolved_package, &config);
+}
+
+/// Add a single dependency (internal function)
+fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *enhanced_config.ZionConfig) !void {
+    _ = config; // For future use
     std.debug.print("Adding package: {s}\n", .{package_ref});
 
     // Validate package reference format (should be "user/repo")
     const slash_index = std.mem.indexOf(u8, package_ref, "/");
     if (slash_index == null) {
-        std.debug.print("Error: Invalid package reference. Use format 'user/repo' (e.g. 'mitchellh/libxev')\n", .{});
+        std.debug.print("❌ Invalid package reference: {s}\n", .{package_ref});
         return error.InvalidPackageReference;
     }
 

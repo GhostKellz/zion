@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const fs = std.fs;
 const crypto = std.crypto;
+const github = @import("github.zig");
 
 /// Maximum size of downloaded content (100MB)
 const MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024;
@@ -28,7 +29,7 @@ fn sanitizePackageRef(allocator: Allocator, package_ref: []const u8) ![]const u8
     return result;
 }
 
-/// Resolves a package reference (e.g. "mitchellh/libxev") to a GitHub URL
+/// Resolves a package reference (e.g. "mitchellh/libxev") to a GitHub URL using the GitHub API
 pub fn resolveGitHubUrl(allocator: Allocator, package_ref: []const u8) ![]const u8 {
     // Check if it's a GitHub reference (username/repo format)
     const slash_index = std.mem.indexOf(u8, package_ref, "/");
@@ -36,22 +37,23 @@ pub fn resolveGitHubUrl(allocator: Allocator, package_ref: []const u8) ![]const 
         return error.InvalidPackageReference;
     }
 
-    // Try to detect the default branch by testing common ones
-    const branches = [_][]const u8{ "main", "master" };
-
-    for (branches) |branch| {
-        const test_url = try std.fmt.allocPrint(allocator, "https://github.com/{s}/archive/refs/heads/{s}.tar.gz", .{ package_ref, branch });
-
-        // Test if this URL works with a quick HEAD request
-        if (testUrlExists(allocator, test_url)) {
-            return test_url;
-        } else {
-            allocator.free(test_url);
+    // Try to get the latest version from GitHub API
+    if (github.getLatestVersion(allocator, package_ref)) |latest_version_const| {
+        var latest_version = latest_version_const;
+        defer latest_version.deinit(allocator);
+        return allocator.dupe(u8, latest_version.url);
+    } else |err| {
+        // Fallback to main branch if no releases/tags found
+        switch (err) {
+            error.NoVersionsFound => {
+                std.debug.print("📝 No releases or tags found, using main branch\n", .{});
+            },
+            else => {
+                std.debug.print("⚠️  GitHub API error ({}), falling back to main branch\n", .{err});
+            },
         }
+        return std.fmt.allocPrint(allocator, "https://github.com/{s}/archive/refs/heads/main.tar.gz", .{package_ref});
     }
-
-    // Fallback to main if detection fails
-    return std.fmt.allocPrint(allocator, "https://github.com/{s}/archive/refs/heads/main.tar.gz", .{package_ref});
 }
 
 /// Test if a URL exists using a HEAD request
@@ -82,13 +84,75 @@ fn testUrlExists(allocator: Allocator, url: []const u8) bool {
     }
 }
 
+/// Downloads a package tarball for a specific version from GitHub API
+pub fn downloadAndHashPackageVersion(allocator: Allocator, package_ref: []const u8, version: []const u8) !DownloadResult {
+    // Create cache directory if it doesn't exist
+    try ensureCacheDir(allocator);
+
+    // Get the specific version from GitHub API
+    var version_info = try github.findVersion(allocator, package_ref, version);
+    defer version_info.deinit(allocator);
+
+    // Generate a unique cache path for this package version
+    const sanitized_ref = try sanitizePackageRef(allocator, package_ref);
+    defer allocator.free(sanitized_ref);
+    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-{s}.tar.gz", .{ sanitized_ref, version_info.version });
+    errdefer allocator.free(cache_path);
+
+    // Check if we already have this cached
+    const cached_file_exists = blk: {
+        fs.cwd().access(cache_path, .{}) catch |err| {
+            if (err == error.FileNotFound) {
+                break :blk false;
+            }
+            return err;
+        };
+        break :blk true;
+    };
+
+    if (!cached_file_exists) {
+        // Download the tarball with performance monitoring
+        const start_time = std.time.milliTimestamp();
+
+        try downloadWithCurlImproved(allocator, version_info.url, cache_path);
+
+        const end_time = std.time.milliTimestamp();
+        const download_time = end_time - start_time;
+
+        // Get file size for speed calculation
+        const file = try fs.cwd().openFile(cache_path, .{});
+        defer file.close();
+        const file_size = try file.getEndPos();
+
+        if (download_time > 0) {
+            const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
+            std.debug.print("📊 Download speed: {d:.1} MB/s\n", .{speed_mbps});
+        }
+    } else {
+        std.debug.print("💾 Using cached package: {s}\n", .{cache_path});
+    }
+
+    // Calculate SHA256 hash of the downloaded file
+    const hash = try calculateFileHash(allocator, cache_path);
+    errdefer allocator.free(hash);
+
+    const url_copy = try allocator.dupe(u8, version_info.url);
+    errdefer allocator.free(url_copy);
+
+    return DownloadResult{
+        .url = url_copy,
+        .hash = hash,
+        .cache_path = cache_path,
+    };
+}
+
 /// Downloads a package tarball from a URL, saves it to cache, and calculates its SHA256 hash
-/// Includes performance monitoring and smart caching
+/// Includes performance monitoring and smart caching - uses latest version from GitHub API
 pub fn downloadAndHashPackage(allocator: Allocator, package_ref: []const u8) !DownloadResult {
     // Create cache directory if it doesn't exist
     try ensureCacheDir(allocator);
 
-    // Resolve GitHub URL
+    // Resolve GitHub URL using API
     const url = try resolveGitHubUrl(allocator, package_ref);
     errdefer allocator.free(url);
 

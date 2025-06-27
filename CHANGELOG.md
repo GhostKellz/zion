@@ -5,6 +5,51 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2024-12-27
+
+### Fixed
+- **ZON File Format Issues**
+  - Fixed `.name = "unknown"` problem - now properly preserves project names from existing ZON files
+  - Corrected `.name` field format to use identifier syntax (`.name = .projectname`) instead of quoted strings
+  - Enhanced ZON parser to handle both identifier and string formats for better compatibility
+  - Fixed dependency parsing to prevent existing dependencies from being wiped out
+
+- **GitHub API Integration**
+  - Replaced hardcoded GitHub URL patterns with actual GitHub API calls
+  - Added proper tarball URL fetching from GitHub releases and tags API
+  - Eliminated manual URL guessing for `github.com/user/repo/archive/tags` patterns
+  - Added fallback to main branch when API calls fail
+
+- **Zig 0.15 Compatibility**
+  - Updated logical operators from `&&` to `and` for latest Zig syntax
+  - Fixed compilation issues with newer Zig versions
+  - Enhanced error handling for const/mutable reference issues
+
+### Enhanced
+- **Cargo-like Experience**
+  - Improved `zion fetch` to automatically use latest tags when no version specified
+  - Enhanced `zion update` to pull latest versions from GitHub API
+  - Better integration with `zion.lock` file for version management
+  - More robust dependency resolution and caching
+
+- **Developer Experience**
+  - Added version-specific download functionality (`downloadAndHashPackageVersion`)
+  - Improved error messages and user feedback
+  - Better performance monitoring for downloads
+  - Enhanced URL validation and accessibility checking
+
+### Technical Improvements
+- Added comprehensive ZON file parsing with support for both legacy and modern formats
+- Implemented proper dependency tracking to prevent data loss during updates
+- Enhanced GitHub API integration with proper error handling and fallbacks
+- Improved caching mechanisms for better performance
+- Added robust URL resolution using GitHub API instead of URL guessing
+
+### Dependencies
+- Updated User-Agent string to Zion-Package-Manager/0.5.0
+- Maintained compatibility with existing zion.lock files
+- Enhanced backward compatibility with existing project structures
+
 ## [0.3.0] - 2024-12-19
 
 ### Added

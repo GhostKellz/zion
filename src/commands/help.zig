@@ -23,8 +23,16 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    repair      Fix broken hashes and dependency issues
         \\    check       Check dependency health and project status
         \\    build       Build the project
-        \\    clean       Clean build artifacts and caches
+        \\    clean       Clean build artifacts and caches  
         \\    lock        Update the lock file
+        \\    run         Run the project executable
+        \\    test        Run project tests with filtering
+        \\    doc         Generate and open documentation
+        \\    tree        Show dependency tree visualization
+        \\    outdated    Check for outdated dependencies
+        \\    hash        Generate, verify, and manage package hashes
+        \\    config      Configuration management (env vars, Lua, JSON)
+        \\    nvim        Neovim integration setup and management
         \\    security    Package signing, verification, and trust management
         \\    performance Performance monitoring and optimization
         \\    search      Search for Zig packages
@@ -49,15 +57,21 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion update                 # Update all dependencies
         \\    zion clean                  # Clean build artifacts
         \\    zion clean --all            # Clean everything including lock file
-        \\    zion search json            # Search for JSON packages
-        \\    zion template list          # List available templates
-        \\    zion template new cli mytool # Create CLI project
-        \\    zion debug build            # Analyze build errors
-        \\    zion fmt                    # Format entire project
-        \\    zion fmt --check            # Check code formatting
-        \\    zion analyze deps           # Show dependency tree
-        \\    zion zig install 0.15.0     # Install Zig version 0.15.0
-        \\    zion zig use 0.15.0         # Switch to Zig version 0.15.0
+        \\    zion run                    # Run the main executable
+        \\    zion run --bin mytool       # Run specific binary
+        \\    zion test                   # Run all tests
+        \\    zion test --filter "json"   # Run tests matching filter
+        \\    zion doc --open             # Generate and open docs
+        \\    zion tree --depth 2         # Show dependency tree (max depth 2)
+        \\    zion outdated               # Check for outdated dependencies
+        \\    zion hash generate file.tar.gz # Generate hash for file
+        \\    zion hash verify file.tar.gz abc123... # Verify file hash
+        \\    zion config init --lua      # Create Lua config for Neovim
+        \\    zion config show            # Show current configuration
+        \\    zion nvim setup             # Setup Neovim integration
+        \\    zion zig install 0.12.0     # Install Zig version 0.12.0
+        \\    zion zig use 0.12.0         # Switch to Zig version 0.12.0
+        \\    zion zig list --remote      # List available Zig versions
         \\
         \\For more information, see the documentation at:
         \\https://github.com/ghostkellz/zion
