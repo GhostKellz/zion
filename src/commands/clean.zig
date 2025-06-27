@@ -29,9 +29,9 @@ pub fn clean(allocator: Allocator, clean_all: bool) !void {
     
     // Always clean up orphaned build.zig comments (hands-free)
     std.debug.print("🔧 Cleaning up build.zig...\n", .{});
-    const orphans_removed = cleanupBuildZig(allocator) catch |err| {
+    const orphans_removed = cleanupBuildZig(allocator) catch |err| blk: {
         std.debug.print("⚠️  Could not clean build.zig: {}\n", .{err});
-        false;
+        break :blk false;
     };
     if (orphans_removed) {
         cleaned_count += 1;
@@ -74,9 +74,9 @@ pub fn clean(allocator: Allocator, clean_all: bool) !void {
         
         // Reset build.zig to pristine state
         std.debug.print("🔄 Resetting build.zig to pristine state...\n", .{});
-        const build_reset = resetBuildZig(allocator) catch |err| {
+        const build_reset = resetBuildZig(allocator) catch |err| blk: {
             std.debug.print("⚠️  Could not reset build.zig: {}\n", .{err});
-            false;
+            break :blk false;
         };
         if (build_reset) {
             cleaned_count += 1;
@@ -84,9 +84,9 @@ pub fn clean(allocator: Allocator, clean_all: bool) !void {
         
         // Reset build.zig.zon dependencies
         std.debug.print("🔄 Cleaning dependencies from build.zig.zon...\n", .{});
-        const zon_reset = resetZonDependencies(allocator) catch |err| {
+        const zon_reset = resetZonDependencies(allocator) catch |err| blk: {
             std.debug.print("⚠️  Could not reset build.zig.zon: {}\n", .{err});
-            false;
+            break :blk false;
         };
         if (zon_reset) {
             cleaned_count += 1;
