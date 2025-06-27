@@ -114,14 +114,10 @@ pub const ZonFile = struct {
         }
         
         // Fall back to quoted string format: .name = "string"
-        // But convert it to a valid identifier by replacing hyphens with underscores
         if (parseZonField(content, ".name")) |quoted_name| {
-            // Convert hyphens to underscores to make it a valid identifier
-            var normalized_name = std.heap.page_allocator.alloc(u8, quoted_name.len) catch return quoted_name;
-            for (quoted_name, 0..) |c, i| {
-                normalized_name[i] = if (c == '-') '_' else c;
-            }
-            return normalized_name;
+            // Just return the quoted name as-is to avoid memory leak
+            // The caller can handle normalization if needed
+            return quoted_name;
         }
         
         return null;
@@ -129,8 +125,9 @@ pub const ZonFile = struct {
     
     /// Parse a simple field from ZON content (quoted strings)
     fn parseZonField(content: []const u8, field_name: []const u8) ?[]const u8 {
-        const search_pattern = std.fmt.allocPrint(std.heap.page_allocator, "{s} = \"", .{field_name}) catch return null;
-        defer std.heap.page_allocator.free(search_pattern);
+        // Use a fixed-size buffer to avoid allocation
+        var pattern_buf: [64]u8 = undefined;
+        const search_pattern = std.fmt.bufPrint(&pattern_buf, "{s} = \"", .{field_name}) catch return null;
 
         if (std.mem.indexOf(u8, content, search_pattern)) |start_pos| {
             const value_start = start_pos + search_pattern.len;
