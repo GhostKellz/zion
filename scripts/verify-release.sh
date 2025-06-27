@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Zion v0.3.0 Final Build and Release Verification Script
+# Zion Build and Release Verification Script
 
 set -e
 
@@ -10,7 +10,7 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}🚀 Zion v0.3.0 Release Verification${NC}"
+echo -e "${BLUE}🚀 Zion Release Verification${NC}"
 echo -e "═══════════════════════════════════════"
 
 # Check Zig version
@@ -63,10 +63,10 @@ echo -e "\n${BLUE}🧪 Testing basic functionality...${NC}"
 echo -e "\n${BLUE}🧪 Testing basic functionality...${NC}"
 VERSION_OUTPUT=$(./zig-out/bin/zion version 2>&1)
 echo "Version output: '$VERSION_OUTPUT'"
-if echo "$VERSION_OUTPUT" | grep -E "(zion 0\.3\.0|0\.3\.0)" > /dev/null; then
-    echo -e "${GREEN}✅ Version command works${NC}"
+if echo "$VERSION_OUTPUT" | grep -E "(zion [0-9]+\.[0-9]+\.[0-9]+|[0-9]+\.[0-9]+\.[0-9]+)" > /dev/null; then
+    echo -e "${GREEN}✅ Version command works - got: '$VERSION_OUTPUT'${NC}"
 else
-    echo -e "${RED}❌ Version command failed - expected version 0.3.0, got: '$VERSION_OUTPUT'${NC}"
+    echo -e "${RED}❌ Version command failed - unexpected output: '$VERSION_OUTPUT'${NC}"
     # Don't exit on version check failure - continue with other tests
 fi
 
@@ -162,7 +162,7 @@ for file in "${PACKAGE_FILES[@]}"; do
 done
 
 # Final summary
-echo -e "\n${GREEN}🎉 Zion v0.3.0 Release Verification Complete!${NC}"
+echo -e "\n${GREEN}🎉 Zion Release Verification Complete!${NC}"
 echo -e "═══════════════════════════════════════════════════"
 echo -e "${GREEN}✅ Build: Success${NC}"
 echo -e "${GREEN}✅ Core functionality: Working${NC}"
@@ -171,7 +171,7 @@ echo -e "${GREEN}✅ Installation scripts: Ready${NC}"
 echo -e "${GREEN}✅ Package files: Available${NC}"
 
 echo -e "\n${BLUE}📋 Release Checklist:${NC}"
-echo -e "✅ Version bumped to 0.3.0"
+echo -e "✅ Version: $VERSION_OUTPUT"
 echo -e "✅ All commands implemented"
 echo -e "✅ Documentation complete"
 echo -e "✅ Installation methods ready"
@@ -179,4 +179,4 @@ echo -e "✅ Build system working"
 echo -e "✅ Security features implemented"
 echo -e "✅ Performance optimizations included"
 
-echo -e "\n${GREEN}🚀 Ready for v0.3.0 release!${NC}"
+echo -e "\n${GREEN}🚀 Ready for release!${NC}"
