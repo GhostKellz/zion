@@ -3,6 +3,8 @@ const json = std.json;
 const http = std.http;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
+const registry = @import("registry.zig");
+const enhanced_config = @import("enhanced_config.zig");
 
 pub const GitHubTag = struct {
     name: []const u8,
@@ -46,6 +48,10 @@ pub const PackageVersion = struct {
 
 /// Fetch available tags and releases for a GitHub repository
 pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]PackageVersion {
+    // Load config to get registry settings
+    var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
+    defer config.deinit();
+    
     // Validate package reference format
     const slash_index = std.mem.indexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
     const owner = package_ref[0..slash_index];
@@ -59,55 +65,27 @@ pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]Pa
         versions.deinit();
     }
     
-    // First try to get releases (these are preferred over plain tags)
-    if (fetchReleases(allocator, owner, repo)) |releases| {
-        defer {
-            for (releases) |*release| {
-                release.deinit(allocator);
-            }
-            allocator.free(releases);
-        }
-        
-        // Add releases as versions
-        for (releases) |release| {
-            if (!release.prerelease) { // Skip prereleases for now
-                try versions.append(PackageVersion{
-                    .version = try allocator.dupe(u8, release.tag_name),
-                    .url = try allocator.dupe(u8, release.tarball_url),
-                    .is_tag = false,
-                });
-            }
-        }
-    } else |_| {
-        // If releases fail, fall back to tags
-        if (fetchTags(allocator, owner, repo)) |tags| {
-            defer {
-                for (tags) |*tag| {
-                    tag.deinit(allocator);
-                }
-                allocator.free(tags);
-            }
-            
-            // Add tags as versions
-            for (tags) |tag| {
-                try versions.append(PackageVersion{
-                    .version = try allocator.dupe(u8, tag.name),
-                    .url = try allocator.dupe(u8, tag.tarball_url),
-                    .is_tag = true,
-                });
-            }
-        } else |_| {
-            // If both fail, return main branch URL
-            const main_url = try std.fmt.allocPrint(allocator, "https://github.com/{s}/{s}/archive/refs/heads/main.tar.gz", .{ owner, repo });
-            try versions.append(PackageVersion{
-                .version = try allocator.dupe(u8, "main"),
-                .url = main_url,
-                .is_tag = false,
-            });
+    // Try primary registry first
+    const primary_registry = registry.getPrimaryRegistry(allocator, &config);
+    if (tryFetchFromRegistry(allocator, &primary_registry, owner, repo, &versions)) {
+        return try versions.toOwnedSlice();
+    } else |err| {
+        std.debug.print("⚠️ Primary registry failed: {}\n", .{err});
+    }
+    
+    // Try fallback registries
+    const fallback_registries = try registry.getFallbackRegistries(allocator, &config);
+    defer allocator.free(fallback_registries);
+    
+    for (fallback_registries) |fallback_registry| {
+        if (tryFetchFromRegistry(allocator, &fallback_registry, owner, repo, &versions)) {
+            return try versions.toOwnedSlice();
+        } else |err| {
+            std.debug.print("⚠️ Fallback registry failed: {}\n", .{err});
         }
     }
     
-    return versions.toOwnedSlice();
+    return error.NoRegistriesAvailable;
 }
 
 /// Get the latest version (release or tag) for a package
@@ -184,6 +162,51 @@ pub fn generateTarballUrl(allocator: Allocator, package_ref: []const u8, version
     }
 }
 
+/// New helper function to try fetching from a specific registry
+fn tryFetchFromRegistry(allocator: Allocator, reg: *const registry.RegistryClient, owner: []const u8, repo: []const u8, versions: *std.ArrayList(PackageVersion)) !void {
+    // First try to get releases
+    if (fetchReleasesFromRegistry(allocator, reg, owner, repo)) |releases| {
+        defer {
+            for (releases) |*release| {
+                release.deinit(allocator);
+            }
+            allocator.free(releases);
+        }
+        
+        // Add releases as versions
+        for (releases) |release| {
+            if (!release.prerelease) {
+                try versions.append(PackageVersion{
+                    .version = try allocator.dupe(u8, release.tag_name),
+                    .url = try allocator.dupe(u8, release.tarball_url),
+                    .is_tag = false,
+                });
+            }
+        }
+    } else |_| {
+        // If releases fail, fall back to tags
+        if (fetchTagsFromRegistry(allocator, reg, owner, repo)) |tags| {
+            defer {
+                for (tags) |*tag| {
+                    tag.deinit(allocator);
+                }
+                allocator.free(tags);
+            }
+            
+            // Add tags as versions
+            for (tags) |tag| {
+                try versions.append(PackageVersion{
+                    .version = try allocator.dupe(u8, tag.name),
+                    .url = try allocator.dupe(u8, tag.tarball_url),
+                    .is_tag = true,
+                });
+            }
+        } else |_| {
+            return error.RegistryUnavailable;
+        }
+    }
+}
+
 /// Fetch releases from GitHub API using curl
 fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHubRelease {
     const url = try std.fmt.allocPrint(allocator, "https://api.github.com/repos/{s}/{s}/releases", .{ owner, repo });
@@ -233,7 +256,99 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
     return releases.toOwnedSlice();
 }
 
-/// Fetch tags from GitHub API using curl
+/// Fetch releases from registry client
+fn fetchReleasesFromRegistry(allocator: Allocator, reg: *const registry.RegistryClient, owner: []const u8, repo: []const u8) ![]GitHubRelease {
+    const url = try reg.getReleasesUrl(owner, repo);
+    defer allocator.free(url);
+    
+    const json_data = fetchJsonWithCurl(allocator, url) catch |err| {
+        std.debug.print("Registry API error fetching releases for {s}/{s}: {}\n", .{ owner, repo, err });
+        return err;
+    };
+    defer allocator.free(json_data);
+    
+    // Check if response is empty or has error
+    if (json_data.len == 0) {
+        return error.EmptyResponse;
+    }
+    
+    var parsed = json.parseFromSlice(json.Value, allocator, json_data, .{}) catch |err| {
+        std.debug.print("JSON parse error for releases: {}\n", .{err});
+        std.debug.print("Response: {s}\n", .{json_data});
+        return err;
+    };
+    defer parsed.deinit();
+    
+    const releases_array = parsed.value.array;
+    var releases = std.ArrayList(GitHubRelease).init(allocator);
+    
+    for (releases_array.items) |release_json| {
+        const release_obj = release_json.object;
+        
+        const tag_name = try allocator.dupe(u8, release_obj.get("tag_name").?.string);
+        const name = try allocator.dupe(u8, release_obj.get("name").?.string);
+        const published_at = try allocator.dupe(u8, release_obj.get("published_at").?.string);
+        const prerelease = release_obj.get("prerelease").?.bool;
+        const tarball_url = try allocator.dupe(u8, release_obj.get("tarball_url").?.string);
+        const zipball_url = try allocator.dupe(u8, release_obj.get("zipball_url").?.string);
+        
+        try releases.append(GitHubRelease{
+            .tag_name = tag_name,
+            .name = name,
+            .published_at = published_at,
+            .prerelease = prerelease,
+            .tarball_url = tarball_url,
+            .zipball_url = zipball_url,
+        });
+    }
+    
+    return releases.toOwnedSlice();
+}
+
+/// Fetch tags from registry client
+fn fetchTagsFromRegistry(allocator: Allocator, reg: *const registry.RegistryClient, owner: []const u8, repo: []const u8) ![]GitHubTag {
+    const url = try reg.getTagsUrl(owner, repo);
+    defer allocator.free(url);
+    
+    const json_data = fetchJsonWithCurl(allocator, url) catch |err| {
+        std.debug.print("Registry API error fetching tags for {s}/{s}: {}\n", .{ owner, repo, err });
+        return err;
+    };
+    defer allocator.free(json_data);
+    
+    // Check if response is empty or has error
+    if (json_data.len == 0) {
+        return error.EmptyResponse;
+    }
+    
+    var parsed = json.parseFromSlice(json.Value, allocator, json_data, .{}) catch |err| {
+        std.debug.print("JSON parse error for tags: {}\n", .{err});
+        std.debug.print("Response: {s}\n", .{json_data});
+        return err;
+    };
+    defer parsed.deinit();
+    
+    const tags_array = parsed.value.array;
+    var tags = std.ArrayList(GitHubTag).init(allocator);
+    
+    for (tags_array.items) |tag_json| {
+        const tag_obj = tag_json.object;
+        
+        const name = try allocator.dupe(u8, tag_obj.get("name").?.string);
+        const tarball_url = try allocator.dupe(u8, tag_obj.get("tarball_url").?.string);
+        const zipball_url = try allocator.dupe(u8, tag_obj.get("zipball_url").?.string);
+        
+        try tags.append(GitHubTag{
+            .name = name,
+            .tarball_url = tarball_url,
+            .zipball_url = zipball_url,
+        });
+    }
+    
+    return tags.toOwnedSlice();
+}
+
+/// Fetch tags from GitHub API using curl (legacy)
 fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHubTag {
     const url = try std.fmt.allocPrint(allocator, "https://api.github.com/repos/{s}/{s}/tags", .{ owner, repo });
     defer allocator.free(url);

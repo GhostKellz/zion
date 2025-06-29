@@ -39,6 +39,8 @@ pub const doc = @import("doc.zig").doc;
 pub const outdated = @import("outdated.zig").outdated;
 pub const zig_manager = @import("zig_manager.zig").zig_manager;
 pub const nvim = @import("nvim.zig").nvim;
+pub const search = @import("search.zig").search;
+pub const registry = @import("registry.zig").registryCommand;
 
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
@@ -56,15 +58,7 @@ pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
     return zig_manager(allocator, zig_args.items);
 }
 
-pub fn search(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    _ = allocator;
-    _ = args;
-    std.debug.print("🔍 Package search (coming soon)\n", .{});
-    std.debug.print("This feature will allow you to:\n", .{});
-    std.debug.print("  • Search for Zig packages\n", .{});
-    std.debug.print("  • Browse package repositories\n", .{});
-    std.debug.print("  • Discover new libraries\n", .{});
-}
+// Search function is now imported from search.zig
 
 pub fn template(allocator: std.mem.Allocator, args: []const []const u8) !void {
     _ = allocator;

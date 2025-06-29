@@ -1,5 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const registry = @import("../registry.zig");
+const enhanced_config = @import("../enhanced_config.zig");
 
 /// Package search functionality
 /// Searches for Zig packages across multiple sources
@@ -12,7 +14,7 @@ fn containsIgnoreCase(haystack: []const u8, needle: []const u8) bool {
     var i: usize = 0;
     while (i <= haystack.len - needle.len) : (i += 1) {
         var match = true;
-        for (needle) |c, j| {
+        for (needle, 0..) |c, j| {
             if (std.ascii.toLower(haystack[i + j]) != std.ascii.toLower(c)) {
                 match = false;
                 break;
@@ -34,23 +36,50 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
     const search_term = args[2];
     std.debug.print("🔍 Searching for packages matching '{s}'...\n", .{search_term});
 
-    // Search multiple sources
-    try searchGitHub(allocator, search_term);
+    // Search multiple registries
+    try searchRegistries(allocator, search_term);
     try searchZigPackageIndex(allocator, search_term);
     try searchAwesome(allocator, search_term);
 }
 
-/// Search GitHub for Zig packages
-fn searchGitHub(allocator: Allocator, term: []const u8) !void {
-    std.debug.print("\n📦 GitHub Repositories:\n", .{});
+/// Search multiple registries for packages
+fn searchRegistries(allocator: Allocator, term: []const u8) !void {
+    var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
+    defer config.deinit();
     
-    // Use GitHub API to search for repositories
-    const search_url = try std.fmt.allocPrint(allocator, 
-        "https://api.github.com/search/repositories?q={s}+language:zig&sort=stars&order=desc&per_page=10", 
-        .{term});
+    std.debug.print("\n🔍 Registry Search Results:\n", .{});
+    
+    // Search primary registry
+    const primary_registry = registry.getPrimaryRegistry(allocator, &config);
+    std.debug.print("\n📦 Primary Registry ({s}):\n", .{primary_registry.base_url});
+    trySearchRegistry(allocator, &primary_registry, term) catch |err| {
+        std.debug.print("⚠️ Primary registry search failed: {}\n", .{err});
+    };
+    
+    // Search fallback registries
+    const fallback_registries = try registry.getFallbackRegistries(allocator, &config);
+    defer allocator.free(fallback_registries);
+    
+    for (fallback_registries) |fallback_registry| {
+        std.debug.print("\n📦 Fallback Registry ({s}):\n", .{fallback_registry.base_url});
+        trySearchRegistry(allocator, &fallback_registry, term) catch |err| {
+            std.debug.print("⚠️ Fallback registry search failed: {}\n", .{err});
+        };
+    }
+}
+
+fn trySearchRegistry(allocator: Allocator, reg: *const registry.RegistryClient, term: []const u8) !void {
+    const search_url = try reg.getSearchUrl(term);
     defer allocator.free(search_url);
+    
+    // Handle different registry response formats
+    if (reg.registry_type == .zigistry) {
+        try searchZigistry(allocator, search_url, term);
+        return;
+    }
 
     // For now, show some popular Zig packages that match common search terms
+    // TODO: Replace with actual API call to the registry
     const popular_packages = [_]PackageInfo{
         .{ .name = "zig-clap", .author = "Hejsil", .description = "Simple command line argument parsing library", .stars = 400 },
         .{ .name = "zig-json", .author = "ziglang", .description = "JSON parsing and generation", .stars = 200 },
@@ -78,8 +107,10 @@ fn searchGitHub(allocator: Allocator, term: []const u8) !void {
     }
 
     if (found_count == 0) {
-        std.debug.print("  No matching GitHub repositories found\n", .{});
-        std.debug.print("  💡 Try searching on GitHub directly: https://github.com/search?q={s}+language:zig\n", .{term});
+        std.debug.print("  No matching packages found in this registry\n", .{});
+        if (reg.registry_type == .github) {
+            std.debug.print("  💡 Try searching on GitHub directly: https://github.com/search?q={s}+language:zig\n", .{term});
+        }
     }
 }
 
@@ -181,3 +212,96 @@ const CategoryInfo = struct {
     name: []const u8,
     packages: []const PackageInfo,
 };
+
+/// Search Zigistry registry
+fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8) !void {
+    _ = term; // TODO: Use for filtering
+    
+    // Make HTTP request to Zigistry API
+    var client = std.http.Client{ .allocator = allocator };
+    defer client.deinit();
+    
+    var header_buffer: [16384]u8 = undefined;
+    var req = client.open(.GET, std.Uri.parse(search_url) catch {
+        std.debug.print("  ❌ Invalid Zigistry URL format\n", .{});
+        return;
+    }, .{
+        .server_header_buffer = &header_buffer,
+    }) catch {
+        std.debug.print("  ❌ Failed to connect to Zigistry\n", .{});
+        return;
+    };
+    defer req.deinit();
+    
+    req.send() catch {
+        std.debug.print("  ❌ Failed to send request to Zigistry\n", .{});
+        return;
+    };
+    req.finish() catch {
+        std.debug.print("  ❌ Failed to finish request to Zigistry\n", .{});
+        return;
+    };
+    req.wait() catch {
+        std.debug.print("  ❌ Request to Zigistry timed out\n", .{});
+        return;
+    };
+    
+    if (req.response.status != .ok) {
+        std.debug.print("  ❌ Zigistry API error: {}\n", .{req.response.status});
+        return;
+    }
+    
+    const body = req.reader().readAllAlloc(allocator, 1024 * 1024) catch {
+        std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
+        return;
+    };
+    defer allocator.free(body);
+    
+    // Parse Zigistry response (simplified - show first few results)
+    var parsed = std.json.parseFromSlice(std.json.Value, allocator, body, .{}) catch {
+        std.debug.print("  ❌ Failed to parse Zigistry response\n", .{});
+        return;
+    };
+    defer parsed.deinit();
+    
+    if (parsed.value != .array) {
+        std.debug.print("  ⚠️ Unexpected Zigistry response format\n", .{});
+        return;
+    }
+    
+    const packages = parsed.value.array;
+    var count: usize = 0;
+    const max_results = 5;
+    
+    for (packages.items) |pkg| {
+        if (count >= max_results) break;
+        
+        if (pkg != .object) continue;
+        const pkg_obj = pkg.object;
+        
+        const name = pkg_obj.get("name") orelse continue;
+        const owner = pkg_obj.get("owner") orelse continue;
+        const description = pkg_obj.get("description") orelse continue;
+        
+        if (name != .string or owner != .string or description != .string) continue;
+        
+        // Extract star count if available
+        const stars = if (pkg_obj.get("stars")) |s| 
+            if (s == .integer) @as(u32, @intCast(s.integer)) else 0
+        else 0;
+        
+        std.debug.print("  📦 {s}/{s}\n", .{ owner.string, name.string });
+        std.debug.print("     {s}\n", .{description.string});
+        std.debug.print("     ⭐ {} stars\n", .{stars});
+        std.debug.print("     💾 zion add {s}/{s}\n", .{ owner.string, name.string });
+        std.debug.print("\n", .{});
+        
+        count += 1;
+    }
+    
+    if (count == 0) {
+        std.debug.print("  No packages found on Zigistry\n", .{});
+    } else {
+        std.debug.print("  💡 Found {} packages from Zigistry community registry\n", .{count});
+    }
+}

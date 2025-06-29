@@ -31,6 +31,13 @@ pub const ZionConfig = struct {
     neovim_integration: bool = false,
     vscode_integration: bool = false,
     
+    // Registry settings
+    registry_url: ?[]const u8 = null,
+    fallback_registries: std.ArrayList([]const u8),
+    registry_timeout_sec: u32 = 30,
+    registry_retries: u32 = 3,
+    prefer_registry_over_github: bool = true,
+    
     // Dependency aliases for easy bulk adding
     dependency_aliases: std.StringHashMap(std.ArrayList([]const u8)),
     
@@ -39,6 +46,7 @@ pub const ZionConfig = struct {
     pub fn init(allocator: Allocator) ZionConfig {
         var config = ZionConfig{
             .github_orgs = std.ArrayList([]const u8).init(allocator),
+            .fallback_registries = std.ArrayList([]const u8).init(allocator),
             .dependency_aliases = std.StringHashMap(std.ArrayList([]const u8)).init(allocator),
             .allocator = allocator,
             .trust_level_required = "medium",
@@ -59,6 +67,17 @@ pub const ZionConfig = struct {
             self.allocator.free(org);
         }
         self.github_orgs.deinit();
+        
+        // Clean up fallback registries
+        for (self.fallback_registries.items) |registry| {
+            self.allocator.free(registry);
+        }
+        self.fallback_registries.deinit();
+        
+        // Clean up registry_url if allocated
+        if (self.registry_url) |url| {
+            self.allocator.free(url);
+        }
         
         // Clean up dependency aliases
         var iterator = self.dependency_aliases.iterator();
@@ -138,6 +157,42 @@ pub const ZionConfig = struct {
         
         if (std.posix.getenv("ZION_CONCURRENT_DOWNLOADS")) |val| {
             self.concurrent_downloads = std.fmt.parseInt(u32, val, 10) catch self.concurrent_downloads;
+        }
+        
+        // Registry configuration
+        if (std.posix.getenv("ZION_REGISTRY_URL")) |url| {
+            self.registry_url = try self.allocator.dupe(u8, url);
+            std.debug.print("🔧 Using custom registry: {s}\n", .{url});
+        }
+        
+        // Fallback registries (comma-separated)
+        if (std.posix.getenv("ZION_FALLBACK_REGISTRIES")) |registries_str| {
+            var it = std.mem.splitScalar(u8, registries_str, ',');
+            while (it.next()) |registry| {
+                const trimmed = std.mem.trim(u8, registry, " ");
+                if (trimmed.len > 0) {
+                    try self.fallback_registries.append(try self.allocator.dupe(u8, trimmed));
+                }
+            }
+        } else {
+            // Default fallbacks: GitHub and Zigistry
+            try self.fallback_registries.append(try self.allocator.dupe(u8, "https://api.github.com"));
+            try self.fallback_registries.append(try self.allocator.dupe(u8, "https://zigistry-api.hf.space"));
+        }
+        
+        // Registry timeout
+        if (std.posix.getenv("ZION_REGISTRY_TIMEOUT")) |val| {
+            self.registry_timeout_sec = std.fmt.parseInt(u32, val, 10) catch 30;
+        }
+        
+        // Registry retries
+        if (std.posix.getenv("ZION_REGISTRY_RETRIES")) |val| {
+            self.registry_retries = std.fmt.parseInt(u32, val, 10) catch 3;
+        }
+        
+        // Prefer registry over GitHub
+        if (std.posix.getenv("ZION_PREFER_REGISTRY")) |val| {
+            self.prefer_registry_over_github = std.mem.eql(u8, val, "true") or std.mem.eql(u8, val, "1");
         }
     }
     

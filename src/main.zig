@@ -103,6 +103,8 @@ pub fn main() !void {
         try commands.zig_manager(allocator, args);
     } else if (std.mem.eql(u8, command, "search")) {
         try commands.search(allocator, args);
+    } else if (std.mem.eql(u8, command, "registry")) {
+        try commands.registry(allocator, args);
     } else if (std.mem.eql(u8, command, "template")) {
         try commands.template(allocator, args);
     } else if (std.mem.eql(u8, command, "debug")) {

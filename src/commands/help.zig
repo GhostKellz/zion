@@ -36,6 +36,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    security    Package signing, verification, and trust management
         \\    performance Performance monitoring and optimization
         \\    search      Search for Zig packages
+        \\    registry    Manage package registries and test connectivity
         \\    template    Create projects from templates
         \\    debug       Debug build errors and analyze project
         \\    fmt         Format code with enhanced project-wide features
@@ -72,6 +73,8 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion zig install 0.12.0     # Install Zig version 0.12.0
         \\    zion zig use 0.12.0         # Switch to Zig version 0.12.0
         \\    zion zig list --remote      # List available Zig versions
+        \\    zion registry list          # List configured registries
+        \\    zion registry test          # Test all registry connections
         \\
         \\For more information, see the documentation at:
         \\https://github.com/ghostkellz/zion
