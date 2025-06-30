@@ -10,6 +10,26 @@ pub const LockedPackage = struct {
     hash: []const u8,
     version: ?[]const u8,
     timestamp: i64,
+    // v0.7.0 enhanced fields
+    registry: ?[]const u8 = null,
+    resolved_from: ?[]const u8 = null,
+    integrity: ?[]const u8 = null,
+    dependencies: ?[][]const u8 = null,
+    dev_only: bool = false,
+    
+    pub fn deinit(self: *LockedPackage, allocator: Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.url);
+        allocator.free(self.hash);
+        if (self.version) |v| allocator.free(v);
+        if (self.registry) |r| allocator.free(r);
+        if (self.resolved_from) |rf| allocator.free(rf);
+        if (self.integrity) |i| allocator.free(i);
+        if (self.dependencies) |deps| {
+            for (deps) |dep| allocator.free(dep);
+            allocator.free(deps);
+        }
+    }
 };
 
 /// Represents the lock file structure
@@ -27,13 +47,8 @@ pub const LockFile = struct {
 
     /// Free all allocated memory
     pub fn deinit(self: *LockFile) void {
-        for (self.packages.items) |pkg| {
-            self.allocator.free(pkg.name);
-            self.allocator.free(pkg.url);
-            self.allocator.free(pkg.hash);
-            if (pkg.version) |version| {
-                self.allocator.free(version);
-            }
+        for (self.packages.items) |*pkg| {
+            pkg.deinit(self.allocator);
         }
         self.packages.deinit();
     }
@@ -46,19 +61,50 @@ pub const LockFile = struct {
         hash: []const u8,
         version: ?[]const u8,
     ) !void {
+        return self.addPackageWithMetadata(name, url, hash, .{ .version = version });
+    }
+
+    /// Enhanced metadata structure for v0.7.0
+    pub const PackageMetadata = struct {
+        version: ?[]const u8 = null,
+        registry: ?[]const u8 = null,
+        resolved_from: ?[]const u8 = null,
+        integrity: ?[]const u8 = null,
+        dependencies: ?[][]const u8 = null,
+        dev_only: bool = false,
+    };
+
+    /// Add a package with enhanced metadata (v0.7.0)
+    pub fn addPackageWithMetadata(
+        self: *LockFile,
+        name: []const u8,
+        url: []const u8,
+        hash: []const u8,
+        metadata: PackageMetadata,
+    ) !void {
         // Check if package already exists, if so update it
         for (self.packages.items) |*pkg| {
             if (std.mem.eql(u8, pkg.name, name)) {
-                self.allocator.free(pkg.url);
-                self.allocator.free(pkg.hash);
-                if (pkg.version) |v| {
-                    self.allocator.free(v);
-                }
-
-                pkg.url = try self.allocator.dupe(u8, url);
-                pkg.hash = try self.allocator.dupe(u8, hash);
-                pkg.version = if (version) |v| try self.allocator.dupe(u8, v) else null;
-                pkg.timestamp = std.time.timestamp();
+                pkg.deinit(self.allocator);
+                
+                pkg.* = LockedPackage{
+                    .name = try self.allocator.dupe(u8, name),
+                    .url = try self.allocator.dupe(u8, url),
+                    .hash = try self.allocator.dupe(u8, hash),
+                    .version = if (metadata.version) |v| try self.allocator.dupe(u8, v) else null,
+                    .registry = if (metadata.registry) |r| try self.allocator.dupe(u8, r) else null,
+                    .resolved_from = if (metadata.resolved_from) |rf| try self.allocator.dupe(u8, rf) else null,
+                    .integrity = if (metadata.integrity) |i| try self.allocator.dupe(u8, i) else null,
+                    .dependencies = if (metadata.dependencies) |deps| blk: {
+                        const deps_copy = try self.allocator.alloc([]const u8, deps.len);
+                        for (deps, 0..) |dep, i| {
+                            deps_copy[i] = try self.allocator.dupe(u8, dep);
+                        }
+                        break :blk deps_copy;
+                    } else null,
+                    .dev_only = metadata.dev_only,
+                    .timestamp = std.time.timestamp(),
+                };
                 return;
             }
         }
@@ -68,7 +114,18 @@ pub const LockFile = struct {
             .name = try self.allocator.dupe(u8, name),
             .url = try self.allocator.dupe(u8, url),
             .hash = try self.allocator.dupe(u8, hash),
-            .version = if (version) |v| try self.allocator.dupe(u8, v) else null,
+            .version = if (metadata.version) |v| try self.allocator.dupe(u8, v) else null,
+            .registry = if (metadata.registry) |r| try self.allocator.dupe(u8, r) else null,
+            .resolved_from = if (metadata.resolved_from) |rf| try self.allocator.dupe(u8, rf) else null,
+            .integrity = if (metadata.integrity) |i| try self.allocator.dupe(u8, i) else null,
+            .dependencies = if (metadata.dependencies) |deps| blk: {
+                const deps_copy = try self.allocator.alloc([]const u8, deps.len);
+                for (deps, 0..) |dep, i| {
+                    deps_copy[i] = try self.allocator.dupe(u8, dep);
+                }
+                break :blk deps_copy;
+            } else null,
+            .dev_only = metadata.dev_only,
             .timestamp = std.time.timestamp(),
         };
 
@@ -141,11 +198,53 @@ pub const LockFile = struct {
                             else
                                 std.time.timestamp();
 
+                            // v0.7.0 enhanced fields
+                            const registry = if (pkg_obj.get("registry")) |r|
+                                if (r == .string) r.string else null
+                            else
+                                null;
+
+                            const resolved_from = if (pkg_obj.get("resolved_from")) |rf|
+                                if (rf == .string) rf.string else null
+                            else
+                                null;
+
+                            const integrity = if (pkg_obj.get("integrity")) |i|
+                                if (i == .string) i.string else null
+                            else
+                                null;
+
+                            const dev_only = if (pkg_obj.get("dev_only")) |d|
+                                if (d == .bool) d.bool else false
+                            else
+                                false;
+
+                            const dependencies = if (pkg_obj.get("dependencies")) |deps_val| blk: {
+                                if (deps_val == .array) {
+                                    const deps_array = deps_val.array.items;
+                                    const deps_copy = try allocator.alloc([]const u8, deps_array.len);
+                                    for (deps_array, 0..) |dep_val, i| {
+                                        if (dep_val == .string) {
+                                            deps_copy[i] = try allocator.dupe(u8, dep_val.string);
+                                        } else {
+                                            break :blk null;
+                                        }
+                                    }
+                                    break :blk deps_copy;
+                                }
+                                break :blk null;
+                            } else null;
+
                             try lock_file.packages.append(LockedPackage{
                                 .name = try allocator.dupe(u8, name),
                                 .url = try allocator.dupe(u8, url),
                                 .hash = try allocator.dupe(u8, hash),
                                 .version = if (version) |v| try allocator.dupe(u8, v) else null,
+                                .registry = if (registry) |r| try allocator.dupe(u8, r) else null,
+                                .resolved_from = if (resolved_from) |rf| try allocator.dupe(u8, rf) else null,
+                                .integrity = if (integrity) |i| try allocator.dupe(u8, i) else null,
+                                .dependencies = dependencies,
+                                .dev_only = dev_only,
                                 .timestamp = timestamp,
                             });
                         }
@@ -177,6 +276,34 @@ pub const LockFile = struct {
 
             if (pkg.version) |version| {
                 try file.writer().print(",\n      \"version\": \"{s}\"", .{version});
+            }
+
+            // v0.7.0 enhanced fields
+            if (pkg.registry) |registry| {
+                try file.writer().print(",\n      \"registry\": \"{s}\"", .{registry});
+            }
+
+            if (pkg.resolved_from) |resolved_from| {
+                try file.writer().print(",\n      \"resolved_from\": \"{s}\"", .{resolved_from});
+            }
+
+            if (pkg.integrity) |integrity| {
+                try file.writer().print(",\n      \"integrity\": \"{s}\"", .{integrity});
+            }
+
+            if (pkg.dependencies) |dependencies| {
+                try file.writer().writeAll(",\n      \"dependencies\": [");
+                for (dependencies, 0..) |dep, dep_i| {
+                    try file.writer().print("\"{s}\"", .{dep});
+                    if (dep_i < dependencies.len - 1) {
+                        try file.writer().writeAll(", ");
+                    }
+                }
+                try file.writer().writeAll("]");
+            }
+
+            if (pkg.dev_only) {
+                try file.writer().print(",\n      \"dev_only\": {}", .{pkg.dev_only});
             }
 
             try file.writer().writeAll("\n    }");

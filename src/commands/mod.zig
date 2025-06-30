@@ -9,10 +9,10 @@ pub const version_mod = @import("version.zig");
 pub const help_mod = @import("help.zig");
 pub const lock_mod = @import("lock.zig");
 
-// Re-export all command modules
+// Re-export all command modules - v0.7.0 uses enhanced commands as defaults
 pub const init = @import("init.zig").init;
-pub const add = @import("add.zig").add;
-pub const addMultiple = @import("add.zig").addMultiple;
+pub const add = @import("add_v2.zig").add; // v0.7.0: Enhanced add is now default
+pub const addMultiple = @import("add_v2.zig").addMultiple; // v0.7.0: Enhanced add multiple
 pub const remove = @import("remove.zig").remove;
 pub const update = @import("update.zig").update;
 pub const list = @import("list.zig").list;
@@ -39,8 +39,17 @@ pub const doc = @import("doc.zig").doc;
 pub const outdated = @import("outdated.zig").outdated;
 pub const zig_manager = @import("zig_manager.zig").zig_manager;
 pub const nvim = @import("nvim.zig").nvim;
-pub const search = @import("search.zig").search;
-pub const registry = @import("registry.zig").registryCommand;
+pub const search = @import("search_v2.zig").search; // v0.7.0: Enhanced search is now default
+pub const registry = @import("registry_v2.zig").registryCommand; // v0.7.0: Enhanced registry is now default
+pub const publish = @import("publish.zig").publish; // v0.7.0: New publishing feature
+
+// Interactive search mode
+pub const search_interactive = @import("search_v2.zig").interactiveSearch;
+
+// Legacy command aliases (for transition period if needed)
+pub const add_legacy = @import("add.zig").add;
+pub const search_legacy = @import("search.zig").search;
+pub const registry_legacy = @import("registry.zig").registryCommand;
 
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {

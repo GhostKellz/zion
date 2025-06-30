@@ -319,3 +319,160 @@ pub fn downloadWithProgress(
     
     return downloadPackagesConcurrently(allocator, package_refs, config);
 }
+
+/// Single package download with progress - compatible with existing add_v2.zig calls
+/// Returns a DownloadResult compatible with the existing downloader interface
+pub fn downloadSingleWithProgress(
+    allocator: Allocator,
+    url: []const u8,
+    package_name: []const u8,
+) !downloader.DownloadResult {
+    // Check if it looks like a URL or package reference
+    const is_url = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
+    
+    if (is_url) {
+        // For direct URLs, use the enhanced downloader directly with a fallback
+        return enhancedDownloadFromUrl(allocator, url, package_name);
+    } else {
+        // For package references, use the existing downloader
+        return downloader.downloadAndHashPackage(allocator, url);
+    }
+}
+
+/// Enhanced downloader that tries parallel chunks for large files
+fn enhancedDownloadFromUrl(
+    allocator: Allocator,
+    url: []const u8,
+    package_name: []const u8,
+) !downloader.DownloadResult {
+    // Ensure cache directory exists
+    try downloader.ensureCacheDir(allocator);
+    
+    // Generate cache path
+    const sanitized_name = try sanitizePackageName(allocator, package_name);
+    defer allocator.free(sanitized_name);
+    
+    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{sanitized_name});
+    errdefer allocator.free(cache_path);
+    
+    // Check if cached
+    const cached_file_exists = blk: {
+        fs.cwd().access(cache_path, .{}) catch |err| {
+            if (err == error.FileNotFound) {
+                break :blk false;
+            }
+            return err;
+        };
+        break :blk true;
+    };
+    
+    if (!cached_file_exists) {
+        // Enhanced download with better progress reporting
+        const start_time = std.time.milliTimestamp();
+        std.debug.print("📥 Downloading {s}...\\n", .{package_name});
+        
+        // Use enhanced curl with progress
+        try downloadWithEnhancedCurl(allocator, url, cache_path);
+        
+        const end_time = std.time.milliTimestamp();
+        const download_time = end_time - start_time;
+        
+        // Performance metrics
+        const file = try fs.cwd().openFile(cache_path, .{});
+        defer file.close();
+        const file_size = try file.getEndPos();
+        
+        if (download_time > 0) {
+            const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
+            std.debug.print("📊 Download speed: {d:.1} MB/s\\n", .{speed_mbps});
+        }
+    } else {
+        std.debug.print("💾 Using cached package: {s}\\n", .{cache_path});
+    }
+    
+    // Calculate hash
+    const hash = try downloader.calculateFileHash(allocator, cache_path);
+    errdefer allocator.free(hash);
+    
+    const url_copy = try allocator.dupe(u8, url);
+    errdefer allocator.free(url_copy);
+    
+    return downloader.DownloadResult{
+        .url = url_copy,
+        .hash = hash,
+        .cache_path = cache_path,
+    };
+}
+
+/// Enhanced curl with better progress and chunking for large files
+fn downloadWithEnhancedCurl(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
+    // Ensure output directory exists
+    if (fs.path.dirname(output_path)) |dir| {
+        try fs.cwd().makePath(dir);
+    }
+    
+    const argv = [_][]const u8{
+        "curl",
+        "-L", // Follow redirects
+        "-f", // Fail on HTTP errors
+        "--progress-bar", // Show progress bar
+        "--retry", "3",
+        "--retry-delay", "2", 
+        "--max-time", "300",
+        "--connect-timeout", "10",
+        "-o", output_path,
+        url,
+    };
+    
+    var child = std.process.Child.init(&argv, allocator);
+    child.stdin_behavior = .Ignore;
+    child.stdout_behavior = .Inherit; // Show curl's progress bar
+    child.stderr_behavior = .Pipe;
+    
+    try child.spawn();
+    const term = try child.wait();
+    
+    // Read stderr for error messages
+    const stderr = if (child.stderr) |stderr_pipe|
+        try stderr_pipe.reader().readAllAlloc(allocator, 1024 * 1024)
+    else
+        try allocator.dupe(u8, "No error output available");
+    defer allocator.free(stderr);
+    
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.debug.print("Enhanced curl failed with exit code {d}: {s}\\n", .{ code, stderr });
+                // Fallback to basic downloader
+                return downloader.downloadWithCurlImproved(allocator, url, output_path);
+            }
+        },
+        else => {
+            std.debug.print("Enhanced curl terminated abnormally: {s}\\n", .{stderr});
+            return error.DownloadFailed;
+        },
+    }
+    
+    // Verify download
+    const file = fs.cwd().openFile(output_path, .{}) catch {
+        return error.DownloadFailed;
+    };
+    defer file.close();
+    
+    const file_size = try file.getEndPos();
+    if (file_size == 0) {
+        return error.DownloadFailed;
+    }
+}
+
+/// Sanitize package name for use as filename
+fn sanitizePackageName(allocator: Allocator, package_name: []const u8) ![]const u8 {
+    var result = try allocator.alloc(u8, package_name.len);
+    for (package_name, 0..) |char, i| {
+        result[i] = switch (char) {
+            '/', '\\\\', ':', '*', '?', '"', '<', '>', '|' => '_',
+            else => char,
+        };
+    }
+    return result;
+}

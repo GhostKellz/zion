@@ -113,8 +113,20 @@ pub fn main() !void {
         try commands.fmt(allocator, args);
     } else if (std.mem.eql(u8, command, "analyze")) {
         try commands.analyze(allocator, args);
+    
+    // v0.7.0 Enhanced Commands
+    } else if (std.mem.eql(u8, command, "publish")) {
+        try commands.publish(allocator, args);
+    } else if (std.mem.eql(u8, command, "search-interactive")) {
+        try commands.search_interactive(allocator);
     } else {
         std.debug.print("Unknown command: {s}\n", .{command});
         std.debug.print("Run 'zion help' for available commands.\n", .{});
+        std.debug.print("\n💡 v0.7.0 features (now default):\n", .{});
+        std.debug.print("  add              - Enhanced multi-registry package addition\n", .{});
+        std.debug.print("  search           - Advanced search with filters\n", .{});
+        std.debug.print("  search-interactive - Interactive search mode\n", .{});
+        std.debug.print("  registry         - Enhanced registry management\n", .{});
+        std.debug.print("  publish          - Publish packages to registries\n", .{});
     }
 }

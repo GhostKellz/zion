@@ -5,7 +5,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
     _ = allocator; // unused but required for API consistency
 
     const help_text =
-        \\Zion - A Modern Zig Package Manager
+        \\Zion v0.7.0 - A Modern Zig Package Manager
         \\
         \\USAGE:
         \\    zion <COMMAND>
@@ -45,6 +45,13 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zig         Zig version manager (install, list, use, etc.)
         \\    help        Show this help message
         \\
+        \\🚀 ENHANCED IN v0.7.0:
+        \\    add                 Now with multi-registry support and dependency analysis
+        \\    search              Now with advanced filters and categories
+        \\    registry            Now with health monitoring and multi-registry management
+        \\    publish             Publish packages to multiple registries (NEW)
+        \\    search-interactive  Interactive search mode with real-time filtering (NEW)
+        \\
         \\EXAMPLES:
         \\    zion init                   # Initialize a new project
         \\    zion add mitchellh/libxev   # Add a dependency
@@ -75,6 +82,14 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion zig list --remote      # List available Zig versions
         \\    zion registry list          # List configured registries
         \\    zion registry test          # Test all registry connections
+        \\
+        \\🚀 v0.7.0 EXAMPLES:
+        \\    zion publish --registry=zigistry --sign    # Publish with signing
+        \\    zion add crypto --verify-signatures        # Add with security checks
+        \\    zion search http --filter=web,network      # Advanced search
+        \\    zion search-interactive                     # Interactive search mode
+        \\    zion registry add https://my-reg.com       # Add custom registry
+        \\    zion registry health                       # Check registry health
         \\
         \\For more information, see the documentation at:
         \\https://github.com/ghostkellz/zion

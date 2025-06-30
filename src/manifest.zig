@@ -6,10 +6,20 @@ const Allocator = std.mem.Allocator;
 pub const Dependency = struct {
     url: []const u8,
     hash: []const u8,
+    // v0.7.0 enhanced fields
+    version: ?[]const u8 = null,
+    registry: ?[]const u8 = null,
+    resolved_from: ?[]const u8 = null,
+    dev_only: bool = false,
+    comment: ?[]const u8 = null,
 
     pub fn deinit(self: *Dependency, allocator: Allocator) void {
         allocator.free(self.url);
         allocator.free(self.hash);
+        if (self.version) |v| allocator.free(v);
+        if (self.registry) |r| allocator.free(r);
+        if (self.resolved_from) |rf| allocator.free(rf);
+        if (self.comment) |c| allocator.free(c);
     }
 };
 
@@ -18,6 +28,9 @@ pub const ZonFile = struct {
     name: []const u8,
     version: []const u8,
     dependencies: std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
+    // v0.7.0 enhanced fields
+    dev_dependencies: std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
+    comments: std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
     allocator: Allocator,
 
     /// Initialize a new ZON file structure
@@ -26,6 +39,8 @@ pub const ZonFile = struct {
             .name = try allocator.dupe(u8, name),
             .version = try allocator.dupe(u8, version),
             .dependencies = std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .dev_dependencies = std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .comments = std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .allocator = allocator,
         };
     }
@@ -41,6 +56,20 @@ pub const ZonFile = struct {
             entry.value_ptr.deinit(self.allocator);
         }
         self.dependencies.deinit();
+
+        var dev_it = self.dev_dependencies.iterator();
+        while (dev_it.next()) |entry| {
+            self.allocator.free(entry.key_ptr.*);
+            entry.value_ptr.deinit(self.allocator);
+        }
+        self.dev_dependencies.deinit();
+
+        var comment_it = self.comments.iterator();
+        while (comment_it.next()) |entry| {
+            self.allocator.free(entry.key_ptr.*);
+            self.allocator.free(entry.value_ptr.*);
+        }
+        self.comments.deinit();
     }
 
     /// Add a dependency to the ZON file
@@ -231,6 +260,74 @@ pub const ZonFile = struct {
         }
 
         try file.writer().print("    }},\n", .{});
+
+        // Add development dependencies section if any exist
+        if (self.dev_dependencies.count() > 0) {
+            try file.writer().print("    .dev_dependencies = .{{\n", .{});
+            
+            var dev_it = self.dev_dependencies.iterator();
+            while (dev_it.next()) |entry| {
+                const name = entry.key_ptr.*;
+                const dep = entry.value_ptr.*;
+                try file.writer().print("        .{s} = .{{\n", .{name});
+                try file.writer().print("            .url = \"{s}\",\n", .{dep.url});
+                try file.writer().print("            .hash = \"{s}\",\n", .{dep.hash});
+                try file.writer().print("        }},\n", .{});
+            }
+            
+            try file.writer().print("    }},\n", .{});
+        }
+        
         try file.writer().print("}}\n", .{});
+    }
+
+    /// Add a development dependency
+    pub fn addDevDependency(self: *ZonFile, name: []const u8, url: []const u8, hash: []const u8) !void {
+        // Check if dependency already exists and free old memory
+        if (self.dev_dependencies.get(name)) |existing_dep| {
+            var old_dep = existing_dep;
+            old_dep.deinit(self.allocator);
+
+            // Find and free the key
+            var it = self.dev_dependencies.iterator();
+            while (it.next()) |entry| {
+                if (std.mem.eql(u8, entry.key_ptr.*, name)) {
+                    self.allocator.free(entry.key_ptr.*);
+                    break;
+                }
+            }
+            _ = self.dev_dependencies.remove(name);
+        }
+
+        const dep = Dependency{
+            .url = try self.allocator.dupe(u8, url),
+            .hash = try self.allocator.dupe(u8, hash),
+            .dev_only = true,
+        };
+
+        const name_copy = try self.allocator.dupe(u8, name);
+        try self.dev_dependencies.put(name_copy, dep);
+    }
+
+    /// Add a comment for a dependency
+    pub fn addComment(self: *ZonFile, name: []const u8, comment: []const u8) !void {
+        // Check if comment already exists and free old memory
+        if (self.comments.get(name)) |existing_comment| {
+            self.allocator.free(existing_comment);
+            
+            // Find and free the key
+            var it = self.comments.iterator();
+            while (it.next()) |entry| {
+                if (std.mem.eql(u8, entry.key_ptr.*, name)) {
+                    self.allocator.free(entry.key_ptr.*);
+                    break;
+                }
+            }
+            _ = self.comments.remove(name);
+        }
+
+        const name_copy = try self.allocator.dupe(u8, name);
+        const comment_copy = try self.allocator.dupe(u8, comment);
+        try self.comments.put(name_copy, comment_copy);
     }
 };
