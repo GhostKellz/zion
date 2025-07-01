@@ -42,7 +42,7 @@ pub const ZionV7 = struct {
             .block_suspicious_packages = true,
             .license_compliance = true,
         };
-        var security_scanner = security.SecurityScanner.init(allocator, security_config);
+        const security_scanner = security.SecurityScanner.init(allocator, security_config);
         
         return ZionV7{
             .allocator = allocator,
@@ -364,8 +364,6 @@ pub const ZionV7 = struct {
     }
     
     fn generateOptimizationRecommendations(self: *ZionV7, report: *PerformanceReport) !void {
-        _ = self;
-        
         if (report.cache_efficiency < 80) {
             try report.recommendations.append("Consider clearing and rebuilding package cache");
         }

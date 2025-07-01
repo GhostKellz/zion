@@ -103,7 +103,7 @@ fn showRegistryHelp() !void {
         \\  zion registry test corporate
         \\  zion registry priority corporate 0
         \\
-    );
+    , .{});
 }
 
 /// List all configured registries with detailed information
@@ -254,7 +254,7 @@ fn testRegistry(allocator: std.mem.Allocator, name: []const u8) !void {
     // Find the registry
     for (config.registries.items) |registry| {
         if (std.mem.eql(u8, registry.name, name)) {
-            try testRegistryConfig(allocator, registry);
+            _ = try testRegistryConfig(allocator, registry);
             return;
         }
     }
@@ -469,7 +469,7 @@ fn showAuthHelp() !void {
         \\  zion registry auth test github
         \\  zion registry auth remove corporate
         \\
-    );
+    , .{});
 }
 
 /// Helper functions (simplified implementations)
@@ -571,7 +571,7 @@ fn listAuthTokens(allocator: std.mem.Allocator) !void {
             if (token.len > 8) {
                 std.debug.print("   Token: {s}...{s}\n", .{ token[0..4], token[token.len - 4 ..] });
             } else {
-                std.debug.print("   Token: {s}\n", .{"*" ** token.len});
+                std.debug.print("   Token: {s}\n", .{"*****"});
             }
         }
         std.debug.print("\n", .{});

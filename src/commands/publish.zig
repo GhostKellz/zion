@@ -321,15 +321,15 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
     defer zon_file.deinit();
     
     // Extract basic information
-    const name = try allocator.dupe(u8, zon_file.name orelse "unnamed");
-    const version = try allocator.dupe(u8, zon_file.version orelse "0.1.0");
+    const name = try allocator.dupe(u8, zon_file.name);
+    const version = try allocator.dupe(u8, zon_file.version);
     
     // Try to read additional metadata from package.json or zion.toml if they exist
     var description: ?[]const u8 = null;
-    var author: ?[]const u8 = null;
+    const author: ?[]const u8 = null;
     var license: ?[]const u8 = null;
-    var homepage: ?[]const u8 = null;
-    var repository: ?[]const u8 = null;
+    const homepage: ?[]const u8 = null;
+    const repository: ?[]const u8 = null;
     var keywords = std.ArrayList([]const u8).init(allocator);
     var categories = std.ArrayList([]const u8).init(allocator);
     
@@ -427,7 +427,6 @@ fn checkExistingPackage(client: *registry_v2.RegistryClient, metadata: PackageMe
 
 /// Build package for publishing
 fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, options: PublishOptions) ![]const u8 {
-    _ = metadata;
     _ = options;
     
     // Create temporary build directory
@@ -608,7 +607,7 @@ fn updateLocalCache(allocator: Allocator, metadata: PackageMetadata, registry: [
 // Helper functions
 fn extractDescriptionFromReadme(allocator: Allocator, content: []const u8) ?[]const u8 {
     // Find first paragraph after title
-    var lines = std.mem.split(u8, content, "\n");
+    var lines = std.mem.splitSequence(u8, content, "\n");
     var found_title = false;
     
     while (lines.next()) |line| {
@@ -648,7 +647,7 @@ fn detectLicenseType(content: []const u8) ?[]const u8 {
 
 fn isValidVersion(version: []const u8) bool {
     // Basic semver validation
-    var parts = std.mem.split(u8, version, ".");
+    var parts = std.mem.splitSequence(u8, version, ".");
     var count: u8 = 0;
     
     while (parts.next()) |part| {

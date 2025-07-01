@@ -325,7 +325,6 @@ pub const HealthMonitor = struct {
     
     pub fn startMonitoring(self: *HealthMonitor, clients: *std.ArrayList(RegistryClient)) !void {
         _ = self;
-        _ = clients;
         // In a real implementation, this would spawn a thread to periodically check registry health
         // For now, we'll just do a one-time check
         for (clients.items) |*client| {
@@ -349,7 +348,6 @@ pub const PackageResolver = struct {
     }
     
     pub fn selectBestPackage(self: *PackageResolver, packages: []Package) !Package {
-        _ = self;
         if (packages.len == 0) return error.NoPackages;
         
         var best_score: f32 = 0;
@@ -371,8 +369,8 @@ pub const PackageResolver = struct {
         var score: f32 = 0;
         
         // Score based on various factors
-        score += @floatFromInt(pkg.stars) * 0.3;
-        score += @floatFromInt(pkg.download_count) * 0.2;
+        score += @as(f32, @floatFromInt(pkg.stars)) * 0.3;
+        score += @as(f32, @floatFromInt(pkg.download_count)) * 0.2;
         
         // Prefer packages with descriptions
         if (pkg.description != null) score += 10;

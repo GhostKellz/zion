@@ -74,7 +74,7 @@ pub const ParallelDownloader = struct {
         self.progress.start_time = std.time.milliTimestamp();
 
         // Prepare results array
-        var results = try self.allocator.alloc(ParallelDownloadResult, requests.len);
+        const results = try self.allocator.alloc(ParallelDownloadResult, requests.len);
         
         // Initialize all results
         for (results, 0..) |*result, i| {
@@ -89,7 +89,7 @@ pub const ParallelDownloader = struct {
         defer work_queue.deinit();
 
         // Create worker threads
-        var threads = try self.allocator.alloc(Thread, self.config.max_concurrent);
+        const threads = try self.allocator.alloc(Thread, self.config.max_concurrent);
         defer self.allocator.free(threads);
 
         // Spawn worker threads
@@ -194,7 +194,6 @@ pub const ParallelDownloader = struct {
         const total_time = std.time.milliTimestamp() - self.progress.start_time;
         var successful: usize = 0;
         var failed: usize = 0;
-        var total_size: u64 = 0;
 
         for (results) |result| {
             if (result.success) {
@@ -470,7 +469,7 @@ fn sanitizePackageName(allocator: Allocator, package_name: []const u8) ![]const 
     var result = try allocator.alloc(u8, package_name.len);
     for (package_name, 0..) |char, i| {
         result[i] = switch (char) {
-            '/', '\\\\', ':', '*', '?', '"', '<', '>', '|' => '_',
+            '/', '\\', ':', '*', '?', '"', '<', '>', '|' => '_',
             else => char,
         };
     }

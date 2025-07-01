@@ -13,6 +13,7 @@ pub const lock_mod = @import("lock.zig");
 pub const init = @import("init.zig").init;
 pub const add = @import("add_v2.zig").add; // v0.7.0: Enhanced add is now default
 pub const addMultiple = @import("add_v2.zig").addMultiple; // v0.7.0: Enhanced add multiple
+pub const AddOptions = @import("add_v2.zig").AddOptions; // Export AddOptions type
 pub const remove = @import("remove.zig").remove;
 pub const update = @import("update.zig").update;
 pub const list = @import("list.zig").list;

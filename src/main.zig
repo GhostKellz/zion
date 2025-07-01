@@ -31,9 +31,12 @@ pub fn main() !void {
 
         const packages = args[2..];
         if (packages.len == 1) {
-            try commands.add(allocator, packages[0]);
+            // Use default options for the enhanced add command
+            const options = commands.AddOptions{};
+            try commands.add(allocator, packages[0], options);
         } else {
-            try commands.addMultiple(allocator, packages);
+            const options = commands.AddOptions{};
+            try commands.addMultiple(allocator, packages, options);
         }
     } else if (std.mem.eql(u8, command, "remove") or std.mem.eql(u8, command, "rm")) {
         if (args.len < 3) {

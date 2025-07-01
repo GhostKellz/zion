@@ -227,7 +227,7 @@ fn parseSearchOptions(options: *SearchOptions, args: []const []const u8, allocat
         if (std.mem.startsWith(u8, arg, "--filter=")) {
             const filter_str = arg[9..];
             var categories = std.ArrayList([]const u8).init(allocator);
-            var it = std.mem.split(u8, filter_str, ",");
+            var it = std.mem.splitSequence(u8, filter_str, ",");
             while (it.next()) |cat| {
                 try categories.append(try allocator.dupe(u8, cat));
             }
@@ -316,7 +316,7 @@ pub fn interactiveSearch(allocator: Allocator) !void {
                 try args.append("zion");
                 try args.append("search");
                 
-                var it = std.mem.tokenize(u8, trimmed, " ");
+                var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
                 while (it.next()) |token| {
                     try args.append(token);
                 }

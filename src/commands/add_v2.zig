@@ -133,7 +133,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     
     // Analyze dependencies
     std.debug.print("\n🔍 Analyzing dependencies...\n", .{});
-    const dep_analysis = try manager.analyzeDependencies(package.full_name);
+    var dep_analysis = try manager.analyzeDependencies(package.full_name);
     defer dep_analysis.deinit();
     
     if (dep_analysis.total_dependencies > 0) {
@@ -236,7 +236,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     const metadata = try std.fmt.allocPrint(allocator,
         \\// {s} v{s} from {s}
         \\// License: {s}
-        \\// Added: {s}
+        \\// Added: {d}
     , .{
         package.full_name,
         package.version,
@@ -254,6 +254,14 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
     
+    // Convert dependencies to the expected format
+    var dep_names = std.ArrayList([]const u8).init(allocator);
+    defer dep_names.deinit();
+    
+    for (package.dependencies) |dep| {
+        try dep_names.append(try allocator.dupe(u8, dep.name));
+    }
+    
     try lock_file.addPackageWithMetadata(
         package_name,
         download_result.url,
@@ -263,7 +271,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             .registry = package.registry_name,
             .resolved_from = package.full_name,
             .integrity = download_result.hash,
-            .dependencies = package.dependencies,
+            .dependencies = if (dep_names.items.len > 0) try dep_names.toOwnedSlice() else null,
             .dev_only = options.dev_only,
         },
     );
@@ -438,6 +446,7 @@ fn modifyBuildZigV2(allocator: Allocator, package_name: []const u8, deps_path: [
 
 /// Print enhanced build instructions
 fn printEnhancedBuildInstructions(package_name: []const u8, deps_path: []const u8, dev_only: bool) !void {
+    _ = deps_path;
     std.debug.print("\n", .{});
     if (dev_only) {
         std.debug.print("To use this development dependency in your project:\n", .{});
