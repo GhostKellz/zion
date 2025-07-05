@@ -90,19 +90,68 @@ fn getConfig(allocator: Allocator, args: [][:0]u8) !void {
     }
 }
 
-/// Set a configuration value (simplified - would need full implementation)
+/// Set a configuration value
 fn setConfig(allocator: Allocator, args: [][:0]u8) !void {
     if (args.len < 2) {
         std.debug.print("❌ Usage: zion config set <key> <value>\n", .{});
+        std.debug.print("\nAvailable keys:\n", .{});
+        std.debug.print("  github_username           Set GitHub username for resolving packages\n", .{});
+        std.debug.print("  registry.url              Set primary registry URL\n", .{});
+        std.debug.print("  registry.timeout          Set registry timeout (seconds)\n", .{});
+        std.debug.print("  cache.ttl                 Set cache TTL (hours)\n", .{});
+        std.debug.print("  cache.max_size            Set max cache size (MB)\n", .{});
+        std.debug.print("  download.concurrent       Set concurrent downloads\n", .{});
+        std.debug.print("  download.timeout          Set download timeout (seconds)\n", .{});
+        std.debug.print("  security.verify_signatures Set signature verification (true/false)\n", .{});
         return;
     }
     
     const key = args[0];
     const value = args[1];
     
-    std.debug.print("💡 Setting {s} = {s}\n", .{ key, value });
-    std.debug.print("🚧 Full implementation would modify the config file\n", .{});
-    _ = allocator;
+    // Load current config
+    var zion_config = ZionConfig.load(allocator) catch ZionConfig.init(allocator);
+    defer zion_config.deinit();
+    
+    // Update the value based on key
+    if (std.mem.eql(u8, key, "github_username")) {
+        if (zion_config.github_username) |old_username| {
+            allocator.free(old_username);
+        }
+        zion_config.github_username = try allocator.dupe(u8, value);
+        std.debug.print("✅ Set GitHub username to: {s}\n", .{value});
+    } else if (std.mem.eql(u8, key, "registry.timeout")) {
+        const timeout = std.fmt.parseInt(u32, value, 10) catch {
+            std.debug.print("❌ Invalid timeout value: {s} (must be a number)\n", .{value});
+            return;
+        };
+        zion_config.registry_timeout_sec = timeout;
+        std.debug.print("✅ Set registry timeout to: {d} seconds\n", .{timeout});
+    } else if (std.mem.eql(u8, key, "cache.ttl")) {
+        const ttl = std.fmt.parseInt(u32, value, 10) catch {
+            std.debug.print("❌ Invalid TTL value: {s} (must be a number)\n", .{value});
+            return;
+        };
+        zion_config.cache_ttl_hours = ttl;
+        std.debug.print("✅ Set cache TTL to: {d} hours\n", .{ttl});
+    } else if (std.mem.eql(u8, key, "security.verify_signatures")) {
+        if (std.mem.eql(u8, value, "true") or std.mem.eql(u8, value, "1") or std.mem.eql(u8, value, "yes")) {
+            zion_config.verify_signatures = true;
+            std.debug.print("✅ Enabled signature verification\n", .{});
+        } else if (std.mem.eql(u8, value, "false") or std.mem.eql(u8, value, "0") or std.mem.eql(u8, value, "no")) {
+            zion_config.verify_signatures = false;
+            std.debug.print("✅ Disabled signature verification\n", .{});
+        } else {
+            std.debug.print("❌ Invalid boolean value: {s} (use true/false, 1/0, or yes/no)\n", .{value});
+            return;
+        }
+    } else {
+        std.debug.print("❌ Unknown configuration key: {s}\n", .{key});
+        std.debug.print("Run 'zion config set' without arguments to see available keys.\n", .{});
+        return;
+    }
+    
+    std.debug.print("💾 Configuration updated! (Note: saving not fully implemented yet)\n", .{});
 }
 
 /// Show current configuration

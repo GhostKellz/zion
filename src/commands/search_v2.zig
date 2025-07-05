@@ -4,24 +4,41 @@ const enhanced_config = @import("../enhanced_config.zig");
 const registry_manager = @import("../registry_manager.zig");
 const registry_v2 = @import("../registry_v2.zig");
 
+/// Print help information for the search command
+fn printSearchHelp() void {
+    std.debug.print("❌ Error: 'zion search' requires a search term\n", .{});
+    std.debug.print("\n📖 Usage: zion search <term> [options]\n", .{});
+    std.debug.print("\nOptions:\n", .{});
+    std.debug.print("  --filter=<categories>   Filter by categories (comma-separated)\n", .{});
+    std.debug.print("  --license=<license>     Filter by license type\n", .{});
+    std.debug.print("  --min-stars=<count>     Minimum stars required\n", .{});
+    std.debug.print("  --sort=<field>          Sort by: relevance, stars, downloads, updated\n", .{});
+    std.debug.print("  --registry=<name>       Search specific registry only\n", .{});
+    std.debug.print("  --zig-version=<ver>     Filter by Zig version compatibility\n", .{});
+    std.debug.print("  --limit=<count>         Maximum results (default: 20)\n", .{});
+    std.debug.print("  --help, -h              Show this help message\n", .{});
+    std.debug.print("\nExamples:\n", .{});
+    std.debug.print("  zion search json\n", .{});
+    std.debug.print("  zion search http --filter=web,network\n", .{});
+    std.debug.print("  zion search crypto --license=MIT --min-stars=50\n", .{});
+    std.debug.print("  zion search game --registry=zigistry\n", .{});
+    std.debug.print("\n💡 Try these popular searches:\n", .{});
+    std.debug.print("  • zion search http\n", .{});
+    std.debug.print("  • zion search json\n", .{});
+    std.debug.print("  • zion search crypto\n", .{});
+    std.debug.print("  • zion search game\n", .{});
+}
+
 /// Enhanced search command for v0.7.0 with multi-registry support
 pub fn search(allocator: Allocator, args: []const []const u8) !void {
+    // Check for help first
+    if (args.len >= 3 and (std.mem.eql(u8, args[2], "--help") or std.mem.eql(u8, args[2], "-h"))) {
+        printSearchHelp();
+        return;
+    }
+    
     if (args.len < 3) {
-        std.debug.print("❌ Error: 'zion search' requires a search term\n", .{});
-        std.debug.print("\n📖 Usage: zion search <term> [options]\n", .{});
-        std.debug.print("\nOptions:\n", .{});
-        std.debug.print("  --filter=<categories>   Filter by categories (comma-separated)\n", .{});
-        std.debug.print("  --license=<license>     Filter by license type\n", .{});
-        std.debug.print("  --min-stars=<count>     Minimum stars required\n", .{});
-        std.debug.print("  --sort=<field>          Sort by: relevance, stars, downloads, updated\n", .{});
-        std.debug.print("  --registry=<name>       Search specific registry only\n", .{});
-        std.debug.print("  --zig-version=<ver>     Filter by Zig version compatibility\n", .{});
-        std.debug.print("  --limit=<count>         Maximum results (default: 20)\n", .{});
-        std.debug.print("\nExamples:\n", .{});
-        std.debug.print("  zion search json\n", .{});
-        std.debug.print("  zion search http --filter=web,network\n", .{});
-        std.debug.print("  zion search crypto --license=MIT --min-stars=50\n", .{});
-        std.debug.print("  zion search game --registry=zigistry\n", .{});
+        printSearchHelp();
         return;
     }
 

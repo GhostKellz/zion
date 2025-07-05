@@ -120,6 +120,11 @@ pub fn findVersion(allocator: Allocator, package_ref: []const u8, target_version
         allocator.free(versions);
     }
     
+    if (versions.len == 0) {
+        std.debug.print("❌ No versions found for package '{s}'\n", .{package_ref});
+        return error.NoVersionsFound;
+    }
+    
     // Look for exact match first
     for (versions) |version| {
         if (std.mem.eql(u8, version.version, target_version)) {
@@ -143,6 +148,17 @@ pub fn findVersion(allocator: Allocator, package_ref: []const u8, target_version
             };
         }
     }
+    
+    // Version not found - show available versions
+    std.debug.print("❌ Version '{s}' not found for package '{s}'\n", .{ target_version, package_ref });
+    std.debug.print("📦 Available versions:\n", .{});
+    for (versions[0..@min(versions.len, 5)]) |version| {
+        std.debug.print("  - {s}\n", .{version.version});
+    }
+    if (versions.len > 5) {
+        std.debug.print("  ... and {d} more versions\n", .{versions.len - 5});
+    }
+    std.debug.print("💡 Try: zion fetch {s}@{s}\n", .{ package_ref, versions[0].version });
     
     return error.VersionNotFound;
 }

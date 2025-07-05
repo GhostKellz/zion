@@ -6,6 +6,11 @@ const LockFile = @import("../lockfile.zig").LockFile;
 
 /// List all dependencies in the project
 pub fn list(allocator: Allocator, json_mode: bool) !void {
+    return listWithOptions(allocator, json_mode, false, false);
+}
+
+/// List dependencies with additional options
+pub fn listWithOptions(allocator: Allocator, json_mode: bool, show_outdated: bool, show_versions: bool) !void {
     const zon_path = "build.zig.zon";
     const cwd = fs.cwd();
 
@@ -28,7 +33,7 @@ pub fn list(allocator: Allocator, json_mode: bool) !void {
     if (json_mode) {
         try printJsonList(allocator, &zon_file, &lock_file);
     } else {
-        try printTableList(allocator, &zon_file, &lock_file);
+        try printEnhancedTableList(allocator, &zon_file, &lock_file, show_outdated, show_versions);
     }
 }
 
@@ -192,4 +197,86 @@ fn extractRepoInfo(allocator: Allocator, url: []const u8) !RepoInfo {
         .owner = try allocator.dupe(u8, owner),
         .repo = try allocator.dupe(u8, repo),
     };
+}
+
+/// Enhanced table format with additional options
+fn printEnhancedTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile, show_outdated: bool, show_versions: bool) !void {
+    _ = show_outdated; // TODO: Implement outdated checking
+    
+    std.debug.print("📦 Dependencies for project '{s}' v{s}:\n", .{ zon_file.name, zon_file.version });
+    std.debug.print("──────────────────────────────────────────────────────────────────────────────────\n", .{});
+    
+    if (show_versions) {
+        std.debug.print("Name                 Status     Repository                     Version       Hash\n", .{});
+    } else {
+        std.debug.print("Name                 Status     Repository                     Hash\n", .{});
+    }
+    std.debug.print("──────────────────────────────────────────────────────────────────────────────────\n", .{});
+
+    var total: usize = 0;
+    var installed: usize = 0;
+
+    var it = zon_file.dependencies.iterator();
+    while (it.next()) |entry| {
+        const pkg_name = entry.key_ptr.*;
+        const dep = entry.value_ptr.*;
+
+        // Check if package directory exists
+        const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{pkg_name});
+        defer allocator.free(deps_path);
+
+        const is_installed = blk: {
+            fs.cwd().access(deps_path, .{}) catch {
+                break :blk false;
+            };
+            break :blk true;
+        };
+
+        // Extract repository info from URL
+        const repo_info = try extractRepoInfo(allocator, dep.url);
+        defer allocator.free(repo_info.owner);
+        defer allocator.free(repo_info.repo);
+
+        const status = if (is_installed) "✅ Installed" else "❌ Missing";
+        const repo_display = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ repo_info.owner, repo_info.repo });
+        defer allocator.free(repo_display);
+
+        if (show_versions) {
+            // Try to get version from lock file
+            const version = if (lock_file.getPackage(pkg_name)) |locked_pkg|
+                locked_pkg.version orelse "unknown"
+            else
+                "unknown";
+            
+            std.debug.print("{s:<20} {s:<10} {s:<30} {s:<12} {s}\n", .{
+                pkg_name[0..@min(pkg_name.len, 19)],
+                status,
+                repo_display[0..@min(repo_display.len, 29)],
+                version[0..@min(version.len, 11)],
+                dep.hash[0..16],
+            });
+        } else {
+            std.debug.print("{s:<20} {s:<10} {s:<30} {s}\n", .{
+                pkg_name[0..@min(pkg_name.len, 19)],
+                status,
+                repo_display[0..@min(repo_display.len, 29)],
+                dep.hash[0..16],
+            });
+        }
+
+        total += 1;
+        if (is_installed) installed += 1;
+    }
+
+    std.debug.print("──────────────────────────────────────────────────────────────────────────────────\n", .{});
+    std.debug.print("📊 Total: {d} dependencies, {d} installed, {d} missing\n", .{ total, installed, total - installed });
+
+    if (installed < total) {
+        std.debug.print("\n💡 Suggestions:\n", .{});
+        std.debug.print("   • Run 'zion fetch' to install missing dependencies\n", .{});
+        std.debug.print("   • Use 'zion list --json' for machine-readable output\n", .{});
+        if (!show_versions) {
+            std.debug.print("   • Use 'zion list --versions' to show version information\n", .{});
+        }
+    }
 }

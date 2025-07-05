@@ -2,6 +2,32 @@ const std = @import("std");
 const zion = @import("zion");
 const commands = zion.commands;
 
+/// Resolve command aliases to full command names
+fn resolveCommandAlias(command: []const u8) []const u8 {
+    // Common aliases
+    if (std.mem.eql(u8, command, "s")) return "search";
+    if (std.mem.eql(u8, command, "i")) return "info";
+    if (std.mem.eql(u8, command, "a")) return "add";
+    if (std.mem.eql(u8, command, "r")) return "remove";
+    if (std.mem.eql(u8, command, "u")) return "update";
+    if (std.mem.eql(u8, command, "l")) return "list";
+    if (std.mem.eql(u8, command, "c")) return "check";
+    if (std.mem.eql(u8, command, "b")) return "build";
+    if (std.mem.eql(u8, command, "t")) return "test";
+    if (std.mem.eql(u8, command, "h")) return "help";
+    if (std.mem.eql(u8, command, "v")) return "version";
+    if (std.mem.eql(u8, command, "f")) return "fetch";
+    if (std.mem.eql(u8, command, "si")) return "search-interactive";
+    if (std.mem.eql(u8, command, "reg")) return "registry";
+    if (std.mem.eql(u8, command, "cfg")) return "config";
+    if (std.mem.eql(u8, command, "sec")) return "security";
+    if (std.mem.eql(u8, command, "perf")) return "performance";
+    if (std.mem.eql(u8, command, "dbg")) return "debug";
+    
+    // Return original command if no alias found
+    return command;
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -15,7 +41,8 @@ pub fn main() !void {
         return;
     }
 
-    const command = args[1];
+    const raw_command = args[1];
+    const command = resolveCommandAlias(raw_command);
 
     if (std.mem.eql(u8, command, "init")) {
         try commands.init(allocator);
@@ -47,7 +74,7 @@ pub fn main() !void {
         }
         try commands.remove(allocator, args[2]);
     } else if (std.mem.eql(u8, command, "update")) {
-        try commands.update(allocator);
+        try commands.update(allocator, args);
     } else if (std.mem.eql(u8, command, "list") or std.mem.eql(u8, command, "ls")) {
         const json_mode = args.len > 2 and std.mem.eql(u8, args[2], "--json");
         try commands.list(allocator, json_mode);
@@ -123,13 +150,16 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "search-interactive")) {
         try commands.search_interactive(allocator);
     } else {
-        std.debug.print("Unknown command: {s}\n", .{command});
+        std.debug.print("Unknown command: {s}\n", .{raw_command});
         std.debug.print("Run 'zion help' for available commands.\n", .{});
-        std.debug.print("\n💡 v0.7.0 features (now default):\n", .{});
-        std.debug.print("  add              - Enhanced multi-registry package addition\n", .{});
-        std.debug.print("  search           - Advanced search with filters\n", .{});
-        std.debug.print("  search-interactive - Interactive search mode\n", .{});
-        std.debug.print("  registry         - Enhanced registry management\n", .{});
-        std.debug.print("  publish          - Publish packages to registries\n", .{});
+        std.debug.print("\n💡 Quick aliases:\n", .{});
+        std.debug.print("  s/search         - Search for packages\n", .{});
+        std.debug.print("  a/add            - Add packages\n", .{});
+        std.debug.print("  i/info           - Package information\n", .{});
+        std.debug.print("  l/list           - List dependencies\n", .{});
+        std.debug.print("  u/update         - Update packages\n", .{});
+        std.debug.print("  r/remove         - Remove packages\n", .{});
+        std.debug.print("  h/help           - Show help\n", .{});
+        std.debug.print("  v/version        - Show version\n", .{});
     }
 }

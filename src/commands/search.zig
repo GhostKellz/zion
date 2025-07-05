@@ -25,25 +25,100 @@ fn containsIgnoreCase(haystack: []const u8, needle: []const u8) bool {
     return false;
 }
 
+pub const SearchOptions = struct {
+    filters: []const []const u8 = &[_][]const u8{},
+    limit: usize = 10,
+    sort_by: enum { relevance, stars, updated } = .relevance,
+    min_stars: usize = 0,
+};
+
 pub fn search(allocator: Allocator, args: []const []const u8) !void {
     if (args.len < 3) {
-        std.debug.print("Error: 'zion search' requires a search term\n", .{});
-        std.debug.print("Usage: zion search <term>\n", .{});
-        std.debug.print("Example: zion search json\n", .{});
+        printSearchHelp();
         return;
     }
 
-    const search_term = args[2];
-    std.debug.print("🔍 Searching for packages matching '{s}'...\n", .{search_term});
+    // Parse search options
+    var search_options = SearchOptions{};
+    const search_term: []const u8 = args[2];
+    var filters_list = std.ArrayList([]const u8).init(allocator);
+    defer filters_list.deinit();
+    
+    // Process additional arguments
+    var i: usize = 3;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        
+        if (std.mem.startsWith(u8, arg, "--filter=")) {
+            const filter_str = arg[9..];
+            var filter_it = std.mem.split(u8, filter_str, ",");
+            while (filter_it.next()) |filter| {
+                try filters_list.append(std.mem.trim(u8, filter, " "));
+            }
+        } else if (std.mem.startsWith(u8, arg, "--limit=")) {
+            search_options.limit = std.fmt.parseInt(usize, arg[8..], 10) catch 10;
+        } else if (std.mem.startsWith(u8, arg, "--sort=")) {
+            const sort_str = arg[7..];
+            if (std.mem.eql(u8, sort_str, "stars")) {
+                search_options.sort_by = .stars;
+            } else if (std.mem.eql(u8, sort_str, "updated")) {
+                search_options.sort_by = .updated;
+            } else {
+                search_options.sort_by = .relevance;
+            }
+        } else if (std.mem.startsWith(u8, arg, "--min-stars=")) {
+            search_options.min_stars = std.fmt.parseInt(usize, arg[12..], 10) catch 0;
+        } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            printSearchHelp();
+            return;
+        }
+    }
+    
+    search_options.filters = try filters_list.toOwnedSlice();
+    defer allocator.free(search_options.filters);
+
+    // Display search configuration
+    std.debug.print("🔍 Searching for packages matching '{s}'", .{search_term});
+    if (search_options.filters.len > 0) {
+        std.debug.print(" (filters: ", .{});
+        for (search_options.filters, 0..) |filter, idx| {
+            if (idx > 0) std.debug.print(", ", .{});
+            std.debug.print("{s}", .{filter});
+        }
+        std.debug.print(")", .{});
+    }
+    std.debug.print("...\n", .{});
 
     // Search multiple registries
-    try searchRegistries(allocator, search_term);
-    try searchZigPackageIndex(allocator, search_term);
-    try searchAwesome(allocator, search_term);
+    try searchRegistries(allocator, search_term, search_options);
+    try searchZigPackageIndex(allocator, search_term, search_options);
+    try searchAwesome(allocator, search_term, search_options);
+}
+
+fn printSearchHelp() void {
+    std.debug.print("❌ Error: 'zion search' requires a search term\n", .{});
+    std.debug.print("\nUsage: zion search <term> [OPTIONS]\n", .{});
+    std.debug.print("\nOptions:\n", .{});
+    std.debug.print("  --filter=<categories>  Filter by categories (web,crypto,json,etc.)\n", .{});
+    std.debug.print("  --limit=<number>       Limit results (default: 10)\n", .{});
+    std.debug.print("  --sort=<method>        Sort by: relevance, stars, updated\n", .{});
+    std.debug.print("  --min-stars=<number>   Minimum stars required\n", .{});
+    std.debug.print("  --help, -h             Show this help\n", .{});
+    std.debug.print("\nExamples:\n", .{});
+    std.debug.print("  zion search json\n", .{});
+    std.debug.print("  zion search http --filter=web,network\n", .{});
+    std.debug.print("  zion search crypto --limit=5 --sort=stars\n", .{});
+    std.debug.print("  zion search game --min-stars=50\n", .{});
+    std.debug.print("\n💡 Try these popular searches:\n", .{});
+    std.debug.print("  • zion search http\n", .{});
+    std.debug.print("  • zion search json\n", .{});
+    std.debug.print("  • zion search crypto\n", .{});
+    std.debug.print("  • zion search game\n", .{});
 }
 
 /// Search multiple registries for packages
-fn searchRegistries(allocator: Allocator, term: []const u8) !void {
+fn searchRegistries(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
+    _ = options; // TODO: Use options for filtering and sorting
     var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
     defer config.deinit();
     
@@ -115,7 +190,8 @@ fn trySearchRegistry(allocator: Allocator, reg: *const registry.RegistryClient, 
 }
 
 /// Search the Zig package index (hypothetical)
-fn searchZigPackageIndex(allocator: Allocator, term: []const u8) !void {
+fn searchZigPackageIndex(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
+    _ = options;
     _ = allocator;
     _ = term;
     
@@ -125,7 +201,8 @@ fn searchZigPackageIndex(allocator: Allocator, term: []const u8) !void {
 }
 
 /// Search awesome-zig list
-fn searchAwesome(allocator: Allocator, term: []const u8) !void {
+fn searchAwesome(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
+    _ = options;
     _ = allocator;
     
     std.debug.print("\n🌟 Awesome Zig:\n", .{});

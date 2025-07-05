@@ -3,6 +3,7 @@ const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
+const github = @import("../github.zig");
 
 /// Show detailed information about a package dependency
 pub fn info(allocator: Allocator, package_name: []const u8) !void {
@@ -82,6 +83,9 @@ pub fn info(allocator: Allocator, package_name: []const u8) !void {
         std.debug.print("📚 Repository:  {s}\n", .{repo_info.repo});
         std.debug.print("🔗 GitHub:      https://github.com/{s}/{s}\n", .{ repo_info.owner, repo_info.repo });
 
+        // Enhanced package information
+        try showEnhancedPackageInfo(allocator, repo_info.owner, repo_info.repo, package_name);
+
         // Suggestions based on status
         std.debug.print("\n💡 Suggestions:\n", .{});
         if (!installed) {
@@ -89,6 +93,7 @@ pub fn info(allocator: Allocator, package_name: []const u8) !void {
         }
         std.debug.print("  • Run 'zion update' to check for updates\n", .{});
         std.debug.print("  • Run 'zion remove {s}' to remove this package\n", .{package_name});
+        std.debug.print("  • View all versions: zion info {s} --versions\n", .{package_name});
     } else {
         std.debug.print("❌ Package '{s}' not found in dependencies.\n", .{package_name});
         std.debug.print("\nAvailable packages:\n", .{});
@@ -145,4 +150,54 @@ fn extractRepoInfo(allocator: Allocator, url: []const u8) !RepoInfo {
         .owner = try allocator.dupe(u8, owner),
         .repo = try allocator.dupe(u8, repo),
     };
+}
+
+/// Show enhanced package information including versions and stats
+fn showEnhancedPackageInfo(allocator: Allocator, owner: []const u8, repo: []const u8, package_name: []const u8) !void {
+    _ = package_name; // We might use this for more specific info later
+    
+    const package_ref = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ owner, repo });
+    defer allocator.free(package_ref);
+    
+    std.debug.print("\n📋 Enhanced Package Information:\n", .{});
+    
+    // Try to fetch available versions
+    const versions = github.fetchPackageVersions(allocator, package_ref) catch |err| {
+        std.debug.print("⚠️  Could not fetch version information: {}\n", .{err});
+        return;
+    };
+    defer {
+        for (versions) |*version| {
+            version.deinit(allocator);
+        }
+        allocator.free(versions);
+    }
+    
+    if (versions.len > 0) {
+        std.debug.print("📦 Available Versions:\n", .{});
+        const display_count = @min(versions.len, 5);
+        for (versions[0..display_count]) |version| {
+            const version_type = if (version.is_tag) "🏷️" else "🚀";
+            std.debug.print("   {s} {s}\n", .{ version_type, version.version });
+        }
+        if (versions.len > 5) {
+            std.debug.print("   ... and {d} more versions\n", .{versions.len - 5});
+        }
+        
+        std.debug.print("🔄 Latest Version: {s}\n", .{versions[0].version});
+    } else {
+        std.debug.print("❌ No versions found\n", .{});
+    }
+    
+    // Additional package information
+    std.debug.print("📊 Package Stats:\n", .{});
+    std.debug.print("   🔢 Total Versions: {d}\n", .{versions.len});
+    
+    // Show example commands
+    if (versions.len > 0) {
+        std.debug.print("\n🛠️  Quick Commands:\n", .{});
+        std.debug.print("   • Fetch latest:     zion fetch {s}\n", .{package_ref});
+        std.debug.print("   • Fetch specific:   zion fetch {s}@{s}\n", .{ package_ref, versions[0].version });
+        std.debug.print("   • Add to project:   zion add {s}\n", .{package_ref});
+    }
 }

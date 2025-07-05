@@ -5,6 +5,65 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-07-05
+
+### Added
+- **Zigistry Integration**
+  - Full support for Zigistry package registry alongside GitHub
+  - New `registry` command for managing multiple registries
+  - Registry authentication and token management
+  - Package publishing to Zigistry with `zion publish`
+  - Enhanced search across multiple registries with `search_v2`
+
+- **Zeppelin Self-Hosted Support**
+  - Complete integration with Zeppelin self-hosted registry
+  - Custom registry URL configuration
+  - Private package repository management
+  - Enterprise registry features
+
+- **Enhanced Package Management**
+  - Improved `add_v2` command with multi-registry support
+  - Advanced version resolution across registries
+  - Better dependency conflict resolution
+  - Parallel package fetching from multiple sources
+
+- **Registry Management**
+  - `registry_v2` implementation for advanced registry operations
+  - Registry priority and fallback mechanisms
+  - Custom registry configuration in enhanced_config
+  - Registry health checks and status monitoring
+
+### Enhanced
+- **Performance Improvements**
+  - Optimized parallel downloader for multiple registries
+  - Better caching strategies for registry responses
+  - Reduced memory usage in manifest parsing
+  - Improved lockfile handling for large projects
+
+- **Security**
+  - Registry-specific authentication tokens
+  - Secure credential storage for multiple registries
+  - Enhanced package verification across registries
+  - Improved trust model for multi-registry environments
+
+- **Developer Experience**
+  - Unified search across GitHub and Zigistry
+  - Seamless registry switching
+  - Better error messages for registry failures
+  - Automatic registry fallback on failures
+
+### Fixed
+- Compilation errors in v0.7.0 build
+- Memory management issues in registry operations
+- Lockfile compatibility with multiple registries
+- Configuration parsing for registry settings
+
+### Technical Improvements
+- Modular registry architecture with `registry_manager`
+- Enhanced HTTP utilities for registry communication
+- Improved manifest handling for registry packages
+- Better separation of registry-specific logic
+
 ## [0.5.2] - 2025-06-27
 
 ### Fixed

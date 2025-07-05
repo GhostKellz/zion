@@ -6,9 +6,60 @@ const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 
-/// Update all dependencies to their latest versions
-pub fn update(allocator: Allocator) !void {
-    std.debug.print("Updating dependencies...\n", .{});
+/// Print help information for the update command
+fn printUpdateHelp() void {
+    std.debug.print(
+        \\Usage: zion update [OPTIONS] [PACKAGES...]
+        \\
+        \\Update dependencies to their latest versions
+        \\
+        \\OPTIONS:
+        \\    --dry-run, -n    Show what would be updated without making changes
+        \\    --help, -h       Show this help message
+        \\
+        \\EXAMPLES:
+        \\    zion update                    # Update all dependencies
+        \\    zion update libxev httpz       # Update specific packages only
+        \\    zion update --dry-run          # Check for updates without applying
+        \\    zion update --dry-run libxev   # Check specific package for updates
+        \\
+    , .{});
+}
+
+/// Update all dependencies to their latest versions, or specific packages if provided
+pub fn update(allocator: Allocator, args: [][:0]u8) !void {
+    // Parse command line arguments
+    var dry_run = false;
+    var specific_packages = std.ArrayList([]const u8).init(allocator);
+    defer specific_packages.deinit();
+    
+    // Process arguments starting from index 2 (skip "zion update")
+    var i: usize = 2;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "--dry-run") or std.mem.eql(u8, arg, "-n")) {
+            dry_run = true;
+        } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            printUpdateHelp();
+            return;
+        } else {
+            // Assume it's a package name
+            try specific_packages.append(arg);
+        }
+    }
+    
+    if (dry_run) {
+        std.debug.print("🔍 Checking for updates (dry run)...\n", .{});
+    } else if (specific_packages.items.len > 0) {
+        std.debug.print("Updating specific packages: ", .{});
+        for (specific_packages.items, 0..) |pkg, idx| {
+            if (idx > 0) std.debug.print(", ", .{});
+            std.debug.print("{s}", .{pkg});
+        }
+        std.debug.print("\n", .{});
+    } else {
+        std.debug.print("Updating all dependencies...\n", .{});
+    }
 
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
@@ -60,6 +111,18 @@ pub fn update(allocator: Allocator) !void {
         const pkg_name = entry.key_ptr.*;
         const current_dep = entry.value_ptr.*;
 
+        // Skip if we're only updating specific packages and this isn't one of them
+        if (specific_packages.items.len > 0) {
+            var found = false;
+            for (specific_packages.items) |target_pkg| {
+                if (std.mem.eql(u8, pkg_name, target_pkg)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) continue;
+        }
+
         std.debug.print("\n📦 Checking {s}...\n", .{pkg_name});
 
         // Re-download and compute new hash
@@ -80,48 +143,61 @@ pub fn update(allocator: Allocator) !void {
             try unchanged_packages.append(try allocator.dupe(u8, pkg_name));
         } else {
             // Hash changed - need to update
-            std.debug.print("  🔄 Hash changed! Updating...\n", .{});
-            std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
-            std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
+            if (dry_run) {
+                std.debug.print("  📋 Would update! (dry run)\n", .{});
+                std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
+                std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
+                try updated_packages.append(try allocator.dupe(u8, pkg_name));
+            } else {
+                std.debug.print("  🔄 Hash changed! Updating...\n", .{});
+                std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
+                std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
 
-            // Update dependency in ZON file
-            allocator.free(current_dep.url);
-            allocator.free(current_dep.hash);
-            entry.value_ptr.url = try allocator.dupe(u8, download_result.url);
-            entry.value_ptr.hash = try allocator.dupe(u8, download_result.hash);
-            zon_updated = true;
+                // Update dependency in ZON file
+                allocator.free(current_dep.url);
+                allocator.free(current_dep.hash);
+                entry.value_ptr.url = try allocator.dupe(u8, download_result.url);
+                entry.value_ptr.hash = try allocator.dupe(u8, download_result.hash);
+                zon_updated = true;
 
-            // Update lock file
-            try lock_file.addPackage(pkg_name, download_result.url, download_result.hash, null);
-            lock_updated = true;
+                // Update lock file
+                try lock_file.addPackage(pkg_name, download_result.url, download_result.hash, null);
+                lock_updated = true;
 
-            // Extract updated package
-            const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{pkg_name});
-            defer allocator.free(deps_path);
+                // Extract updated package
+                const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{pkg_name});
+                defer allocator.free(deps_path);
 
-            std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
-            try extractTarball(allocator, download_result.cache_path, deps_path);
+                std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
+                try extractTarball(allocator, download_result.cache_path, deps_path);
 
-            try updated_packages.append(try allocator.dupe(u8, pkg_name));
+                try updated_packages.append(try allocator.dupe(u8, pkg_name));
+            }
         }
     }
 
-    // Save updated files if needed
-    if (zon_updated) {
-        try zon_file.saveToFile(zon_path);
-        std.debug.print("\n✅ Updated build.zig.zon\n", .{});
-    }
+    // Save updated files if needed (skip in dry-run mode)
+    if (!dry_run) {
+        if (zon_updated) {
+            try zon_file.saveToFile(zon_path);
+            std.debug.print("\n✅ Updated build.zig.zon\n", .{});
+        }
 
-    if (lock_updated) {
-        try lock_file.saveToFile();
-        std.debug.print("✅ Updated zion.lock\n", .{});
+        if (lock_updated) {
+            try lock_file.saveToFile();
+            std.debug.print("✅ Updated zion.lock\n", .{});
+        }
     }
 
     // Print summary
     std.debug.print("\n📋 Update Summary:\n", .{});
 
     if (updated_packages.items.len > 0) {
-        std.debug.print("🔄 Updated packages ({d}):\n", .{updated_packages.items.len});
+        if (dry_run) {
+            std.debug.print("📋 Packages that would be updated ({d}):\n", .{updated_packages.items.len});
+        } else {
+            std.debug.print("🔄 Updated packages ({d}):\n", .{updated_packages.items.len});
+        }
         for (updated_packages.items) |pkg_name| {
             std.debug.print("  - {s}\n", .{pkg_name});
         }
@@ -136,6 +212,8 @@ pub fn update(allocator: Allocator) !void {
 
     if (updated_packages.items.len == 0) {
         std.debug.print("🎉 All dependencies are up to date!\n", .{});
+    } else if (dry_run) {
+        std.debug.print("\n💡 {d} package(s) can be updated. Run 'zion update' to apply changes.\n", .{updated_packages.items.len});
     } else {
         std.debug.print("\n🚀 Updated {d} package(s). Run 'zig build' to use the latest versions.\n", .{updated_packages.items.len});
     }
