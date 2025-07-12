@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manual build script for Zag on Arch Linux that uses the existing Zig installation
+# Manual build script for Zion on Arch Linux that uses the existing Zig installation
 set -e
 
 # Colors for terminal output
@@ -9,7 +9,7 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}Zag Manual Build Script for Arch Linux${NC}"
+echo -e "${BLUE}Zion Manual Build Script for Arch Linux${NC}"
 
 # Check for Zig
 if ! command -v zig &> /dev/null; then
@@ -28,14 +28,14 @@ echo -e "${GREEN}Found Zig: ${ZIG_VERSION}${NC}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
-# Build Zag with the dev version of Zig
-echo -e "${BLUE}Building Zag using Zig ${ZIG_VERSION}...${NC}"
+# Build Zion with the dev version of Zig
+echo -e "${BLUE}Building Zion using Zig ${ZIG_VERSION}...${NC}"
 cd "$REPO_ROOT"
 zig build -Doptimize=ReleaseSafe
 
 # Check if build succeeded
-if [ ! -f "$REPO_ROOT/zig-out/bin/zag" ]; then
-    echo -e "${RED}Build failed. Binary not found at zig-out/bin/zag${NC}"
+if [ ! -f "$REPO_ROOT/zig-out/bin/zion" ]; then
+    echo -e "${RED}Build failed. Binary not found at zig-out/bin/zion${NC}"
     exit 1
 fi
 
@@ -53,7 +53,7 @@ case $INSTALL_CHOICE in
     1)
         echo -e "${BLUE}Installing for current user...${NC}"
         mkdir -p $HOME/.local/bin
-        cp "$REPO_ROOT/zig-out/bin/zag" "$HOME/.local/bin/"
+        cp "$REPO_ROOT/zig-out/bin/zion" "$HOME/.local/bin/"
         
         # Check if ~/.local/bin is in PATH
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -79,15 +79,15 @@ case $INSTALL_CHOICE in
             fi
         fi
         
-        echo -e "${GREEN}Zag installed to ~/.local/bin/zag${NC}"
+        echo -e "${GREEN}Zag installed to ~/.local/bin/zion${NC}"
         
         # Install ZSH completion for user
         ZSH_USER_DIR="$HOME/.zsh/completions"
         if [ ! -d "$ZSH_USER_DIR" ]; then
             mkdir -p "$ZSH_USER_DIR"
         fi
-        cp "$REPO_ROOT/release/completions/zag.zsh" "$ZSH_USER_DIR/_zag"
-        echo -e "${GREEN}ZSH completion installed to $ZSH_USER_DIR/_zag${NC}"
+        cp "$REPO_ROOT/release/completions/zion.zsh" "$ZSH_USER_DIR/_zion"
+        echo -e "${GREEN}ZSH completion installed to $ZSH_USER_DIR/_zion${NC}"
         echo -e "${YELLOW}Add this to your .zshrc to enable completion:${NC}"
         echo -e "${BLUE}fpath=(~/.zsh/completions \$fpath)${NC}"
         echo -e "${BLUE}autoload -U compinit && compinit${NC}"
@@ -95,12 +95,12 @@ case $INSTALL_CHOICE in
     2)
         echo -e "${BLUE}Installing system-wide...${NC}"
         if command -v sudo &> /dev/null; then
-            sudo cp "$REPO_ROOT/zig-out/bin/zag" "/usr/local/bin/"
-            echo -e "${GREEN}Zag installed to /usr/local/bin/zag${NC}"
+            sudo cp "$REPO_ROOT/zig-out/bin/zion" "/usr/local/bin/"
+            echo -e "${GREEN}Zag installed to /usr/local/bin/zion${NC}"
         else
             echo -e "${YELLOW}sudo not available, trying with su...${NC}"
-            su -c "cp '$REPO_ROOT/zig-out/bin/zag' '/usr/local/bin/'"
-            echo -e "${GREEN}Zag installed to /usr/local/bin/zag${NC}"
+            su -c "cp '$REPO_ROOT/zig-out/bin/zion' '/usr/local/bin/'"
+            echo -e "${GREEN}Zag installed to /usr/local/bin/zion${NC}"
         fi
         
         # Install ZSH completion systemwide
@@ -108,11 +108,11 @@ case $INSTALL_CHOICE in
         if [ -d "$ZSH_COMPLETION_DIR" ]; then
             echo -e "${BLUE}Installing ZSH completion systemwide...${NC}"
             if command -v sudo &> /dev/null; then
-                sudo cp "$REPO_ROOT/release/completions/zag.zsh" "$ZSH_COMPLETION_DIR/_zag"
-                echo -e "${GREEN}ZSH completion installed to $ZSH_COMPLETION_DIR/_zag${NC}"
+                sudo cp "$REPO_ROOT/release/completions/zion.zsh" "$ZSH_COMPLETION_DIR/_zion"
+                echo -e "${GREEN}ZSH completion installed to $ZSH_COMPLETION_DIR/_zion${NC}"
             else
-                su -c "cp '$REPO_ROOT/release/completions/zag.zsh' '$ZSH_COMPLETION_DIR/_zag'"
-                echo -e "${GREEN}ZSH completion installed to $ZSH_COMPLETION_DIR/_zag${NC}"
+                su -c "cp '$REPO_ROOT/release/completions/zion.zsh' '$ZSH_COMPLETION_DIR/_zion'"
+                echo -e "${GREEN}ZSH completion installed to $ZSH_COMPLETION_DIR/_zion${NC}"
             fi
         else
             echo -e "${YELLOW}ZSH site-functions directory not found. Skipping ZSH completion installation.${NC}"
@@ -123,11 +123,11 @@ case $INSTALL_CHOICE in
         if [ -d "$BASH_COMPLETION_DIR" ]; then
             echo -e "${BLUE}Installing Bash completion systemwide...${NC}"
             if command -v sudo &> /dev/null; then
-                sudo cp "$REPO_ROOT/release/completions/zag.bash" "$BASH_COMPLETION_DIR/zag"
-                echo -e "${GREEN}Bash completion installed to $BASH_COMPLETION_DIR/zag${NC}"
+                sudo cp "$REPO_ROOT/release/completions/zion.bash" "$BASH_COMPLETION_DIR/zion"
+                echo -e "${GREEN}Bash completion installed to $BASH_COMPLETION_DIR/zion${NC}"
             else
-                su -c "cp '$REPO_ROOT/release/completions/zag.bash' '$BASH_COMPLETION_DIR/zag'"
-                echo -e "${GREEN}Bash completion installed to $BASH_COMPLETION_DIR/zag${NC}"
+                su -c "cp '$REPO_ROOT/release/completions/zion.bash' '$BASH_COMPLETION_DIR/zion'"
+                echo -e "${GREEN}Bash completion installed to $BASH_COMPLETION_DIR/zion${NC}"
             fi
         fi
         
@@ -136,17 +136,17 @@ case $INSTALL_CHOICE in
         echo -e "${BLUE}Installing man page...${NC}"
         if command -v sudo &> /dev/null; then
             sudo mkdir -p "$MAN_DIR"
-            sudo cp "$REPO_ROOT/release/man/zag.1" "$MAN_DIR/zag.1"
+            sudo cp "$REPO_ROOT/release/man/zion.1" "$MAN_DIR/zion.1"
             sudo mandb &>/dev/null
-            echo -e "${GREEN}Man page installed to $MAN_DIR/zag.1${NC}"
+            echo -e "${GREEN}Man page installed to $MAN_DIR/zion.1${NC}"
         else
-            su -c "mkdir -p '$MAN_DIR' && cp '$REPO_ROOT/release/man/zag.1' '$MAN_DIR/zag.1' && mandb &>/dev/null"
-            echo -e "${GREEN}Man page installed to $MAN_DIR/zag.1${NC}"
+            su -c "mkdir -p '$MAN_DIR' && cp '$REPO_ROOT/release/man/zion.1' '$MAN_DIR/zion.1' && mandb &>/dev/null"
+            echo -e "${GREEN}Man page installed to $MAN_DIR/zion.1${NC}"
         fi
         ;;
     3)
         echo -e "${GREEN}Build completed. Binary is at:${NC}"
-        echo -e "$REPO_ROOT/zig-out/bin/zag"
+        echo -e "$REPO_ROOT/zig-out/bin/zion"
         ;;
     *)
         echo -e "${RED}Invalid option. Exiting.${NC}"
@@ -155,4 +155,4 @@ case $INSTALL_CHOICE in
 esac
 
 echo -e "${BLUE}All done!${NC}"
-echo -e "Run 'zag help' to see available commands."
+echo -e "Run 'zion help' to see available commands."

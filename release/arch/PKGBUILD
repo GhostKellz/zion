@@ -1,6 +1,6 @@
-# Maintainer: Your Name <your.email@example.com>
+# Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
 pkgname=zion
-pkgver=0.2.0.dev
+pkgver=0.8.0
 pkgrel=1
 pkgdesc="A modern, cargo-inspired package manager for the Zig programming language"
 arch=('x86_64' 'aarch64')
