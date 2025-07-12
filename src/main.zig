@@ -149,6 +149,14 @@ pub fn main() !void {
         try commands.publish(allocator, args);
     } else if (std.mem.eql(u8, command, "search-interactive")) {
         try commands.search_interactive(allocator);
+    
+    // v0.8.0 New Commands
+    } else if (std.mem.eql(u8, command, "setup")) {
+        try commands.setup(allocator, args);
+    } else if (std.mem.eql(u8, command, "zls")) {
+        try commands.zls(allocator, args);
+    } else if (std.mem.eql(u8, command, "workspace")) {
+        try commands.workspace(allocator, args);
     } else {
         std.debug.print("Unknown command: {s}\n", .{raw_command});
         std.debug.print("Run 'zion help' for available commands.\n", .{});

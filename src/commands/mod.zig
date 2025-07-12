@@ -43,6 +43,9 @@ pub const nvim = @import("nvim.zig").nvim;
 pub const search = @import("search_v2.zig").search; // v0.7.0: Enhanced search is now default
 pub const registry = @import("registry_v2.zig").registryCommand; // v0.7.0: Enhanced registry is now default
 pub const publish = @import("publish.zig").publish; // v0.7.0: New publishing feature
+pub const setup = @import("setup_simple.zig").setup; // v0.8.0: Simplified setup system
+pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
+pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
 
 // Interactive search mode
 pub const search_interactive = @import("search_v2.zig").interactiveSearch;

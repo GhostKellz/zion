@@ -137,7 +137,8 @@ fn cleanupBuildZig(allocator: Allocator) !bool {
                 const package_name = trimmed[package_start..];
                 
                 // Check if this package still exists in .zion/deps/
-                const deps_path = std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name}) catch {
+                const deps_path = std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name}) catch |alloc_err| {
+                    std.debug.print("⚠️  Memory allocation failed for deps path: {}\n", .{alloc_err});
                     try cleaned_content.appendSlice(line);
                     try cleaned_content.append('\n');
                     continue;

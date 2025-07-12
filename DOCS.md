@@ -2,17 +2,259 @@
 
 This document provides comprehensive information about Zion's architecture, advanced features, and development.
 
+## 🎉 v0.8.0 "The Cargo for Zig" Release
+
+**Major architectural evolution** - Zion has transformed from a package manager into a complete Zig development environment tool, comparable to Rust's Cargo + rustup combined.
+
+### Key Changes in v0.8.0
+- **Complete Zig version management** - `anyzig`-like functionality
+- **ZLS integration** - Language server management and diagnostics
+- **Environment setup system** - "One Nation Under Zig" complete setup
+- **Workspace management** - Cargo-style multi-package projects
+- **Arch Linux first-class support** - Optimized for Arch ecosystem
+
 ## Table of Contents
 
-- [Architecture](#architecture)
-- [v0.4.0 Features](#v040-features)
+- [v0.8.0 Architecture](#v080-architecture)
+- [Zig Version Management](#zig-version-management)
+- [ZLS Integration](#zls-integration)
+- [Setup System](#setup-system)
+- [Workspace Management](#workspace-management)
+- [Legacy Architecture](#legacy-architecture)
 - [File Formats](#file-formats)
 - [Dependency Resolution](#dependency-resolution)
-- [Version Management](#version-management)
 - [Build Integration](#build-integration)
 - [Configuration](#configuration)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## v0.8.0 Architecture
+
+### Modular Command System
+
+Zion v0.8.0 introduces a highly modular architecture supporting multiple development workflows:
+
+```
+src/
+├── main.zig                    # CLI entry point with command routing
+├── root.zig                    # Library exports
+├── commands/
+│   ├── mod.zig                # Command module exports
+│   │
+│   # Core Package Management (v0.7.0+)
+│   ├── add_v2.zig             # Enhanced dependency management
+│   ├── search_v2.zig          # Multi-registry search
+│   ├── registry_v2.zig        # Advanced registry management
+│   ├── publish.zig            # Cross-registry publishing
+│   │
+│   # NEW: Version Management (v0.8.0)
+│   ├── zig_manager.zig        # Complete Zig version lifecycle
+│   ├── zls.zig                # ZLS integration and diagnostics
+│   │
+│   # NEW: Environment Management (v0.8.0)
+│   ├── setup.zig              # "One Nation Under Zig" setup
+│   ├── workspace.zig          # Cargo-style workspaces
+│   │
+│   # Core Functionality
+│   ├── init.zig               # Project initialization
+│   ├── clean.zig              # Build artifact management
+│   ├── build.zig              # Build system integration
+│   ├── help.zig               # Comprehensive help system
+│   └── ...                    # Other commands
+│
+├── config/                     # Configuration management
+├── registry/                   # Multi-registry support
+├── security/                   # Cryptographic verification
+└── manifest.zig               # Package manifest handling
+```
+
+### System Integration Philosophy
+
+**Arch Linux First-Class Citizen:**
+- Detects and integrates with `pacman`-installed Zig (`/usr/bin/zig`)
+- Respects system PATH and filesystem hierarchy
+- Minimal dependencies, leverages system tools
+- AUR-ready packaging support
+
+### Command Architecture
+
+**Unified Command Dispatch:**
+```zig
+// main.zig - Command routing with aliases
+const command = resolveCommandAlias(raw_command);
+
+if (std.mem.eql(u8, command, "zig")) {
+    try commands.zig_manager(allocator, args);
+} else if (std.mem.eql(u8, command, "zls")) {
+    try commands.zls(allocator, args);
+} else if (std.mem.eql(u8, command, "setup")) {
+    try commands.setup(allocator, args);
+} else if (std.mem.eql(u8, command, "workspace")) {
+    try commands.workspace(allocator, args);
+}
+```
+
+**Subcommand Pattern:**
+Each major feature area uses consistent subcommand patterns:
+- `zion zig install/use/list/current/remove/clean`
+- `zion zls doctor/install/config/which/version`
+- `zion setup all/zig/zls/shell/verify`
+- `zion workspace init/add/build/test/clean`
+
+---
+
+## Zig Version Management
+
+### Architecture
+
+**Version Detection and Management:**
+```zig
+// System Zig Detection
+fn detectSystemZig(allocator: Allocator) ![]const u8 {
+    // Check common system paths
+    const system_paths = [_][]const u8{
+        "/usr/bin/zig",           // Arch package manager
+        "/usr/local/bin/zig",     // Manual install
+        "/opt/zig/bin/zig",       // Alternative location
+    };
+    // Fallback to PATH lookup
+}
+
+// Version Switching Logic
+fn useVersion(allocator: Allocator, args: [][:0]u8) !void {
+    if (std.mem.eql(u8, version, "system")) {
+        // Clear managed version, fall back to system
+        try clearActiveVersion(allocator);
+    } else {
+        // Set managed version
+        try setActiveVersion(allocator, version);
+    }
+}
+```
+
+**Download System:**
+- Real downloads from ziglang.org official sources
+- Automatic tar.xz extraction with integrity verification
+- Parallel download support with resume capability
+- Version-specific installation paths
+
+**PATH Management:**
+- Managed versions: `~/.zion/zig-versions/<version>/zig`
+- System fallback: `/usr/bin/zig` (Arch Linux)
+- Automatic shell profile updates
+
+---
+
+## ZLS Integration
+
+### Comprehensive Diagnostics
+
+**Health Check System:**
+```zig
+fn doctorZLS(allocator: Allocator) !void {
+    // Multi-layered verification
+    var all_good = true;
+    var warnings: u32 = 0;
+    
+    // 1. Binary detection and path verification
+    const zls_path = getZLSPath(allocator) catch null;
+    
+    // 2. Version compatibility checking
+    if (isZLSVersionCompatible(zls_version)) {
+        // Compatible
+    } else {
+        warnings += 1;
+    }
+    
+    // 3. Configuration validation
+    // 4. Project structure verification
+    // 5. Environment setup checking
+}
+```
+
+**Installation Guidance:**
+- Platform-specific instructions (Arch: `pacman -S zls`)
+- Pre-built binary downloads from GitHub
+- Build-from-source instructions
+- Editor-specific setup (Mason, manual)
+
+**Configuration Generation:**
+- Optimal ZLS settings for Zig development
+- Editor-specific integration tips
+- Performance optimization settings
+
+---
+
+## Setup System
+
+### "One Nation Under Zig" Philosophy
+
+**Zero-to-Hero Development Setup:**
+```zig
+fn setupAll(allocator: Allocator) !void {
+    // Interactive confirmation
+    std.debug.print("Continue with setup? [Y/n]: ");
+    
+    // Step-by-step setup with progress tracking
+    try setupZig(allocator, &.{});      // 1. Zig version management
+    try setupZLS(allocator, &.{});      // 2. Language server
+    try setupShell(allocator, &.{});    // 3. Shell integration
+    try setupTools(allocator, &.{});    // 4. Development tools
+    try verifySetup(allocator);         // 5. Verification
+}
+```
+
+**Modular Components:**
+- **Zig Setup**: Version management installation
+- **ZLS Setup**: Language server configuration
+- **Shell Setup**: PATH, completions, profiles
+- **Tool Setup**: Development tool verification
+- **Verification**: Comprehensive health check
+
+---
+
+## Workspace Management
+
+### Cargo-Style Architecture
+
+**Workspace Structure:**
+```
+my-workspace/
+├── zion-workspace.toml         # Workspace configuration
+├── packages/                   # Package directory
+│   ├── mylib/                 # Library package
+│   │   ├── src/lib.zig
+│   │   └── build.zig
+│   └── myapp/                 # Application package
+│       ├── src/main.zig
+│       └── build.zig
+└── target/                    # Shared build output
+```
+
+**Configuration Format:**
+```toml
+[workspace]
+name = "my-workspace"
+version = "0.1.0"
+
+members = [
+    "packages/mylib",
+    "packages/myapp",
+]
+
+[workspace.dependencies]
+# Shared dependencies
+
+[workspace.build]
+optimize = "Debug"
+target_dir = "target"
+```
+
+---
+
+## Legacy Architecture
 
 ## Architecture
 

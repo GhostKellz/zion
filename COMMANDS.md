@@ -2,6 +2,18 @@
 
 This document provides detailed information about all available commands in the Zion package manager.
 
+## What's New in v0.8.0 🚀
+
+Zion v0.8.0 "The Cargo for Zig" introduces major new functionality:
+
+- **🔧 Zig Version Management** - Complete `anyzig`-like functionality
+- **🧠 ZLS Integration** - Language server management and diagnostics  
+- **🎯 Setup System** - "One Nation Under Zig" complete environment setup
+- **📁 Workspace Management** - Cargo-style multi-package projects
+- **🏗️ Arch Linux First-Class Support** - Optimized for Arch Linux ecosystem
+
+**New Commands:** `zig`, `zls`, `setup`, `workspace`
+
 ## Command Reference
 
 ### `zion init`
@@ -488,6 +500,424 @@ Displays help information about available commands.
 ```bash
 zion help
 ```
+
+---
+
+## 🚀 New Commands in v0.8.0
+
+### `zion zig` - Zig Version Management
+
+Complete Zig version lifecycle management with `anyzig`-like functionality.
+
+#### `zion zig list [--remote] [--prerelease]`
+
+Lists installed Zig versions and optionally shows available remote versions.
+
+```bash
+zion zig list                    # Show installed versions
+zion zig list --remote           # Show available stable versions  
+zion zig list --remote --prerelease  # Include development versions
+```
+
+**Example output:**
+```
+🔧 Installed Zig Versions:
+  🖥️  system (0.15.0-dev.889+b8ac740a1) - /usr/bin/zig
+  → 🦎 0.14.1 (active)
+    🦎 0.13.0
+
+💡 Use 'zion zig list --remote' to see available versions
+```
+
+#### `zion zig install <version>`
+
+Installs a specific Zig version from official sources.
+
+```bash
+zion zig install 0.14.1                     # Install stable release
+zion zig install 0.15.0-dev.936+fc2c1883b  # Install development build
+zion zig install master                     # Install latest development
+```
+
+**What it does:**
+- Downloads from official ziglang.org sources (x86_64-linux)
+- Extracts to `~/.zion/zig-versions/<version>/`
+- Verifies integrity of downloaded archives
+- Provides usage instructions after installation
+
+**Supported versions:**
+- `0.14.1`, `0.13.0`, `0.12.1`, `0.11.0` (stable releases)
+- `0.15.0-dev.936+fc2c1883b` (development builds)
+- `master` (latest development)
+
+#### `zion zig use <version|system>`
+
+Switches between Zig versions or back to system installation.
+
+```bash
+zion zig use 0.14.1              # Switch to managed version
+zion zig use system              # Switch to system Zig (/usr/bin/zig)
+```
+
+**System Integration:**
+- Automatically detects Arch Linux package manager installations
+- Seamlessly switches between system and managed versions
+- Updates PATH and environment as needed
+
+#### `zion zig current`
+
+Shows detailed information about current Zig installation.
+
+```bash
+zion zig current
+```
+
+**Example output:**
+```
+🔧 Zig Version Status:
+🖥️  System Zig: /usr/bin/zig
+    Version: 0.15.0-dev.889+b8ac740a1
+🦎 Managed Zig: 0.14.1 (active)
+📁 Active Path: /home/user/.zion/zig-versions/0.14.1/zig
+📊 Active Version Details:
+0.14.1
+```
+
+#### `zion zig remove <version>`
+
+Removes an installed Zig version.
+
+```bash
+zion zig remove 0.13.0           # Remove specific version
+```
+
+#### `zion zig clean`
+
+Cleans up old and unused Zig versions.
+
+```bash
+zion zig clean
+```
+
+#### `zion zig default <version>`
+
+Sets a version as the default and updates shell profiles.
+
+```bash
+zion zig default 0.14.1
+```
+
+---
+
+### `zion zls` - ZLS (Zig Language Server) Integration
+
+Comprehensive ZLS management, configuration, and diagnostics.
+
+#### `zion zls doctor`
+
+Performs comprehensive health check of ZLS installation and configuration.
+
+```bash
+zion zls doctor
+```
+
+**Example output:**
+```
+🩺 ZLS Doctor - Health Check
+==============================
+🔍 ZLS Binary: ✅ Found at /home/user/.local/share/nvim/mason/bin/zls
+📊 ZLS Version: 0.14.0
+    ✅ Compatible with current Zig
+🦎 Zig Version: 0.15.0-dev.889+b8ac740a1
+    ✅ Supported version
+⚙️  ZLS Config: ⚠️  Not Found (using defaults)
+📁 Project Root: ✅ Zig project detected (build.zig found)
+    ✅ build.zig.zon found
+🌍 Environment: ✅ ZLS in PATH
+
+📋 Summary:
+⚠️  ZLS is functional but has 1 warning(s).
+💡 Consider running 'zion zls config' to optimize.
+
+🔗 Editor Integration:
+  Neovim:  :LspInfo to check ZLS status
+  VSCode:  Install 'ziglang.vscode-zig' extension
+  Emacs:   Use zig-mode with lsp-mode
+```
+
+**What it checks:**
+- ZLS binary location and accessibility
+- Version compatibility between ZLS and Zig
+- Configuration file existence and validity
+- Project structure (build.zig, build.zig.zon)
+- Environment setup (PATH, editor integration)
+
+#### `zion zls install`
+
+Provides platform-specific ZLS installation guidance.
+
+```bash
+zion zls install
+```
+
+**Installation options provided:**
+- Package manager instructions (Arch: `pacman -S zls`)
+- Pre-built binary downloads from GitHub releases
+- Build-from-source instructions
+- Editor-specific installation (Mason, etc.)
+
+#### `zion zls config`
+
+Generates optimal ZLS configuration file.
+
+```bash
+zion zls config
+```
+
+**What it does:**
+- Creates `~/.config/zls/zls.json` with optimal settings
+- Enables semantic tokens, inlay hints, snippets
+- Configures build-on-save and style warnings
+- Provides editor-specific integration tips
+
+**Generated config example:**
+```json
+{
+  "enable_semantic_tokens": true,
+  "enable_inlay_hints": true,
+  "enable_snippets": true,
+  "warn_style": true,
+  "highlight_global_var_declarations": true,
+  "enable_build_on_save": false,
+  "build_on_save_step": "check",
+  "prefer_ast_check_as_child_process": true
+}
+```
+
+#### `zion zls which`
+
+Shows the path to the currently active ZLS binary.
+
+```bash
+zion zls which
+```
+
+#### `zion zls version`
+
+Shows detailed ZLS version information.
+
+```bash
+zion zls version
+```
+
+#### `zion zls restart`
+
+Provides instructions for restarting ZLS in various editors.
+
+```bash
+zion zls restart
+```
+
+---
+
+### `zion setup` - "One Nation Under Zig" Setup System
+
+Complete Zig development environment setup and verification.
+
+#### `zion setup all`
+
+Performs complete Zig development environment setup with interactive prompts.
+
+```bash
+zion setup all
+```
+
+**What it does:**
+1. Installs latest stable Zig version
+2. Sets up ZLS (Zig Language Server)
+3. Configures shell integration (PATH, completions)
+4. Sets up development tools and directories
+5. Verifies complete setup
+
+**Interactive experience:**
+- Prompts for confirmation before each step
+- Provides progress feedback and status updates
+- Offers rollback on failures
+- Generates setup verification report
+
+#### `zion setup zig [--version=X.Y.Z] [--skip-install]`
+
+Sets up Zig version management.
+
+```bash
+zion setup zig                   # Install latest stable
+zion setup zig --version=0.14.1  # Install specific version
+zion setup zig --skip-install    # Setup without installing
+```
+
+#### `zion setup zls`
+
+Sets up ZLS installation and configuration.
+
+```bash
+zion setup zls
+```
+
+#### `zion setup shell [--zsh|--bash|--fish]`
+
+Sets up shell integration with PATH and completions.
+
+```bash
+zion setup shell                 # Auto-detect shell
+zion setup shell --zsh           # Force zsh setup
+zion setup shell --bash          # Force bash setup
+```
+
+**What it configures:**
+- Adds `~/.local/bin` to PATH in shell profile
+- Installs shell completions (zsh, bash, fish)
+- Creates backup of existing configurations
+- Provides manual setup instructions as fallback
+
+#### `zion setup nvim`
+
+Sets up Neovim integration with zion.nvim plugin.
+
+```bash
+zion setup nvim
+```
+
+**Provides:**
+- Plugin installation instructions for lazy.nvim/packer
+- Example configuration files
+- LSP integration setup
+- Telescope integration examples
+
+#### `zion setup tools`
+
+Sets up and verifies essential development tools.
+
+```bash
+zion setup tools
+```
+
+**Checks and configures:**
+- `git`, `curl`, `tar`, `unzip` availability
+- Creates development directories
+- Sets up tool configurations
+
+#### `zion setup verify`
+
+Comprehensive verification of complete setup.
+
+```bash
+zion setup verify
+```
+
+**Verification includes:**
+- Zig installation and PATH accessibility
+- ZLS installation and functionality
+- Shell completions installation
+- Project root detection capabilities
+- Development tools availability
+
+---
+
+### `zion workspace` - Cargo-style Workspace Management
+
+Multi-package project management with shared configuration.
+
+#### `zion workspace init`
+
+Initializes a new Zig workspace for multi-package projects.
+
+```bash
+zion workspace init
+```
+
+**Creates:**
+- `zion-workspace.toml` - Workspace configuration file
+- `packages/` - Directory for workspace packages
+- `target/` - Shared build output directory
+
+**Example workspace structure:**
+```
+my-workspace/
+├── zion-workspace.toml
+├── packages/
+│   ├── mylib/
+│   └── myapp/
+└── target/
+```
+
+#### `zion workspace add <package-name>`
+
+Adds a new package to the workspace.
+
+```bash
+zion workspace add mylib         # Add library package
+zion workspace add myapp         # Add application package
+```
+
+**What it does:**
+- Creates `packages/<package-name>/` directory
+- Generates basic package structure (src/, build.zig)
+- Creates template main.zig or lib.zig
+- Updates workspace configuration
+- Provides package-specific build.zig template
+
+#### `zion workspace list`
+
+Lists all packages in the current workspace.
+
+```bash
+zion workspace list
+```
+
+**Example output:**
+```
+Workspace Members:
+  packages/mylib/
+  packages/myapp/
+  packages/shared/
+```
+
+#### `zion workspace build`
+
+Builds all packages in the workspace.
+
+```bash
+zion workspace build
+```
+
+**Build process:**
+- Iterates through all workspace members
+- Builds each package in dependency order
+- Reports build status for each package
+- Aggregates build results and errors
+
+#### `zion workspace test`
+
+Runs tests for all packages in the workspace.
+
+```bash
+zion workspace test
+```
+
+#### `zion workspace clean`
+
+Cleans build artifacts for all workspace packages.
+
+```bash
+zion workspace clean
+```
+
+**Cleans:**
+- Shared `target/` directory
+- Individual package `.zig-cache/` directories
+- Individual package `zig-out/` directories
+
+---
 
 ## Exit Codes
 

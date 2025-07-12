@@ -43,6 +43,9 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    analyze     Analyze dependencies and project structure
         \\    version     Show version information
         \\    zig         Zig version manager (install, list, use, etc.)
+        \\    zls         ZLS (Zig Language Server) integration
+        \\    workspace   Cargo-style workspace management
+        \\    setup       One Nation Under Zig - complete setup wizard
         \\    help        Show this help message
         \\
         \\🚀 NEW IN v0.8.0:
@@ -87,6 +90,15 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion nvim setup             # Setup Neovim integration
         \\    zion zig install 0.12.0     # Install Zig version 0.12.0
         \\    zion zig use 0.12.0         # Switch to Zig version 0.12.0
+        \\    zion setup all              # Complete development environment setup
+        \\    zion setup zig              # Install and configure Zig
+        \\    zion setup verify           # Verify setup completion
+        \\    zion zls install            # Get ZLS installation guidance
+        \\    zion zls doctor             # Check ZLS health and setup
+        \\    zion zls config             # Create optimal ZLS configuration
+        \\    zion workspace init         # Initialize Cargo-style workspace
+        \\    zion workspace add mylib    # Add package to workspace
+        \\    zion workspace build        # Build all workspace packages
         \\    zion zig list --remote      # List available Zig versions
         \\    zion registry list          # List configured registries
         \\    zion registry test          # Test all registry connections
