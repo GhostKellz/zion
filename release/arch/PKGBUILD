@@ -1,6 +1,6 @@
 # Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
 pkgname=zion
-pkgver=0.8.0
+pkgver=v0.8.0.r3.g66c2bd7
 pkgrel=1
 pkgdesc="A modern, cargo-inspired package manager for the Zig programming language"
 arch=('x86_64' 'aarch64')

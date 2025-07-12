@@ -256,8 +256,7 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
     hash.final(&digest);
 
     // Convert the digest to hexadecimal
-    const hex_digest = try allocator.alloc(u8, digest.len * 2);
-    _ = try std.fmt.bufPrint(hex_digest, "{s}", .{std.fmt.fmtSliceHexLower(&digest)});
+    const hex_digest = try std.fmt.allocPrint(allocator, "{x}", .{digest});
 
     std.debug.print("Hash: {s}\n", .{hex_digest});
     return hex_digest;
@@ -288,9 +287,19 @@ pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []co
     const term = try child.wait();
 
     // Read output
-    const stderr = if (child.stderr) |stderr_pipe|
-        try stderr_pipe.reader().readAllAlloc(allocator, 10 * 1024 * 1024)
-    else
+    const stderr = if (child.stderr) |stderr_pipe| blk: {
+        var output_buf = std.ArrayList(u8).init(allocator);
+        defer output_buf.deinit();
+        
+        var read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            if (bytes_read == 0) break;
+            try output_buf.appendSlice(read_buf[0..bytes_read]);
+        }
+        
+        break :blk try allocator.dupe(u8, output_buf.items);
+    } else
         try allocator.dupe(u8, "No error output available");
     defer allocator.free(stderr);
 
@@ -343,9 +352,19 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
     const term = try child.wait();
 
     // Read stderr for error messages
-    const stderr = if (child.stderr) |stderr_pipe|
-        try stderr_pipe.reader().readAllAlloc(allocator, 10 * 1024 * 1024)
-    else
+    const stderr = if (child.stderr) |stderr_pipe| blk: {
+        var output_buf = std.ArrayList(u8).init(allocator);
+        defer output_buf.deinit();
+        
+        var read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            if (bytes_read == 0) break;
+            try output_buf.appendSlice(read_buf[0..bytes_read]);
+        }
+        
+        break :blk try allocator.dupe(u8, output_buf.items);
+    } else
         try allocator.dupe(u8, "No error output available");
     defer allocator.free(stderr);
 

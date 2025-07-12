@@ -5,7 +5,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
     _ = allocator; // unused but required for API consistency
 
     const help_text =
-        \\Zion v0.8.0 - A Modern Zig Package Manager
+        \\Zion v0.9.0 - A Modern Zig Package Manager
         \\
         \\USAGE:
         \\    zion <COMMAND>
@@ -48,13 +48,13 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    setup       One Nation Under Zig - complete setup wizard
         \\    help        Show this help message
         \\
-        \\🚀 NEW IN v0.8.0:
-        \\    Command aliases      Quick shortcuts (s=search, a=add, u=update, etc.)
-        \\    Selective updates    Update specific packages: zion update pkg1 pkg2
-        \\    Dry-run mode        Preview updates: zion update --dry-run
-        \\    Enhanced search     Advanced filters and better help
-        \\    Better package info  Show versions and stats: zion info <package>
-        \\    Config management   Set options: zion config set github_username myname
+        \\🚀 NEW IN v0.9.0:
+        \\    Production ready     All temporary workarounds removed
+        \\    Zig API updates      Compatible with latest Zig (0.15.0-dev)
+        \\    TokioZ integration   Full async support with updated tokioZ
+        \\    Stability fixes      Enhanced error handling and memory management
+        \\    HTTP timeouts        Proper timeout handling for network requests
+        \\    Interactive search   Fully working with proper stdin/stdout handling
         \\
         \\🚀 ENHANCED IN v0.7.0:
         \\    add                 Now with multi-registry support and dependency analysis

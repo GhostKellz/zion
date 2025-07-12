@@ -424,9 +424,30 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
     
     try child.spawn();
     
-    const stdout = try child.stdout.?.reader().readAllAlloc(allocator, 10 * 1024 * 1024); // 10MB limit
-    const stderr = try child.stderr.?.reader().readAllAlloc(allocator, 1024 * 1024);
+    // Use direct file readAll with pre-allocated buffers
+    var stdout_buf = std.ArrayList(u8).init(allocator);
+    defer stdout_buf.deinit();
+    var stderr_buf = std.ArrayList(u8).init(allocator);
+    defer stderr_buf.deinit();
+    
+    // Read data in chunks
+    var read_buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
+        if (bytes_read == 0) break;
+        try stdout_buf.appendSlice(read_buf[0..bytes_read]);
+    }
+    
+    while (true) {
+        const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
+        if (bytes_read == 0) break;
+        try stderr_buf.appendSlice(read_buf[0..bytes_read]);
+    }
+    
+    const stdout = try allocator.dupe(u8, stdout_buf.items);
+    const stderr = try allocator.dupe(u8, stderr_buf.items);
     defer allocator.free(stderr);
+    errdefer allocator.free(stdout); // Free stdout on error, caller frees on success
     
     const term = try child.wait();
     
@@ -434,13 +455,11 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
         .Exited => |code| {
             if (code != 0) {
                 std.debug.print("curl failed (exit code {d}): {s}\n", .{ code, stderr });
-                allocator.free(stdout);
                 return error.CurlFailed;
             }
         },
         else => {
             std.debug.print("curl terminated abnormally: {s}\n", .{stderr});
-            allocator.free(stdout);
             return error.CurlFailed;
         },
     }

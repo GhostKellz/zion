@@ -47,9 +47,10 @@ fn setupAll(allocator: Allocator) !void {
     // Ask for confirmation
     std.debug.print("Continue with setup? [Y/n]: ", .{});
     
-    const stdin = std.io.getStdIn().reader();
+    const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
     var buf: [256]u8 = undefined;
-    const response = (try stdin.readUntilDelimiterOrEof(&buf, '\n')) orelse "";
+    const bytes_read = try stdin.readAll(&buf);
+    const response = if (bytes_read > 0) buf[0..bytes_read] else "";
     const trimmed = std.mem.trim(u8, response, " \t\r\n");
     
     if (trimmed.len > 0 and !std.mem.eql(u8, trimmed, "Y") and !std.mem.eql(u8, trimmed, "y")) {

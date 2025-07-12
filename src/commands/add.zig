@@ -92,7 +92,17 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
         return null;
     }
     
-    const body = req.reader().readAllAlloc(allocator, 1024 * 1024) catch return null;
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = req.readAll(read_buf[0..]) catch return null;
+        if (bytes_read == 0) break;
+        output_buf.appendSlice(read_buf[0..bytes_read]) catch return null;
+    }
+    
+    const body = allocator.dupe(u8, output_buf.items) catch return null;
     defer allocator.free(body);
     
     // Parse JSON response: {"short_name": "zcrypto", "full_name": "cktech/zcrypto", "resolved": true}
@@ -268,9 +278,19 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     try child.spawn();
     
     // Read stderr for error messages (must be done before wait)
-    const stderr = if (child.stderr) |stderr_pipe|
-        try stderr_pipe.reader().readAllAlloc(allocator, 1024 * 1024)
-    else
+    const stderr = if (child.stderr) |stderr_pipe| blk: {
+        var output_buf = std.ArrayList(u8).init(allocator);
+        defer output_buf.deinit();
+        
+        var read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            if (bytes_read == 0) break;
+            try output_buf.appendSlice(read_buf[0..bytes_read]);
+        }
+        
+        break :blk try allocator.dupe(u8, output_buf.items);
+    } else
         try allocator.dupe(u8, "No error output available");
     defer allocator.free(stderr);
     

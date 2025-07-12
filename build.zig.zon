@@ -1,9 +1,14 @@
 .{
     .name = .zion,
-    .fingerprint = 0x2aaf547cce3f4848,
-    .version = "0.8.0",
+    .fingerprint = 0x2aaf547c00a3154e,
+    .version = "0.9.0",
     .minimum_zig_version = "0.13.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .tokioZ = .{
+            .url = "https://github.com/ghostkellz/tokioZ/archive/main.tar.gz",
+            .hash = "tokioZ-1.0.1-P0qt07Z-AwDM-WcpwjDbb0cIN4qQaTHpDuuszJ4bus5D",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

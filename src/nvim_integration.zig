@@ -216,8 +216,29 @@ pub const NvimIntegration = struct {
         
         try child.spawn();
         
-        const stdout = try child.stdout.?.reader().readAllAlloc(self.allocator, 10 * 1024 * 1024);
-        const stderr = try child.stderr.?.reader().readAllAlloc(self.allocator, 1024 * 1024);
+        var stdout_output_buf = std.ArrayList(u8).init(self.allocator);
+        defer stdout_output_buf.deinit();
+        
+        var stdout_read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = try child.stdout.?.readAll(stdout_read_buf[0..]);
+            if (bytes_read == 0) break;
+            try stdout_output_buf.appendSlice(stdout_read_buf[0..bytes_read]);
+        }
+        
+        const stdout = try self.allocator.dupe(u8, stdout_output_buf.items);
+        
+        var stderr_output_buf = std.ArrayList(u8).init(self.allocator);
+        defer stderr_output_buf.deinit();
+        
+        var stderr_read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = try child.stderr.?.readAll(stderr_read_buf[0..]);
+            if (bytes_read == 0) break;
+            try stderr_output_buf.appendSlice(stderr_read_buf[0..bytes_read]);
+        }
+        
+        const stderr = try self.allocator.dupe(u8, stderr_output_buf.items);
         defer self.allocator.free(stderr);
         
         const term = try child.wait();

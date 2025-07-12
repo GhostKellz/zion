@@ -267,7 +267,17 @@ const ProjectFormatter = struct {
 
         // Read any error output
         if (child_format.stderr) |stderr_pipe| {
-            const stderr_data = try stderr_pipe.reader().readAllAlloc(self.allocator, 1024 * 16);
+            var output_buf = std.ArrayList(u8).init(self.allocator);
+            defer output_buf.deinit();
+            
+            var read_buf: [4096]u8 = undefined;
+            while (true) {
+                const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+                if (bytes_read == 0) break;
+                try output_buf.appendSlice(read_buf[0..bytes_read]);
+            }
+            
+            const stderr_data = try self.allocator.dupe(u8, output_buf.items);
             defer self.allocator.free(stderr_data);
             
             if (stderr_data.len > 0) {

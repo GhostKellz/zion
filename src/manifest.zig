@@ -244,41 +244,67 @@ pub const ZonFile = struct {
         defer file.close();
 
         // Write ZON format with proper identifier syntax
-        try file.writer().print(".{{\n", .{});
-        try file.writer().print("    .name = .{s},\n", .{self.name}); // Use identifier format
-        try file.writer().print("    .version = \"{s}\",\n", .{self.version});
-        try file.writer().print("    .dependencies = .{{\n", .{});
+        try file.writeAll(".{\n");
+        
+        const name_line = try std.fmt.allocPrint(self.allocator, "    .name = .{s},\n", .{self.name});
+        defer self.allocator.free(name_line);
+        try file.writeAll(name_line);
+        
+        const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{self.version});
+        defer self.allocator.free(version_line);
+        try file.writeAll(version_line);
+        
+        try file.writeAll("    .dependencies = .{\n");
 
         var it = self.dependencies.iterator();
         while (it.next()) |entry| {
             const name = entry.key_ptr.*;
             const dep = entry.value_ptr.*;
-            try file.writer().print("        .{s} = .{{\n", .{name});
-            try file.writer().print("            .url = \"{s}\",\n", .{dep.url});
-            try file.writer().print("            .hash = \"{s}\",\n", .{dep.hash});
-            try file.writer().print("        }},\n", .{});
+            const dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
+            defer self.allocator.free(dep_name_line);
+            try file.writeAll(dep_name_line);
+            
+            const dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
+            defer self.allocator.free(dep_url_line);
+            try file.writeAll(dep_url_line);
+            
+            const dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
+            defer self.allocator.free(dep_hash_line);
+            try file.writeAll(dep_hash_line);
+            
+            try file.writeAll("        },\n");
         }
 
-        try file.writer().print("    }},\n", .{});
+        try file.writeAll("    },\n");
 
         // Add development dependencies section if any exist
         if (self.dev_dependencies.count() > 0) {
-            try file.writer().print("    .dev_dependencies = .{{\n", .{});
+            try file.writeAll("    .dev_dependencies = .{\n");
             
             var dev_it = self.dev_dependencies.iterator();
             while (dev_it.next()) |entry| {
                 const name = entry.key_ptr.*;
                 const dep = entry.value_ptr.*;
-                try file.writer().print("        .{s} = .{{\n", .{name});
-                try file.writer().print("            .url = \"{s}\",\n", .{dep.url});
-                try file.writer().print("            .hash = \"{s}\",\n", .{dep.hash});
-                try file.writer().print("        }},\n", .{});
+                
+                const dev_dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
+                defer self.allocator.free(dev_dep_name_line);
+                try file.writeAll(dev_dep_name_line);
+                
+                const dev_dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
+                defer self.allocator.free(dev_dep_url_line);
+                try file.writeAll(dev_dep_url_line);
+                
+                const dev_dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
+                defer self.allocator.free(dev_dep_hash_line);
+                try file.writeAll(dev_dep_hash_line);
+                
+                try file.writeAll("        },\n");
             }
             
-            try file.writer().print("    }},\n", .{});
+            try file.writeAll("    },\n");
         }
         
-        try file.writer().print("}}\n", .{});
+        try file.writeAll("}\n");
     }
 
     /// Add a development dependency

@@ -135,7 +135,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         
         // Downloads
         if (pkg.download_count > 0) {
-            std.debug.print("📥 {d} ", .{formatCount(pkg.download_count)});
+            std.debug.print("📥 {s} ", .{formatCount(pkg.download_count)});
         }
         
         // License
@@ -223,17 +223,37 @@ const SearchOptions = struct {
     filters: registry_v2.SearchFilters = .{},
     specific_registry: ?[]const u8 = null,
     
+    // Track what was allocated vs default literals
+    allocated_license: bool = false,
+    allocated_zig_version: bool = false,
+    allocated_registry: bool = false,
+    allocated_categories: bool = false,
+    
     fn deinit(self: *SearchOptions, allocator: Allocator) void {
-        if (self.filters.language) |lang| allocator.free(lang);
-        if (self.filters.license) |lic| allocator.free(lic);
-        if (self.filters.zig_version) |ver| allocator.free(ver);
-        if (self.specific_registry) |reg| allocator.free(reg);
-        
-        for (self.filters.categories) |cat| {
-            allocator.free(cat);
+        // Only free language if it was changed from default
+        if (self.filters.language) |lang| {
+            if (!std.mem.eql(u8, lang, "zig")) {
+                allocator.free(lang);
+            }
         }
-        if (self.filters.categories.len > 0) {
-            allocator.free(self.filters.categories);
+        
+        if (self.allocated_license and self.filters.license != null) {
+            allocator.free(self.filters.license.?);
+        }
+        if (self.allocated_zig_version and self.filters.zig_version != null) {
+            allocator.free(self.filters.zig_version.?);
+        }
+        if (self.allocated_registry and self.specific_registry != null) {
+            allocator.free(self.specific_registry.?);
+        }
+        
+        if (self.allocated_categories) {
+            for (self.filters.categories) |cat| {
+                allocator.free(cat);
+            }
+            if (self.filters.categories.len > 0) {
+                allocator.free(self.filters.categories);
+            }
         }
     }
 };
@@ -249,8 +269,10 @@ fn parseSearchOptions(options: *SearchOptions, args: []const []const u8, allocat
                 try categories.append(try allocator.dupe(u8, cat));
             }
             options.filters.categories = try categories.toOwnedSlice();
+            options.allocated_categories = true;
         } else if (std.mem.startsWith(u8, arg, "--license=")) {
             options.filters.license = try allocator.dupe(u8, arg[10..]);
+            options.allocated_license = true;
         } else if (std.mem.startsWith(u8, arg, "--min-stars=")) {
             options.filters.min_stars = try std.fmt.parseInt(u64, arg[12..], 10);
         } else if (std.mem.startsWith(u8, arg, "--sort=")) {
@@ -258,8 +280,10 @@ fn parseSearchOptions(options: *SearchOptions, args: []const []const u8, allocat
             options.filters.sort_by = std.meta.stringToEnum(registry_v2.SortOption, sort_str) orelse .relevance;
         } else if (std.mem.startsWith(u8, arg, "--registry=")) {
             options.specific_registry = try allocator.dupe(u8, arg[11..]);
+            options.allocated_registry = true;
         } else if (std.mem.startsWith(u8, arg, "--zig-version=")) {
             options.filters.zig_version = try allocator.dupe(u8, arg[14..]);
+            options.allocated_zig_version = true;
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             options.filters.per_page = try std.fmt.parseInt(u32, arg[8..], 10);
         }
@@ -311,39 +335,39 @@ pub fn interactiveSearch(allocator: Allocator) !void {
     std.debug.print("🔍 Zion Interactive Package Search\n", .{});
     std.debug.print("Type 'help' for search tips, 'exit' to quit\n\n", .{});
     
-    const stdin = std.io.getStdIn();
-    const stdout = std.io.getStdOut();
+    const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
+    const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
     
     while (true) {
         try stdout.writeAll("search> ");
         
         var buf: [1024]u8 = undefined;
-        if (try stdin.reader().readUntilDelimiterOrEof(&buf, '\n')) |line| {
-            const trimmed = std.mem.trim(u8, line, " \t\r\n");
+        const bytes_read = try stdin.readAll(&buf);
+        if (bytes_read == 0) break; // EOF
+        
+        const input = buf[0..bytes_read];
+        const trimmed = std.mem.trim(u8, input, " \t\r\n");
+        
+        if (std.mem.eql(u8, trimmed, "exit") or std.mem.eql(u8, trimmed, "quit")) {
+            break;
+        } else if (std.mem.eql(u8, trimmed, "help")) {
+            try printInteractiveHelp();
+        } else if (trimmed.len > 0) {
+            // Parse the search command
+            var args = std.ArrayList([]const u8).init(allocator);
+            defer args.deinit();
             
-            if (std.mem.eql(u8, trimmed, "exit") or std.mem.eql(u8, trimmed, "quit")) {
-                break;
-            } else if (std.mem.eql(u8, trimmed, "help")) {
-                try printInteractiveHelp();
-            } else if (trimmed.len > 0) {
-                // Parse the search command
-                var args = std.ArrayList([]const u8).init(allocator);
-                defer args.deinit();
-                
-                try args.append("zion");
-                try args.append("search");
-                
-                var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
-                while (it.next()) |token| {
-                    try args.append(token);
-                }
-                
-                search(allocator, args.items) catch |err| {
-                    std.debug.print("❌ Search error: {}\n", .{err});
-                };
+            try args.append("zion");
+            try args.append("search");
+            
+            var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
+            while (it.next()) |token| {
+                try args.append(token);
             }
-        } else {
-            break; // EOF
+            
+            search(allocator, args.items) catch |err| {
+                std.debug.print("❌ Search error: {}\n", .{err});
+            };
         }
     }
     

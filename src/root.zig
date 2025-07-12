@@ -3,7 +3,7 @@ const std = @import("std");
 pub const commands = @import("commands/mod.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "0.8.0";
+pub const ZION_VERSION = "0.9.0";
 
 // v0.7.0 Enhanced Modules
 pub const enhanced_config = @import("enhanced_config.zig");

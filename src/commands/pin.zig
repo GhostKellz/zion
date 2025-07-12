@@ -189,7 +189,17 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     const term = try child.wait();
     
     // Read stderr for error messages
-    const stderr = try child.stderr.?.reader().readAllAlloc(allocator, 1024 * 1024);
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
+        if (bytes_read == 0) break;
+        try output_buf.appendSlice(read_buf[0..bytes_read]);
+    }
+    
+    const stderr = try allocator.dupe(u8, output_buf.items);
     defer allocator.free(stderr);
     
     switch (term) {

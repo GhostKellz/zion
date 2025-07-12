@@ -237,7 +237,8 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\        .allocator = allocator,
             \\    }) catch |err| switch (err) {
             \\        error.InvalidArgument => {
-            \\            try diag.report(std.io.getStdErr().writer(), err);
+            \\            var buffer: [4096]u8 = undefined;
+            \\            try diag.report(std.io.getStdErr().writer(&buffer), err);
             \\            return;
             \\        },
             \\        else => return err,
@@ -245,10 +246,12 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\    defer res.deinit();
             \\
             \\    if (res.args.help != 0) {
-            \\        return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
+            \\        var buffer2: [4096]u8 = undefined;
+            \\        return clap.help(std.io.getStdErr().writer(&buffer2), clap.Help, &params, .{});
             \\    }
             \\    if (res.args.version != 0) {
-            \\        return std.io.getStdOut().writer().print("Version 1.0.0\n");
+            \\        var buffer3: [4096]u8 = undefined;
+            \\        return std.io.getStdOut().writer(&buffer3).print("Version 1.0.0\n");
             \\    }
             \\
             \\    std.debug.print("Hello from CLI app!\n");

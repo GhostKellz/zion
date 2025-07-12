@@ -265,56 +265,79 @@ pub const LockFile = struct {
         defer file.close();
 
         // Create a simple JSON structure manually for better control
-        try file.writer().writeAll("{\n  \"packages\": [\n");
+        try file.writeAll("{\n  \"packages\": [\n");
 
         for (self.packages.items, 0..) |pkg, i| {
-            try file.writer().writeAll("    {\n");
-            try file.writer().print("      \"name\": \"{s}\",\n", .{pkg.name});
-            try file.writer().print("      \"url\": \"{s}\",\n", .{pkg.url});
-            try file.writer().print("      \"hash\": \"{s}\",\n", .{pkg.hash});
-            try file.writer().print("      \"timestamp\": {d}", .{pkg.timestamp});
+            try file.writeAll("    {\n");
+            const name_line = try std.fmt.allocPrint(self.allocator, "      \"name\": \"{s}\",\n", .{pkg.name});
+            defer self.allocator.free(name_line);
+            try file.writeAll(name_line);
+            
+            const url_line = try std.fmt.allocPrint(self.allocator, "      \"url\": \"{s}\",\n", .{pkg.url});
+            defer self.allocator.free(url_line);
+            try file.writeAll(url_line);
+            
+            const hash_line = try std.fmt.allocPrint(self.allocator, "      \"hash\": \"{s}\",\n", .{pkg.hash});
+            defer self.allocator.free(hash_line);
+            try file.writeAll(hash_line);
+            
+            const timestamp_line = try std.fmt.allocPrint(self.allocator, "      \"timestamp\": {d}", .{pkg.timestamp});
+            defer self.allocator.free(timestamp_line);
+            try file.writeAll(timestamp_line);
 
             if (pkg.version) |version| {
-                try file.writer().print(",\n      \"version\": \"{s}\"", .{version});
+                const version_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version\": \"{s}\"", .{version});
+                defer self.allocator.free(version_line);
+                try file.writeAll(version_line);
             }
 
             // v0.7.0 enhanced fields
             if (pkg.registry) |registry| {
-                try file.writer().print(",\n      \"registry\": \"{s}\"", .{registry});
+                const registry_line = try std.fmt.allocPrint(self.allocator, ",\n      \"registry\": \"{s}\"", .{registry});
+                defer self.allocator.free(registry_line);
+                try file.writeAll(registry_line);
             }
 
             if (pkg.resolved_from) |resolved_from| {
-                try file.writer().print(",\n      \"resolved_from\": \"{s}\"", .{resolved_from});
+                const resolved_from_line = try std.fmt.allocPrint(self.allocator, ",\n      \"resolved_from\": \"{s}\"", .{resolved_from});
+                defer self.allocator.free(resolved_from_line);
+                try file.writeAll(resolved_from_line);
             }
 
             if (pkg.integrity) |integrity| {
-                try file.writer().print(",\n      \"integrity\": \"{s}\"", .{integrity});
+                const integrity_line = try std.fmt.allocPrint(self.allocator, ",\n      \"integrity\": \"{s}\"", .{integrity});
+                defer self.allocator.free(integrity_line);
+                try file.writeAll(integrity_line);
             }
 
             if (pkg.dependencies) |dependencies| {
-                try file.writer().writeAll(",\n      \"dependencies\": [");
+                try file.writeAll(",\n      \"dependencies\": [");
                 for (dependencies, 0..) |dep, dep_i| {
-                    try file.writer().print("\"{s}\"", .{dep});
+                    const dep_line = try std.fmt.allocPrint(self.allocator, "\"{s}\"", .{dep});
+                    defer self.allocator.free(dep_line);
+                    try file.writeAll(dep_line);
                     if (dep_i < dependencies.len - 1) {
-                        try file.writer().writeAll(", ");
+                        try file.writeAll(", ");
                     }
                 }
-                try file.writer().writeAll("]");
+                try file.writeAll("]");
             }
 
             if (pkg.dev_only) {
-                try file.writer().print(",\n      \"dev_only\": {}", .{pkg.dev_only});
+                const dev_only_line = try std.fmt.allocPrint(self.allocator, ",\n      \"dev_only\": {}", .{pkg.dev_only});
+                defer self.allocator.free(dev_only_line);
+                try file.writeAll(dev_only_line);
             }
 
-            try file.writer().writeAll("\n    }");
+            try file.writeAll("\n    }");
 
             if (i < self.packages.items.len - 1) {
-                try file.writer().writeAll(",");
+                try file.writeAll(",");
             }
-            try file.writer().writeAll("\n");
+            try file.writeAll("\n");
         }
 
-        try file.writer().writeAll("  ]\n}\n");
+        try file.writeAll("  ]\n}\n");
     }
 
     /// Get a package by name

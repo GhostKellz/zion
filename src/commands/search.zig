@@ -328,7 +328,23 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
         return;
     }
     
-    const body = req.reader().readAllAlloc(allocator, 1024 * 1024) catch {
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = req.readAll(read_buf[0..]) catch {
+            std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
+            return;
+        };
+        if (bytes_read == 0) break;
+        output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
+            return;
+        };
+    }
+    
+    const body = allocator.dupe(u8, output_buf.items) catch {
         std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
         return;
     };

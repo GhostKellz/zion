@@ -60,7 +60,7 @@ pub const Config = struct {
         const file = try fs.cwd().createFile(".zion/config.json", .{});
         defer file.close();
 
-        try file.writer().print(
+        const config_json = try std.fmt.allocPrint(self.allocator,
             \\{{
             \\  "security": {{
             \\    "verify_signatures": {s},
@@ -88,5 +88,7 @@ pub const Config = struct {
             self.download_timeout_seconds,
             self.max_retries,
         });
+        defer self.allocator.free(config_json);
+        try file.writeAll(config_json);
     }
 };

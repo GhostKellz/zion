@@ -461,7 +461,18 @@ fn verifyZigVersion(allocator: Allocator, expected_version: []const u8) !void {
     child.stderr_behavior = .Pipe;
     
     try child.spawn();
-    const stdout = try child.stdout.?.reader().readAllAlloc(allocator, 1024);
+    
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
+        if (bytes_read == 0) break;
+        try output_buf.appendSlice(read_buf[0..bytes_read]);
+    }
+    
+    const stdout = try allocator.dupe(u8, output_buf.items);
     defer allocator.free(stdout);
     _ = try child.wait();
     
@@ -532,9 +543,27 @@ fn detectSystemZig(allocator: Allocator) ![]const u8 {
     child.stderr_behavior = .Ignore;
     
     child.spawn() catch return error.SystemZigNotFound;
-    const stdout = child.stdout.?.reader().readAllAlloc(allocator, 1024) catch {
-        _ = child.wait() catch {};
-        return error.SystemZigNotFound;
+    
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    const stdout = blk: {
+        while (true) {
+            const bytes_read = child.stdout.?.readAll(read_buf[0..]) catch {
+                _ = child.wait() catch {};
+                return error.SystemZigNotFound;
+            };
+            if (bytes_read == 0) break;
+            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+                _ = child.wait() catch {};
+                return error.SystemZigNotFound;
+            };
+        }
+        break :blk allocator.dupe(u8, output_buf.items) catch {
+            _ = child.wait() catch {};
+            return error.SystemZigNotFound;
+        };
     };
     
     const result = child.wait() catch {
@@ -560,9 +589,27 @@ fn getZigVersionFromPath(allocator: Allocator, zig_path: []const u8) ![]const u8
     child.stderr_behavior = .Ignore;
     
     child.spawn() catch return error.VersionDetectionFailed;
-    const stdout = child.stdout.?.reader().readAllAlloc(allocator, 1024) catch {
-        _ = child.wait() catch {};
-        return error.VersionDetectionFailed;
+    
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+    
+    var read_buf: [4096]u8 = undefined;
+    const stdout = blk: {
+        while (true) {
+            const bytes_read = child.stdout.?.readAll(read_buf[0..]) catch {
+                _ = child.wait() catch {};
+                return error.VersionDetectionFailed;
+            };
+            if (bytes_read == 0) break;
+            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+                _ = child.wait() catch {};
+                return error.VersionDetectionFailed;
+            };
+        }
+        break :blk allocator.dupe(u8, output_buf.items) catch {
+            _ = child.wait() catch {};
+            return error.VersionDetectionFailed;
+        };
     };
     
     const result = child.wait() catch {
