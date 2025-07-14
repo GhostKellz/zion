@@ -1,0 +1,143 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+/// Registry configuration for multi-registry support
+pub const RegistryConfig = struct {
+    name: []const u8,
+    base_url: []const u8,
+    api_version: []const u8 = "v1",
+    auth_token: ?[]const u8 = null,
+    priority: u32 = 0, // Lower = higher priority
+    enabled: bool = true,
+    timeout_ms: u32 = 30000,
+    
+    pub fn getApiUrl(self: RegistryConfig, allocator: Allocator) ![]const u8 {
+        // Handle GitHub's special case (no /api/v1 prefix)
+        if (std.mem.eql(u8, self.name, "github")) {
+            return try allocator.dupe(u8, self.base_url);
+        }
+        
+        return std.fmt.allocPrint(allocator, "{s}/api/{s}", .{
+            std.mem.trimRight(u8, self.base_url, "/"),
+            self.api_version
+        });
+    }
+    
+    pub fn deinit(self: RegistryConfig, allocator: Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.base_url);
+        if (!std.mem.eql(u8, self.api_version, "v1")) {
+            allocator.free(self.api_version);
+        }
+        if (self.auth_token) |token| {
+            allocator.free(token);
+        }
+    }
+};
+
+/// Enhanced Zion configuration for v1.1.0 registry abstraction
+pub const ZionConfig = struct {
+    allocator: Allocator,
+    registries: std.ArrayList(RegistryConfig),
+    github_username: ?[]const u8 = null,
+    cache_dir: []const u8,
+    
+    pub fn init(allocator: Allocator) ZionConfig {
+        return ZionConfig{
+            .allocator = allocator,
+            .registries = std.ArrayList(RegistryConfig).init(allocator),
+            .cache_dir = "/tmp/zion-cache", // Default
+        };
+    }
+    
+    pub fn loadFromEnvironment(self: *ZionConfig) !void {
+        // Primary registry from environment
+        if (std.posix.getenv("ZION_REGISTRY_URL")) |registry_url| {
+            const auth_token = std.posix.getenv("ZION_REGISTRY_TOKEN");
+            
+            try self.registries.append(RegistryConfig{
+                .name = try self.allocator.dupe(u8, "custom"),
+                .base_url = try self.allocator.dupe(u8, registry_url),
+                .auth_token = if (auth_token) |token| 
+                    try self.allocator.dupe(u8, token) else null,
+                .priority = 0, // Highest priority
+            });
+        }
+        
+        // Multiple registries support
+        if (std.posix.getenv("ZION_REGISTRIES")) |registries_str| {
+            var it = std.mem.splitScalar(u8, registries_str, ',');
+            var priority: u32 = 1;
+            
+            while (it.next()) |registry_url| {
+                const trimmed = std.mem.trim(u8, registry_url, " ");
+                if (trimmed.len > 0) {
+                    try self.registries.append(RegistryConfig{
+                        .name = try std.fmt.allocPrint(self.allocator, "registry-{}", .{priority}),
+                        .base_url = try self.allocator.dupe(u8, trimmed),
+                        .priority = priority,
+                    });
+                    priority += 1;
+                }
+            }
+        }
+        
+        // Add Zigistry as preferred registry (if not already configured)
+        if (self.registries.items.len == 0 or !self.hasRegistry("zigistry")) {
+            try self.registries.append(RegistryConfig{
+                .name = try self.allocator.dupe(u8, "zigistry"),
+                .base_url = try self.allocator.dupe(u8, "https://zigistry-api.hf.space"),
+                .priority = 1,
+            });
+        }
+        
+        // Always add GitHub as fallback (lowest priority)
+        try self.registries.append(RegistryConfig{
+            .name = try self.allocator.dupe(u8, "github"),
+            .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
+            .api_version = try self.allocator.dupe(u8, ""), // GitHub doesn't use /api/v1 prefix
+            .priority = 999, // Lowest priority
+        });
+        
+        // Sort registries by priority
+        std.sort.block(RegistryConfig, self.registries.items, {}, struct {
+            fn lessThan(context: void, a: RegistryConfig, b: RegistryConfig) bool {
+                _ = context;
+                return a.priority < b.priority;
+            }
+        }.lessThan);
+        
+        // Load other config
+        if (std.posix.getenv("ZION_GITHUB_USERNAME")) |username| {
+            self.github_username = try self.allocator.dupe(u8, username);
+        }
+        
+        if (std.posix.getenv("ZION_CACHE_DIR")) |cache_dir| {
+            self.cache_dir = try self.allocator.dupe(u8, cache_dir);
+        }
+    }
+    
+    pub fn deinit(self: *ZionConfig) void {
+        for (self.registries.items) |registry| {
+            registry.deinit(self.allocator);
+        }
+        self.registries.deinit();
+        
+        if (self.github_username) |username| {
+            self.allocator.free(username);
+        }
+        
+        if (!std.mem.eql(u8, self.cache_dir, "/tmp/zion-cache")) {
+            self.allocator.free(self.cache_dir);
+        }
+    }
+    
+    fn hasRegistry(self: *const ZionConfig, name: []const u8) bool {
+        for (self.registries.items) |registry| {
+            if (std.mem.eql(u8, registry.name, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+};

@@ -1,12 +1,12 @@
 .{
     .name = .zion,
     .fingerprint = 0x2aaf547c00a3154e,
-    .version = "0.9.0",
+    .version = "1.0.0",
     .minimum_zig_version = "0.13.0",
     .dependencies = .{
-        .tokioZ = .{
-            .url = "https://github.com/ghostkellz/tokioZ/archive/main.tar.gz",
-            .hash = "tokioZ-1.0.1-P0qt07Z-AwDM-WcpwjDbb0cIN4qQaTHpDuuszJ4bus5D",
+        .zsync = .{
+            .url = "https://github.com/ghostkellz/zsync/archive/main.tar.gz",
+            .hash = "zsync-0.2.0-KAuheaGRDAD-QcOCIdlrjI8K13Ocd077SXaI85d4iC9E",
         },
     },
     .paths = .{

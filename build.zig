@@ -42,6 +42,15 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    // Import zsync dependency
+    const zsync_mod = b.lazyDependency("zsync", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    if (zsync_mod) |zsync| {
+        mod.addImport("zsync", zsync.module("zsync"));
+    }
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
@@ -83,6 +92,11 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+
+    // Add zsync to executable if available
+    if (zsync_mod) |zsync| {
+        exe.root_module.addImport("zsync", zsync.module("zsync"));
+    }
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default

@@ -2,17 +2,18 @@
 
 This document provides detailed information about all available commands in the Zion package manager.
 
-## What's New in v0.8.0 🚀
+## What's New in v1.1.0 🚀
 
-Zion v0.8.0 "The Cargo for Zig" introduces major new functionality:
+Zion v1.1.0 "The Deep Integration Release" introduces revolutionary community features:
 
-- **🔧 Zig Version Management** - Complete `anyzig`-like functionality
-- **🧠 ZLS Integration** - Language server management and diagnostics  
-- **🎯 Setup System** - "One Nation Under Zig" complete environment setup
-- **📁 Workspace Management** - Cargo-style multi-package projects
-- **🏗️ Arch Linux First-Class Support** - Optimized for Arch Linux ecosystem
+- **🌐 Multi-Registry Support** - Custom registries, Zepplin, Zigistry with priority fallback
+- **🌟 Enhanced Ziglibs Integration** - Curated packages, quality indicators, category browsing
+- **⚡ Advanced Zig Manager** - Cross-platform anyzig functionality with zsync async
+- **🔥 Advanced Zigistry Features** - Publishing, analytics, trending packages, ratings
+- **🧠 Deep ZLS Integration** - Real-time dependency monitoring, IDE optimization
+- **🚀 Async Performance** - zsync runtime for blazing-fast operations
 
-**New Commands:** `zig`, `zls`, `setup`, `workspace`
+**New Commands:** `ziglibs`, `zigistry`, Enhanced `zig`, Enhanced `zls`, Enhanced `add`
 
 ## Command Reference
 
@@ -502,6 +503,228 @@ zion help
 ```
 
 ---
+
+## 🌟 New Commands in v1.1.0
+
+### `zion ziglibs` - Enhanced Ziglibs Integration
+
+Complete integration with the Ziglibs community collection for high-quality, vetted packages.
+
+#### `zion ziglibs list [category]`
+
+Browse all Ziglibs packages with optional category filtering.
+
+```bash
+zion ziglibs list                    # All packages
+zion ziglibs list network            # Network-related packages
+zion ziglibs list crypto             # Cryptography packages
+```
+
+**Features:**
+- Quality indicators and maintenance status
+- Categorized package organization  
+- Enhanced metadata display
+- Community-vetted package showcase
+
+#### `zion ziglibs search <query>`
+
+Search within Ziglibs packages only for highest quality results.
+
+```bash
+zion ziglibs search http             # Search HTTP libraries in Ziglibs
+zion ziglibs search json             # Find JSON parsers
+```
+
+#### `zion ziglibs status`
+
+Show Ziglibs packages used in the current project.
+
+```bash
+zion ziglibs status                  # Display project Ziglibs usage
+```
+
+#### `zion ziglibs categories`
+
+List available package categories for browsing.
+
+```bash
+zion ziglibs categories              # Show all available categories
+```
+
+### `zion zigistry` - Advanced Zigistry Integration
+
+Enhanced features for the Zigistry package registry with analytics and publishing.
+
+#### `zion zigistry login`
+
+Authenticate with Zigistry for publishing and enhanced features.
+
+```bash
+zion zigistry login                  # Setup authentication
+```
+
+#### `zion zigistry publish [--sign]`
+
+Publish packages to Zigistry with optional cryptographic signing.
+
+```bash
+zion zigistry publish                # Publish current package
+zion zigistry publish --sign         # Publish with signing
+```
+
+#### `zion zigistry status [package]`
+
+Show Zigistry connection status or detailed package information.
+
+```bash
+zion zigistry status                 # Show connection status
+zion zigistry status mypackage       # Package-specific stats
+```
+
+#### `zion zigistry analytics [package]`
+
+View comprehensive package statistics and trends.
+
+```bash
+zion zigistry analytics              # Overall registry stats
+zion zigistry analytics mypackage    # Package-specific analytics
+```
+
+#### `zion zigistry search <query>`
+
+Enhanced Zigistry search with metadata and ratings.
+
+```bash
+zion zigistry search game            # Search with enhanced metadata
+```
+
+#### `zion zigistry trending`
+
+Discover trending packages on Zigistry.
+
+```bash
+zion zigistry trending               # Show popular packages
+```
+
+#### `zion zigistry info <package>`
+
+Get detailed package information including ratings and statistics.
+
+```bash
+zion zigistry info zig-clap          # Comprehensive package info
+```
+
+### Enhanced `zion add` - Multi-Registry Support
+
+The `add` command now supports multiple registries with intelligent resolution.
+
+#### Enhanced Options
+
+```bash
+zion add <package> [options]
+zion add <package1> <package2> ... [options]
+```
+
+**New Options:**
+- `--prefer-ziglibs` - Prefer Ziglibs packages when available
+- `--version, -v <ver>` - Install specific version
+- `--registry, -r <reg>` - Use specific registry
+
+**Examples:**
+```bash
+zion add raylib --prefer-ziglibs     # Prefer Ziglibs version
+zion add httpz --registry zigistry   # From specific registry
+zion add crypto json logging         # Multiple packages
+zion add zig-clap --version 0.8.0    # Specific version
+```
+
+**Features:**
+- Multi-registry package resolution
+- Ziglibs quality preference
+- Smart suggestions for typos
+- Parallel package processing
+
+## 🚀 Enhanced Commands in v1.1.0
+
+### Enhanced `zion zig` - Advanced Zig Version Management
+
+The Zig manager now includes cross-platform support and enhanced IDE integration.
+
+#### New Subcommands
+
+**`zion zig status`** - Comprehensive environment status
+```bash
+zion zig status                      # Complete Zig environment overview
+```
+
+**`zion zig which`** - Path helpers for IDE integration
+```bash
+zion zig which                       # Show path to current Zig binary
+```
+
+**`zion zig update`** - Update version index
+```bash
+zion zig update                      # Update available versions list
+```
+
+#### Enhanced Features
+
+- **Cross-platform support** - Linux, macOS, Windows
+- **Development build support** - Install dev builds and nightly versions
+- **IDE integration helpers** - JSON output for editor integrations
+- **Async downloads** - Fast downloads with zsync
+- **System integration** - Respects package managers (pacman, brew)
+
+**Enhanced Examples:**
+```bash
+zion zig install 0.12.0-dev.3180+83e578a18  # Dev builds
+zion zig current --json                      # JSON for IDEs
+zion zig status                              # Environment overview
+```
+
+### Enhanced `zion zls` - Deep ZLS Integration
+
+Advanced ZLS integration with real-time dependency management and IDE optimization.
+
+#### New Subcommands
+
+**`zion zls deps [--watch]`** - Real-time dependency monitoring
+```bash
+zion zls deps                        # Show dependency status
+zion zls deps --watch                # Live monitoring for IDE
+```
+
+**`zion zls completions`** - Generate completion data
+```bash
+zion zls completions                 # Generate package completions
+```
+
+**`zion zls analyze`** - Project analysis for optimization
+```bash
+zion zls analyze                     # Analyze for ZLS optimization
+```
+
+**`zion zls imports [--optimize]`** - Smart import management
+```bash
+zion zls imports                     # Analyze import usage
+zion zls imports --optimize          # Optimize imports
+```
+
+**`zion zls setup <editor>`** - Editor-specific setup
+```bash
+zion zls setup neovim                # Setup for Neovim
+zion zls setup vscode                # Setup for VS Code
+zion zls setup emacs                 # Setup for Emacs
+zion zls setup helix                 # Setup for Helix
+```
+
+#### Enhanced Features
+
+- **Real-time dependency health** - Live monitoring in editor
+- **Smart import optimization** - Remove unused, optimize organization  
+- **Package name completion** - Auto-complete package names in editor
+- **Visual dependency trees** - IDE integration for dependency visualization
+- **Comprehensive health checks** - Deep ZLS environment analysis
 
 ## 🚀 New Commands in v0.8.0
 

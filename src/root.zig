@@ -3,7 +3,7 @@ const std = @import("std");
 pub const commands = @import("commands/mod.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "0.9.0";
+pub const ZION_VERSION = "1.1.0";
 
 // v0.7.0 Enhanced Modules
 pub const enhanced_config = @import("enhanced_config.zig");
@@ -21,5 +21,5 @@ pub const downloader = @import("downloader.zig");
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {
     std.debug.print("Zion v{s} package manager is ready!\n", .{ZION_VERSION});
-    std.debug.print("🚀 New in v0.7.0: Multi-registry support, enhanced security, and performance optimizations!\n", .{});
+    std.debug.print("🌟 New in v1.1.0: Deep community integration, multi-registry support, and zsync async runtime!\n", .{});
 }

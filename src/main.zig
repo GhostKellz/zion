@@ -157,6 +157,10 @@ pub fn main() !void {
         try commands.zls(allocator, args);
     } else if (std.mem.eql(u8, command, "workspace")) {
         try commands.workspace(allocator, args);
+    } else if (std.mem.eql(u8, command, "ziglibs")) {
+        try commands.ziglibs(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "zigistry")) {
+        try commands.zigistry(allocator, args[2..]);
     } else {
         std.debug.print("Unknown command: {s}\n", .{raw_command});
         std.debug.print("Run 'zion help' for available commands.\n", .{});
