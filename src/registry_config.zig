@@ -140,4 +140,29 @@ pub const ZionConfig = struct {
         }
         return false;
     }
+    
+    pub fn createDefault(allocator: Allocator) !ZionConfig {
+        var config = ZionConfig.init(allocator);
+        
+        // Add default registries
+        try config.registries.append(RegistryConfig{
+            .name = try allocator.dupe(u8, "zigistry"),
+            .base_url = try allocator.dupe(u8, "https://zigistry.dev"),
+            .priority = 0,
+        });
+        
+        try config.registries.append(RegistryConfig{
+            .name = try allocator.dupe(u8, "github"),
+            .base_url = try allocator.dupe(u8, "https://api.github.com"),
+            .priority = 1,
+        });
+        
+        return config;
+    }
+    
+    pub fn loadOrDefault(allocator: Allocator) !ZionConfig {
+        var config = try createDefault(allocator);
+        try config.loadFromEnvironment();
+        return config;
+    }
 };

@@ -51,6 +51,24 @@ pub fn build(b: *std.Build) void {
         mod.addImport("zsync", zsync.module("zsync"));
     }
 
+    // Import ghostnet dependency for advanced HTTP client
+    const ghostnet_mod = b.lazyDependency("ghostnet", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    if (ghostnet_mod) |ghostnet| {
+        mod.addImport("ghostnet", ghostnet.module("ghostnet"));
+    }
+
+    // Import phantom dependency for TUI components
+    const phantom_mod = b.lazyDependency("phantom", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    if (phantom_mod) |phantom| {
+        mod.addImport("phantom", phantom.module("phantom"));
+    }
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
@@ -96,6 +114,16 @@ pub fn build(b: *std.Build) void {
     // Add zsync to executable if available
     if (zsync_mod) |zsync| {
         exe.root_module.addImport("zsync", zsync.module("zsync"));
+    }
+
+    // Add ghostnet to executable if available
+    if (ghostnet_mod) |ghostnet| {
+        exe.root_module.addImport("ghostnet", ghostnet.module("ghostnet"));
+    }
+
+    // Add phantom to executable if available
+    if (phantom_mod) |phantom| {
+        exe.root_module.addImport("phantom", phantom.module("phantom"));
     }
 
     // This declares intent for the executable to be installed into the

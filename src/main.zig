@@ -23,6 +23,8 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "sec")) return "security";
     if (std.mem.eql(u8, command, "perf")) return "performance";
     if (std.mem.eql(u8, command, "dbg")) return "debug";
+    if (std.mem.eql(u8, command, "tui")) return "interface";
+    if (std.mem.eql(u8, command, "ui")) return "interface";
     
     // Return original command if no alias found
     return command;
@@ -149,6 +151,8 @@ pub fn main() !void {
         try commands.publish(allocator, args);
     } else if (std.mem.eql(u8, command, "search-interactive")) {
         try commands.search_interactive(allocator);
+    } else if (std.mem.eql(u8, command, "interface")) {
+        try commands.interface(allocator);
     
     // v0.8.0 New Commands
     } else if (std.mem.eql(u8, command, "setup")) {

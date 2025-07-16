@@ -47,6 +47,10 @@ pub const setup = @import("setup_simple.zig").setup; // v0.8.0: Simplified setup
 pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
 pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
 
+// NEW v1.0.1: Enhanced TUI and HTTP3/2/1 Integration Commands
+pub const interface = @import("interface.zig").interface; // v1.0.1: Phantom TUI with ghostnet HTTP3/2/1
+pub const search_interactive = interface; // v1.0.1: Alias for TUI interface
+
 // NEW v1.1.0: Community Integration Commands
 pub const ziglibs = @import("ziglibs.zig").ziglibs; // v1.1.0: Enhanced Ziglibs integration
 pub const zigistry = @import("zigistry.zig").zigistry; // v1.1.0: Advanced Zigistry features
@@ -54,8 +58,8 @@ pub const enhanced_add = @import("enhanced_add.zig").enhanced_add; // v1.1.0: Mu
 pub const enhanced_zls = @import("enhanced_zls.zig").enhanced_zls; // v1.1.0: Deep ZLS integration
 pub const enhanced_zig_manager = @import("enhanced_zig_manager.zig").enhanced_zig_manager; // v1.1.0: Enhanced Zig manager
 
-// Interactive search mode
-pub const search_interactive = @import("search_v2.zig").interactiveSearch;
+// Interactive search mode (legacy)
+// pub const search_interactive = @import("search_v2.zig").interactiveSearch;
 
 // Legacy command aliases (for transition period if needed)
 pub const add_legacy = @import("add.zig").add;

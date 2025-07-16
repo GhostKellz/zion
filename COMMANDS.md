@@ -17,6 +17,92 @@ Zion v1.1.0 "The Deep Integration Release" introduces revolutionary community fe
 
 ## Command Reference
 
+### `zion tui` - Enhanced TUI Interface (phantom v0.3.0)
+
+Launches the advanced Terminal User Interface for interactive package management with full ecosystem integration.
+
+```bash
+zion tui
+```
+
+**What it does:**
+- Launches enhanced TUI v3.0 powered by phantom framework
+- Provides interactive browsing of GhostLibs and ZigLibs ecosystems
+- Real-time package search across multiple registries
+- Visual package installation queue and progress tracking
+- Comprehensive ecosystem overview with statistics
+- Mouse support and responsive interface
+
+**Features:**
+- **🌟 Ecosystem Overview** - Visual dashboard with GhostLibs and ZigLibs statistics
+- **👻 GhostLibs Browser** - Navigate phantom, ghostnet, zcrypto, and other packages
+- **🦎 ZigLibs Integration** - Browse curated community packages with quality indicators
+- **🔍 Universal Search** - Combined search across all repositories
+- **📦 Installation Manager** - Visual queue with progress tracking
+- **⚡ Async Operations** - Powered by zsync runtime for smooth performance
+
+**Navigation:**
+- `g` - Switch to GhostLibs ecosystem
+- `z` - Switch to ZigLibs ecosystem  
+- `s` - Open combined search interface
+- `i` - Open installation manager
+- `q` - Quit TUI
+
+**Package Categories:**
+- **Network**: HTTP3/2/1 clients, QUIC implementation, protocol bridges
+- **Crypto**: Quantum-resistant cryptography, digital signatures
+- **Database**: High-performance embedded database (zqlite)
+- **Concurrency**: Structured concurrency runtime (zsync)
+- **UI/TUI**: Advanced terminal interfaces (phantom)
+- **Privacy**: Advanced privacy toolkits and anonymization
+- **Financial**: Cryptocurrency wallets and ledger technology
+
+### `zion ui` - Ecosystem Interface
+
+Displays comprehensive ecosystem information and available packages in a structured CLI format.
+
+```bash
+zion ui
+```
+
+**What it does:**
+- Shows GhostLibs ecosystem with package count and descriptions
+- Displays ZigLibs integration status with tools and packages
+- Lists all available repositories with GitHub URLs
+- Provides quick installation examples for popular packages
+- Shows ecosystem statistics and health information
+
+**Example output:**
+```
+🚀 Launching Zion v1.0.1 - GhostLibs & ZigLibs Ecosystem Manager
+
+👻 GhostLibs Ecosystem (12 packages available):
+  • phantom - Advanced TUI framework
+  • ghostnet - HTTP3/2/1 context-aware client
+  • zcrypto - Quantum-resistant cryptography
+  • zquic - Ultra-fast QUIC/HTTP3 implementation
+  • zsync - Structured concurrency runtime
+  
+🦎 ZigLibs Integration (25+ packages, 15+ tools):
+  • 25+ curated packages from ziglibs repository
+  • Development tools and utilities
+  • Comprehensive ecosystem support
+
+🛠️ Quick Installation Examples:
+👻 Install GhostLibs packages:
+  zig fetch --save https://github.com/ghostkellz/phantom/archive/main.tar.gz
+  zig fetch --save https://github.com/ghostkellz/ghostnet/archive/main.tar.gz
+
+🦎 Install ZigLibs packages:
+  zig fetch --save https://github.com/ziglibs/zig-clap/archive/master.tar.gz
+```
+
+**Use cases:**
+- Quick ecosystem overview before diving into TUI
+- CI/CD environments where TUI is not available
+- Scripting and automation workflows
+- Package discovery and exploration
+
 ### `zion init`
 
 Initializes a new Zig project with the necessary file structure.
