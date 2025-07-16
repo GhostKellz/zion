@@ -7,7 +7,6 @@
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
 [![Arch Linux](https://img.shields.io/badge/Arch%20Linux-First%20Class-blue.svg)](https://archlinux.org)
 
-**🎉 v0.8.0 "The Cargo for Zig" Release** - Complete Zig development environment management
 
 Zion is the **definitive development tool** for the [Zig programming language](https://ziglang.org) - combining the best of Cargo's package management with rustup's version management, plus comprehensive tooling that goes beyond both. From zero to productive Zig development in one command.
 
