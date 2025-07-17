@@ -10,7 +10,7 @@
         },
         .ghostnet = .{
             .url = "https://github.com/ghostkellz/ghostnet/archive/main.tar.gz",
-            .hash = "ghostnet-0.2.4-mG-fWNDFBwAm2Hi5cdnqAeMDWGLP9yoY6z39kQNMIX95",
+            .hash = "ghostnet-0.2.4-mG-fWHfNBwCbJo_Pw-nH1OQtWzfBbL6VIdGWfyxSFUdh",
         },
         .phantom = .{
             .url = "https://github.com/ghostkellz/phantom/archive/refs/heads/main.tar.gz",
