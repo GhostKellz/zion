@@ -1,17 +1,17 @@
 const std = @import("std");
 const zsync = @import("zsync");
-const ghostnet = @import("ghostnet");
+const http_client = @import("http_client.zig");
 const Allocator = std.mem.Allocator;
 const ZionConfig = @import("registry_config.zig").ZionConfig;
 const RegistryConfig = @import("registry_config.zig").RegistryConfig;
 const Package = @import("registry_client.zig").Package;
 const Release = @import("registry_client.zig").Release;
 
-/// Enhanced Registry Manager v2.0 with ghostnet HTTP3/2/1 support for v1.0.1
+/// Enhanced Registry Manager v2.0 with standard HTTP client for v1.0.1
 pub const EnhancedRegistryManager = struct {
     allocator: Allocator,
     config: *ZionConfig,
-    http_client: *ghostnet.HttpClient,
+    http_client: *http_client.HttpClient,
     runtime: *zsync.Runtime,
     registries: std.ArrayList(RegistryEndpoint),
     
@@ -30,13 +30,13 @@ pub const EnhancedRegistryManager = struct {
         const runtime = try allocator.create(zsync.Runtime);
         runtime.* = zsync.Runtime.init(allocator, .{});
         
-        // Initialize ghostnet HTTP client with HTTP3/2/1 support
-        const http_client = try ghostnet.HttpClient.init(allocator, runtime);
+        // Initialize standard HTTP client
+        const http_client_instance = try http_client.HttpClient.init(allocator, runtime);
         
         manager.* = .{
             .allocator = allocator,
             .config = zion_config,
-            .http_client = http_client,
+            .http_client = http_client_instance,
             .runtime = runtime,
             .registries = std.ArrayList(RegistryEndpoint).init(allocator),
         };
@@ -82,11 +82,11 @@ pub const EnhancedRegistryManager = struct {
         }.lessThan);
     }
     
-    /// Resolve package with HTTP3/2/1 context-aware performance
+    /// Resolve package with HTTP client
     pub fn resolvePackage(self: *EnhancedRegistryManager, package_name: []const u8) !?Package {
-        std.log.info("🔍 Resolving package: {s} (HTTP3/2/1 context-aware)", .{package_name});
+        std.log.info("🔍 Resolving package: {s}", .{package_name});
         
-        // Use ghostnet's parallel async resolution
+        // Use parallel async resolution
         var futures = std.ArrayList(*zsync.Future(PackageResult)).init(self.allocator);
         defer {
             for (futures.items) |future| future.deinit();
@@ -103,7 +103,7 @@ pub const EnhancedRegistryManager = struct {
         for (futures.items) |future| {
             const result = try future.await();
             if (result.package) |pkg| {
-                std.log.info("✅ Found package {s} from {s} (HTTP/3)", .{ pkg.full_name, pkg.registry_name });
+                std.log.info("✅ Found package {s} from {s}", .{ pkg.full_name, pkg.registry_name });
                 return pkg;
             }
         }
@@ -112,9 +112,9 @@ pub const EnhancedRegistryManager = struct {
         return null;
     }
     
-    /// Enhanced search with HTTP3/2/1 parallel execution
+    /// Enhanced search with parallel HTTP execution
     pub fn searchPackages(self: *EnhancedRegistryManager, query: []const u8, max_results: usize) ![]Package {
-        std.log.info("🔍 Searching packages: {s} (parallel HTTP3/2/1)", .{query});
+        std.log.info("🔍 Searching packages: {s}", .{query});
         
         var search_futures = std.ArrayList(*zsync.Future(SearchResult)).init(self.allocator);
         defer {
@@ -159,15 +159,15 @@ pub const EnhancedRegistryManager = struct {
         // Sort by quality and relevance
         std.sort.block(Package, all_packages.items, {}, packageComparator);
         
-        std.log.info("📦 Found {} packages via HTTP3/2/1", .{all_packages.items.len});
+        std.log.info("📦 Found {} packages via HTTP", .{all_packages.items.len});
         return all_packages.toOwnedSlice();
     }
     
-    /// Download package with resume support and intelligent retry
+    /// Download package with HTTP client
     pub fn downloadPackage(self: *EnhancedRegistryManager, url: []const u8, dest_path: []const u8) !void {
-        std.log.info("⬇️ Downloading with HTTP3/2/1 resume support: {s}", .{url});
+        std.log.info("⬇️ Downloading: {s}", .{url});
         
-        // Use ghostnet's context-aware HTTP client for optimal protocol selection
+        // Use HTTP client
         const response = try self.http_client.get(url);
         defer response.deinit(self.allocator);
         
@@ -186,13 +186,13 @@ pub const EnhancedRegistryManager = struct {
         }
     }
     
-    /// Enhanced package metadata with HTTP/2 multiplexing
+    /// Enhanced package metadata with HTTP client
     pub fn getPackageMetadata(self: *EnhancedRegistryManager, full_name: []const u8) !?PackageMetadata {
         var parts = std.mem.splitScalar(u8, full_name, '/');
         const owner = parts.next() orelse return null;
         const repo = parts.next() orelse return null;
         
-        // Use HTTP/2 multiplexing for parallel metadata requests
+        // Use parallel metadata requests
         var metadata_futures = std.ArrayList(*zsync.Future(?PackageMetadata)).init(self.allocator);
         defer {
             for (metadata_futures.items) |future| future.deinit();

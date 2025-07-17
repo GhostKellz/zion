@@ -48,7 +48,7 @@ pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
 pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
 
 // NEW v1.0.1: Enhanced TUI and HTTP3/2/1 Integration Commands
-pub const interface = @import("interface.zig").interface; // v1.0.1: Phantom TUI with ghostnet HTTP3/2/1
+pub const interface = @import("interface.zig").interface; // v1.0.1: Phantom TUI with standard HTTP client
 pub const search_interactive = interface; // v1.0.1: Alias for TUI interface
 
 // NEW v1.1.0: Community Integration Commands

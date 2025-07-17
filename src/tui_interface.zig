@@ -200,7 +200,7 @@ pub const ZionTUI = struct {
         _ = package;
         
         // In real implementation:
-        // 1. Download with ghostnet's resume-capable HTTP client
+        // 1. Download with standard HTTP client
         // 2. Update progress widget with real-time status
         // 3. Handle installation steps with proper error handling
         // 4. Show completion or error status

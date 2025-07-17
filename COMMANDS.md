@@ -35,7 +35,7 @@ zion tui
 
 **Features:**
 - **🌟 Ecosystem Overview** - Visual dashboard with GhostLibs and ZigLibs statistics
-- **👻 GhostLibs Browser** - Navigate phantom, ghostnet, zcrypto, and other packages
+- **👻 GhostLibs Browser** - Navigate phantom, http_client, zcrypto, and other packages
 - **🦎 ZigLibs Integration** - Browse curated community packages with quality indicators
 - **🔍 Universal Search** - Combined search across all repositories
 - **📦 Installation Manager** - Visual queue with progress tracking
@@ -78,7 +78,7 @@ zion ui
 
 👻 GhostLibs Ecosystem (12 packages available):
   • phantom - Advanced TUI framework
-  • ghostnet - HTTP3/2/1 context-aware client
+  • http_client - Standard HTTP client (replaced ghostnet)
   • zcrypto - Quantum-resistant cryptography
   • zquic - Ultra-fast QUIC/HTTP3 implementation
   • zsync - Structured concurrency runtime
@@ -91,7 +91,7 @@ zion ui
 🛠️ Quick Installation Examples:
 👻 Install GhostLibs packages:
   zig fetch --save https://github.com/ghostkellz/phantom/archive/main.tar.gz
-  zig fetch --save https://github.com/ghostkellz/ghostnet/archive/main.tar.gz
+  # ghostnet removed - using standard HTTP client now
 
 🦎 Install ZigLibs packages:
   zig fetch --save https://github.com/ziglibs/zig-clap/archive/master.tar.gz

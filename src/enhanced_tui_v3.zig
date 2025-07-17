@@ -1,6 +1,6 @@
 const std = @import("std");
 const phantom = @import("phantom");
-const ghostnet = @import("ghostnet");
+// ghostnet removed - using standard HTTP client now
 const Allocator = std.mem.Allocator;
 const GhostKellzEcosystem = @import("ghostkellz_ecosystem.zig").GhostKellzEcosystem;
 const ZigLibsIntegration = @import("ziglibs_integration.zig").ZigLibsIntegration;
@@ -403,7 +403,7 @@ const EcosystemOverviewWidget = struct {
         
         // Feature highlights
         const features = [_][]const u8{
-            "🚀 HTTP3/2/1 context-aware networking (ghostnet)",
+            "🚀 HTTP networking with standard client",
             "🔐 Quantum-resistant cryptography (zcrypt)",
             "⚡ Structured concurrency runtime (zsync)",
             "🎨 Advanced TUI framework (phantom)",

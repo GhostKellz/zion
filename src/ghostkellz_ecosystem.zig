@@ -157,7 +157,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Advanced privacy and anonymization toolkit",
                 .category = .security,
                 .features = &[_][]const u8{ "Onion routing", "Traffic obfuscation", "Anonymous messaging", "Steganography" },
-                .deps = &[_][]const u8{ "zcrypt", "ghostnet" },
+                .deps = &[_][]const u8{"zcrypt"},
                 .maturity = .alpha,
             },
             .{
@@ -168,12 +168,13 @@ pub const GhostKellzEcosystem = struct {
                 .deps = &[_][]const u8{ "zsync" },
                 .maturity = .stable,
             },
+            // ghostnet removed - replaced with standard HTTP client
             .{
-                .name = "ghostnet",
-                .description = "Context-aware HTTP3/2/1 client with intelligent protocol selection",
+                .name = "http_client",
+                .description = "Standard HTTP client using Zig's built-in HTTP library",
                 .category = .networking,
-                .features = &[_][]const u8{ "HTTP/3 auto-negotiation", "Resume downloads", "Smart retry", "Connection pooling" },
-                .deps = &[_][]const u8{ "zsync", "zcrypt", "zquic" },
+                .features = &[_][]const u8{ "HTTP/1.1 support", "Standard library", "Simple API", "Reliable" },
+                .deps = &[_][]const u8{},
                 .maturity = .stable,
             },
             .{
@@ -197,7 +198,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Blazing-fast build system and package manager for Zig",
                 .category = .development_tools,
                 .features = &[_][]const u8{ "Incremental builds", "Parallel compilation", "Smart caching", "Cross-compilation" },
-                .deps = &[_][]const u8{ "zsync", "ghostnet" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .beta,
             },
             .{
@@ -213,7 +214,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Distributed computing and orchestration platform",
                 .category = .virtualization,
                 .features = &[_][]const u8{ "Container orchestration", "Service mesh", "Auto-scaling", "Load balancing" },
-                .deps = &[_][]const u8{ "ghostnet", "zsync", "zcrypt" },
+                .deps = &[_][]const u8{ "zsync", "zcrypt" },
                 .maturity = .alpha,
             },
             .{
@@ -245,7 +246,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Zero-configuration DNS server with advanced filtering",
                 .category = .networking,
                 .features = &[_][]const u8{ "DoH/DoT support", "Ad blocking", "Geographic filtering", "DNSSEC validation" },
-                .deps = &[_][]const u8{ "ghostnet", "zcrypt" },
+                .deps = &[_][]const u8{"zcrypt"},
                 .maturity = .beta,
             },
             .{
@@ -253,7 +254,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Content-addressable network storage system",
                 .category = .database,
                 .features = &[_][]const u8{ "Distributed storage", "Content deduplication", "Encryption at rest", "P2P sync" },
-                .deps = &[_][]const u8{ "zcrypt", "ghostnet", "zqlite" },
+                .deps = &[_][]const u8{ "zcrypt", "zqlite" },
                 .maturity = .alpha,
             },
             .{
@@ -269,7 +270,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Universal protocol bridge and translation layer",
                 .category = .networking,
                 .features = &[_][]const u8{ "Protocol translation", "Legacy support", "API gateway", "Traffic shaping" },
-                .deps = &[_][]const u8{ "ghostnet", "zquic", "zcrypt" },
+                .deps = &[_][]const u8{ "zquic", "zcrypt" },
                 .maturity = .beta,
             },
             .{
@@ -285,7 +286,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Cryptocurrency wallet framework with multi-chain support",
                 .category = .crypto,
                 .features = &[_][]const u8{ "HD wallet support", "Multi-chain compatibility", "Hardware wallet integration", "Secure key management" },
-                .deps = &[_][]const u8{ "zcrypt", "zsig", "ghostnet" },
+                .deps = &[_][]const u8{ "zcrypt", "zsig" },
                 .maturity = .beta,
             },
             .{
@@ -293,7 +294,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Distributed ledger technology and blockchain framework",
                 .category = .database,
                 .features = &[_][]const u8{ "Consensus algorithms", "Smart contracts", "Block validation", "P2P networking" },
-                .deps = &[_][]const u8{ "zcrypt", "zsig", "ghostnet", "zqlite" },
+                .deps = &[_][]const u8{ "zcrypt", "zsig", "zqlite" },
                 .maturity = .alpha,
             },
         };
