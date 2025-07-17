@@ -14,7 +14,7 @@
 - [ ] Implement `zion ziglibs list`, `zion ziglibs search`, and `--prefer-ziglibs` flag
 - [ ] Display maintenance status, API stability, and other Ziglibs info
 - [ ] Command: `zion ziglibs status` for current project packages
-
+- [ ] Depedencies: Pin depedencies, fix build.zig and build.zig.zon for v0.15+ zig 
 ---
 
 ### 2. Zigistry API Enhancements

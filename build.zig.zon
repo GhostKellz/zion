@@ -9,8 +9,8 @@
             .hash = "zsync-0.3.2-KAuhed0XGADaOKjYNl34Ragvca2zBYqvoAsBV-AhkoLS",
         },
         .ghostnet = .{
-            .url = "https://github.com/ghostkellz/ghostnet/archive/refs/heads/main.tar.gz",
-            .hash = "ghostnet-0.2.1-mG-fWP6zBQBJJHlIjasFZu-I3zAFlWuJuOqj_gaTWsYg",
+            .url = "https://github.com/ghostkellz/ghostnet/archive/main.tar.gz",
+            .hash = "ghostnet-0.2.3-mG-fWC_MBwBffS9k3967RGmWPg6Hdn7cyed300bT-m2v",
         },
         .phantom = .{
             .url = "https://github.com/ghostkellz/phantom/archive/refs/heads/main.tar.gz",
