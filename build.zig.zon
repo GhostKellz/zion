@@ -1,8 +1,8 @@
 .{
     .name = .zion,
     .fingerprint = 0x2aaf547c00a3154e,
-    .version = "1.0.2",
-    .minimum_zig_version = "0.13.0",
+    .version = "1.0.3",
+    .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .zsync = .{
             .url = "https://github.com/ghostkellz/zsync/archive/refs/heads/main.tar.gz",
