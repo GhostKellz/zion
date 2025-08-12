@@ -66,7 +66,8 @@ pub const RegistryManager = struct {
     
     /// Async search across all registries with result aggregation
     pub fn searchPackages(self: *RegistryManager, query: []const u8, max_results: usize) ![]Package {
-        std.log.info("🔍 Searching for: {s}", .{query});
+        const logger = @import("logger.zig");
+        logger.info("🔍 Searching for packages: {s}", .{query});
         
         // For now, use sequential search across registries
         // TODO: Implement proper async search with zsync Future API
@@ -75,7 +76,7 @@ pub const RegistryManager = struct {
         
         for (self.clients.items) |*client| {
             const result = searchInRegistry(client, query) catch |err| {
-                std.log.warn("Search failed in {s}: {}", .{ client.config.name, err });
+                logger.warn("Search failed in {s}: {}", .{ client.config.name, err });
                 continue;
             };
             

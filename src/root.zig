@@ -1,6 +1,8 @@
 //! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
 pub const commands = @import("commands/mod.zig");
+pub const logger = @import("logger.zig");
+pub const progress = @import("progress.zig");
 
 /// Current version of zion
 pub const ZION_VERSION = "1.0.3";

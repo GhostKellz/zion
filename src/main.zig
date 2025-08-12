@@ -35,6 +35,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Initialize logging system
+    zion.logger.init();
+
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
@@ -44,6 +47,18 @@ pub fn main() !void {
     }
 
     const raw_command = args[1];
+    
+    // Handle standard flags first
+    if (std.mem.eql(u8, raw_command, "--help") or std.mem.eql(u8, raw_command, "-h")) {
+        try commands.help(allocator);
+        return;
+    }
+    
+    if (std.mem.eql(u8, raw_command, "--version") or std.mem.eql(u8, raw_command, "-V")) {
+        try commands.version(allocator);
+        return;
+    }
+    
     const command = resolveCommandAlias(raw_command);
 
     if (std.mem.eql(u8, command, "init")) {
@@ -166,16 +181,25 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "zigistry")) {
         try commands.zigistry(allocator, args[2..]);
     } else {
-        std.debug.print("Unknown command: {s}\n", .{raw_command});
-        std.debug.print("Run 'zion help' for available commands.\n", .{});
-        std.debug.print("\n💡 Quick aliases:\n", .{});
-        std.debug.print("  s/search         - Search for packages\n", .{});
-        std.debug.print("  a/add            - Add packages\n", .{});
-        std.debug.print("  i/info           - Package information\n", .{});
-        std.debug.print("  l/list           - List dependencies\n", .{});
-        std.debug.print("  u/update         - Update packages\n", .{});
-        std.debug.print("  r/remove         - Remove packages\n", .{});
-        std.debug.print("  h/help           - Show help\n", .{});
-        std.debug.print("  v/version        - Show version\n", .{});
+        std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});
+        
+        // Suggest similar commands
+        if (std.mem.startsWith(u8, raw_command, "se")) {
+            std.debug.print("💡 Did you mean: 'zion search' or 'zion security'?\n\n", .{});
+        } else if (std.mem.startsWith(u8, raw_command, "ad")) {
+            std.debug.print("💡 Did you mean: 'zion add'?\n\n", .{});
+        } else if (std.mem.startsWith(u8, raw_command, "li")) {
+            std.debug.print("💡 Did you mean: 'zion list'?\n\n", .{});
+        } else if (std.mem.startsWith(u8, raw_command, "re")) {
+            std.debug.print("💡 Did you mean: 'zion remove' or 'zion registry'?\n\n", .{});
+        } else {
+            std.debug.print("💡 Run 'zion help' or 'zion --help' for available commands\n\n", .{});
+        }
+        
+        std.debug.print("🚀 Common commands:\n", .{});
+        std.debug.print("  zion search <package>     - Search for packages\n", .{});
+        std.debug.print("  zion add <package>        - Add a package\n", .{});
+        std.debug.print("  zion list                 - List dependencies\n", .{});
+        std.debug.print("  zion help                 - Show detailed help\n", .{});
     }
 }

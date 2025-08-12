@@ -135,11 +135,19 @@ fn searchRegistries(allocator: Allocator, term: []const u8, options: SearchOptio
     const fallback_registries = try registry.getFallbackRegistries(allocator, &config);
     defer allocator.free(fallback_registries);
     
-    for (fallback_registries) |fallback_registry| {
-        std.debug.print("\n📦 Fallback Registry ({s}):\n", .{fallback_registry.base_url});
-        trySearchRegistry(allocator, &fallback_registry, term) catch |err| {
-            std.debug.print("⚠️ Fallback registry search failed: {}\n", .{err});
-        };
+    if (fallback_registries.len > 0) {
+        const progress = @import("../progress.zig");
+        var registry_progress = progress.ProgressBar.init(allocator, "🔍 Searching registries", fallback_registries.len);
+        
+        for (fallback_registries, 0..) |fallback_registry, i| {
+            registry_progress.update(i);
+            std.debug.print("\n📦 Fallback Registry ({s}):\n", .{fallback_registry.base_url});
+            trySearchRegistry(allocator, &fallback_registry, term) catch |err| {
+                std.debug.print("⚠️ Fallback registry search failed: {}\n", .{err});
+            };
+        }
+        
+        registry_progress.finish();
     }
 }
 

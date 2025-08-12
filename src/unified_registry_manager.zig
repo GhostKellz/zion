@@ -474,9 +474,18 @@ pub const UnifiedRegistryManager = struct {
         defer response.deinit(self.allocator);
         
         if (response.status_code == 200 and response.body != null) {
-            // TODO: Parse JSON response and create Package
+            // Parse JSON response and create Package
+            const package_result = self.parsePackageFromJson(response.body.?, registry.name) catch |err| {
+                return PackageResult{
+                    .package = null,
+                    .registry_id = registry.getId(),
+                    .response_time = null,
+                    .error_msg = "JSON parsing failed",
+                };
+            };
+            
             return PackageResult{
-                .package = null, // TODO: Parse JSON to Package
+                .package = package_result,
                 .registry_id = registry.getId(),
                 .response_time = null,
                 .error_msg = null,
@@ -502,9 +511,18 @@ pub const UnifiedRegistryManager = struct {
         defer response.deinit(self.allocator);
         
         if (response.status_code == 200 and response.body != null) {
-            // TODO: Parse JSON response and create Package array
+            // Parse JSON response and create Package array
+            const packages_result = self.parsePackagesFromJson(response.body.?, registry.name) catch |err| {
+                return SearchResult{
+                    .packages = null,
+                    .registry_id = registry.getId(),
+                    .response_time = null,
+                    .error_msg = "JSON parsing failed",
+                };
+            };
+            
             return SearchResult{
-                .packages = &[_]Package{},
+                .packages = packages_result,
                 .registry_id = registry.getId(),
                 .response_time = null,
                 .error_msg = null,
@@ -519,6 +537,155 @@ pub const UnifiedRegistryManager = struct {
         };
     }
     
+    /// Parse a single package from JSON response
+    fn parsePackageFromJson(self: *UnifiedRegistryManager, json_body: []const u8, registry_name: []const u8) !Package {
+        const parsed = std.json.parseFromSlice(std.json.Value, self.allocator, json_body, .{}) catch {
+            std.debug.print("Failed to parse package JSON\n", .{});
+            return error.JsonParsingFailed;
+        };
+        defer parsed.deinit();
+        
+        const root_obj = parsed.value.object;
+        
+        // Extract package fields from JSON
+        const name = if (root_obj.get("name")) |name_val| 
+            try self.allocator.dupe(u8, name_val.string)
+        else 
+            return error.MissingPackageName;
+            
+        const full_name = if (root_obj.get("full_name")) |full_name_val| 
+            try self.allocator.dupe(u8, full_name_val.string)
+        else 
+            try self.allocator.dupe(u8, name);
+            
+        const description = if (root_obj.get("description")) |desc_val| 
+            if (desc_val == .string) try self.allocator.dupe(u8, desc_val.string) else null
+        else 
+            null;
+            
+        const version = if (root_obj.get("version") orelse root_obj.get("tag_name")) |ver_val| 
+            try self.allocator.dupe(u8, ver_val.string)
+        else 
+            try self.allocator.dupe(u8, "unknown");
+            
+        const tarball_url = if (root_obj.get("tarball_url") orelse root_obj.get("download_url")) |url_val| 
+            try self.allocator.dupe(u8, url_val.string)
+        else 
+            try self.allocator.dupe(u8, "");
+            
+        const sha256_hash = if (root_obj.get("sha256") orelse root_obj.get("sha")) |hash_val| 
+            try self.allocator.dupe(u8, hash_val.string)
+        else 
+            null;
+            
+        const published_at = if (root_obj.get("published_at") orelse root_obj.get("created_at")) |pub_val| 
+            try self.allocator.dupe(u8, pub_val.string)
+        else 
+            try self.allocator.dupe(u8, "unknown");
+        
+        return Package{
+            .name = name,
+            .full_name = full_name,
+            .description = description,
+            .version = version,
+            .tarball_url = tarball_url,
+            .sha256_hash = sha256_hash,
+            .published_at = published_at,
+            .registry_name = try self.allocator.dupe(u8, registry_name),
+            .is_ziglibs = std.mem.indexOf(u8, registry_name, "ziglibs") != null,
+            .quality_score = if (root_obj.get("quality_score")) |qs| @intCast(qs.integer) else null,
+            .maintenance_status = if (root_obj.get("maintenance_status")) |ms| try self.allocator.dupe(u8, ms.string) else null,
+            .download_count = if (root_obj.get("downloads")) |dl| @intCast(dl.integer) else null,
+            .star_count = if (root_obj.get("stargazers_count") orelse root_obj.get("stars")) |sc| @intCast(sc.integer) else null,
+            .rating = if (root_obj.get("rating")) |r| @floatCast(r.float) else null,
+        };
+    }
+    
+    /// Parse an array of packages from JSON search results
+    fn parsePackagesFromJson(self: *UnifiedRegistryManager, json_body: []const u8, registry_name: []const u8) ![]Package {
+        const parsed = std.json.parseFromSlice(std.json.Value, self.allocator, json_body, .{}) catch {
+            std.debug.print("Failed to parse search JSON\n", .{});
+            return error.JsonParsingFailed;
+        };
+        defer parsed.deinit();
+        
+        // Handle different response formats
+        var packages_array: std.json.Array = undefined;
+        
+        if (parsed.value.object.get("items")) |items| {
+            // GitHub API format: {"items": [...]}
+            packages_array = items.array;
+        } else if (parsed.value.object.get("packages")) |packages| {
+            // Custom registry format: {"packages": [...]}
+            packages_array = packages.array;
+        } else if (parsed.value == .array) {
+            // Direct array format: [...]
+            packages_array = parsed.value.array;
+        } else {
+            return error.InvalidJsonFormat;
+        }
+        
+        var packages = std.ArrayList(Package).init(self.allocator);
+        
+        for (packages_array.items) |item| {
+            if (item != .object) continue;
+            
+            const pkg_obj = item.object;
+            
+            // Extract package fields (similar to parsePackageFromJson but for array items)
+            const name = if (pkg_obj.get("name")) |name_val| 
+                try self.allocator.dupe(u8, name_val.string)
+            else 
+                continue; // Skip packages without names
+                
+            const full_name = if (pkg_obj.get("full_name")) |full_name_val| 
+                try self.allocator.dupe(u8, full_name_val.string)
+            else 
+                try self.allocator.dupe(u8, name);
+                
+            const description = if (pkg_obj.get("description")) |desc_val| 
+                if (desc_val == .string and desc_val.string.len > 0) try self.allocator.dupe(u8, desc_val.string) else null
+            else 
+                null;
+                
+            const version = if (pkg_obj.get("version") orelse pkg_obj.get("tag_name") orelse pkg_obj.get("default_branch")) |ver_val| 
+                try self.allocator.dupe(u8, ver_val.string)
+            else 
+                try self.allocator.dupe(u8, "latest");
+                
+            const tarball_url = if (pkg_obj.get("tarball_url") orelse pkg_obj.get("clone_url") orelse pkg_obj.get("html_url")) |url_val| 
+                try self.allocator.dupe(u8, url_val.string)
+            else 
+                try self.allocator.dupe(u8, "");
+                
+            const published_at = if (pkg_obj.get("published_at") orelse pkg_obj.get("created_at") orelse pkg_obj.get("updated_at")) |pub_val| 
+                try self.allocator.dupe(u8, pub_val.string)
+            else 
+                try self.allocator.dupe(u8, "unknown");
+            
+            const package = Package{
+                .name = name,
+                .full_name = full_name,
+                .description = description,
+                .version = version,
+                .tarball_url = tarball_url,
+                .sha256_hash = null, // Usually not available in search results
+                .published_at = published_at,
+                .registry_name = try self.allocator.dupe(u8, registry_name),
+                .is_ziglibs = std.mem.indexOf(u8, registry_name, "ziglibs") != null,
+                .quality_score = if (pkg_obj.get("quality_score")) |qs| @intCast(qs.integer) else null,
+                .maintenance_status = if (pkg_obj.get("maintenance_status")) |ms| try self.allocator.dupe(u8, ms.string) else null,
+                .download_count = if (pkg_obj.get("downloads") orelse pkg_obj.get("download_count")) |dl| @intCast(dl.integer) else null,
+                .star_count = if (pkg_obj.get("stargazers_count") orelse pkg_obj.get("stars")) |sc| @intCast(sc.integer) else null,
+                .rating = if (pkg_obj.get("rating")) |r| @floatCast(r.float) else null,
+            };
+            
+            try packages.append(package);
+        }
+        
+        return try packages.toOwnedSlice();
+    }
+
     fn packageComparator(context: void, a: Package, b: Package) bool {
         _ = context;
         

@@ -390,7 +390,8 @@ pub const RegistryClient = struct {
         _ = body;
         
         // Simulate HTTP request - in production, use actual HTTP client
-        std.log.debug("Making request to: {s}", .{url});
+        const logger = @import("logger.zig");
+        logger.debug("Making request to: {s}", .{url});
         
         // Return mock data for now
         const mock_response = try self.allocator.dupe(u8, "{}");

@@ -134,19 +134,13 @@ pub const RequestBatcher = struct {
         
         // Parse and distribute results
         if (response.isSuccess() and response.body != null) {
-            // TODO: Parse JSON response and distribute to individual futures
-            // For now, create placeholder results
-            for (batch.requests.items) |request| {
-                const result = BatchedResult{
-                    .success = true,
-                    .data = response.body,
-                    .error_message = null,
-                    .from_cache = false,
-                    .batch_size = @intCast(batch.requests.items.len),
-                };
-                
-                request.future.complete(result);
-            }
+            // Parse JSON response for search results
+            self.parseAndDistributeSearchResults(batch, response.body.?) catch |err| {
+                // If JSON parsing fails, fallback to error handling
+                std.debug.print("Warning: JSON parsing failed: {}\n", .{err});
+                self.handleBatchError(batch, "JSON parsing error");
+                return;
+            };
         } else {
             // Handle error for all requests in batch
             for (batch.requests.items) |request| {
@@ -189,18 +183,13 @@ pub const RequestBatcher = struct {
         
         // Parse and distribute results
         if (response.isSuccess() and response.body != null) {
-            // TODO: Parse JSON response and distribute to individual futures
-            for (batch.requests.items) |request| {
-                const result = BatchedResult{
-                    .success = true,
-                    .data = response.body,
-                    .error_message = null,
-                    .from_cache = false,
-                    .batch_size = @intCast(batch.requests.items.len),
-                };
-                
-                request.future.complete(result);
-            }
+            // Parse JSON response for package info
+            self.parseAndDistributePackageInfo(batch, response.body.?) catch |err| {
+                // If JSON parsing fails, fallback to error handling
+                std.debug.print("Warning: Package info JSON parsing failed: {}\n", .{err});
+                self.handleBatchError(batch, "Package info parsing error");
+                return;
+            };
         } else {
             // Handle error for all requests in batch
             for (batch.requests.items) |request| {
@@ -327,6 +316,131 @@ pub const RequestBatcher = struct {
     /// Reset batch statistics
     pub fn resetStats(self: *Self) void {
         self.stats = BatchStats.init();
+    }
+    
+    /// Parse search results JSON and distribute to individual futures
+    fn parseAndDistributeSearchResults(self: *Self, batch: *RequestBatch, json_body: []const u8) !void {
+        // Basic JSON structure expected: {"packages": [{"name": "...", "version": "...", ...}, ...]}
+        const parsed = std.json.parseFromSlice(std.json.Value, self.allocator, json_body, .{}) catch {
+            std.debug.print("Failed to parse search JSON\n", .{});
+            // Fallback to simple data distribution
+            for (batch.requests.items) |request| {
+                const result = BatchedResult{
+                    .success = true,
+                    .data = json_body,
+                    .error_message = null,
+                    .from_cache = false,
+                    .batch_size = @intCast(batch.requests.items.len),
+                };
+                request.future.complete(result);
+            }
+            return;
+        };
+        defer parsed.deinit();
+        
+        // Extract packages array
+        const packages_array = if (parsed.value.object.get("packages")) |packages| 
+            packages.array else {
+            // No packages array found, distribute raw data
+            for (batch.requests.items) |request| {
+                const result = BatchedResult{
+                    .success = true,
+                    .data = json_body,
+                    .error_message = null,
+                    .from_cache = false,
+                    .batch_size = @intCast(batch.requests.items.len),
+                };
+                request.future.complete(result);
+            }
+            return;
+        };
+        
+        // Distribute search results to matching requests
+        for (batch.requests.items) |request| {
+            // For search requests, return all results for now
+            // In a more sophisticated implementation, we'd filter results per query
+            const result = BatchedResult{
+                .success = true,
+                .data = json_body,
+                .error_message = null,
+                .from_cache = false,
+                .batch_size = @intCast(batch.requests.items.len),
+            };
+            request.future.complete(result);
+        }
+    }
+    
+    /// Parse package info JSON and distribute to individual futures
+    fn parseAndDistributePackageInfo(self: *Self, batch: *RequestBatch, json_body: []const u8) !void {
+        // Basic JSON structure expected: {"packages": {"pkg1": {...}, "pkg2": {...}, ...}}
+        const parsed = std.json.parseFromSlice(std.json.Value, self.allocator, json_body, .{}) catch {
+            std.debug.print("Failed to parse package info JSON\n", .{});
+            // Fallback to error distribution
+            self.handleBatchError(batch, "JSON parsing failed");
+            return;
+        };
+        defer parsed.deinit();
+        
+        // Extract packages object
+        const packages_obj = if (parsed.value.object.get("packages")) |packages| 
+            packages.object else {
+            self.handleBatchError(batch, "Invalid JSON structure");
+            return;
+        };
+        
+        // Distribute package info to matching requests
+        for (batch.requests.items) |request| {
+            const package_name = request.package_name orelse "";
+            
+            if (packages_obj.get(package_name)) |package_info| {
+                // Found specific package info
+                const package_json = std.json.stringifyAlloc(self.allocator, package_info, .{}) catch {
+                    const result = BatchedResult{
+                        .success = false,
+                        .data = null,
+                        .error_message = "Failed to serialize package info",
+                        .from_cache = false,
+                        .batch_size = @intCast(batch.requests.items.len),
+                    };
+                    request.future.complete(result);
+                    continue;
+                };
+                defer self.allocator.free(package_json);
+                
+                const result = BatchedResult{
+                    .success = true,
+                    .data = try self.allocator.dupe(u8, package_json),
+                    .error_message = null,
+                    .from_cache = false,
+                    .batch_size = @intCast(batch.requests.items.len),
+                };
+                request.future.complete(result);
+            } else {
+                // Package not found
+                const result = BatchedResult{
+                    .success = false,
+                    .data = null,
+                    .error_message = "Package not found",
+                    .from_cache = false,
+                    .batch_size = @intCast(batch.requests.items.len),
+                };
+                request.future.complete(result);
+            }
+        }
+    }
+    
+    /// Handle batch errors by distributing error results to all requests
+    fn handleBatchError(self: *Self, batch: *RequestBatch, error_message: []const u8) void {
+        for (batch.requests.items) |request| {
+            const result = BatchedResult{
+                .success = false,
+                .data = null,
+                .error_message = error_message,
+                .from_cache = false,
+                .batch_size = @intCast(batch.requests.items.len),
+            };
+            request.future.complete(result);
+        }
     }
 };
 

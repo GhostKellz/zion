@@ -152,8 +152,28 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     }
 
     // Step 1: Download and hash the package
-    std.debug.print("Downloading {s}...\n", .{package_ref});
-    const download_result = try downloader.downloadAndHashPackage(allocator, package_ref);
+    const progress = @import("../progress.zig");
+    var spinner = progress.Spinner.init("Downloading and verifying package");
+    
+    // Show spinner while downloading
+    var download_result: downloader.DownloadResult = undefined;
+    var download_error: ?anyerror = null;
+    
+    // Simulate download with spinner (in real impl, this would be async)
+    const download_iterations = 10;
+    var i: u32 = 0;
+    while (i < download_iterations) : (i += 1) {
+        spinner.tick();
+        std.time.sleep(100_000_000); // 100ms
+    }
+    
+    download_result = downloader.downloadAndHashPackage(allocator, package_ref) catch |err| {
+        download_error = err;
+        spinner.fail("Package download failed");
+        return err;
+    };
+    
+    spinner.finish("Package downloaded and verified");
     defer {
         allocator.free(download_result.url);
         allocator.free(download_result.hash);

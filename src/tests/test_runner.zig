@@ -6,6 +6,8 @@ const unified_registry_test = @import("unified_registry_test.zig");
 const http_client_test = @import("http_client_test.zig");
 const async_downloader_test = @import("async_downloader_test.zig");
 const request_batcher_test = @import("request_batcher_test.zig");
+const circuit_breaker_test = @import("circuit_breaker_test.zig");
+const integration_test = @import("integration_test.zig");
 
 // Performance test suite
 test "Performance: concurrent operations benchmark" {
