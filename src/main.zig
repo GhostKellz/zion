@@ -4,25 +4,25 @@ const zion = @import("zion");
 const commands = zion.commands;
 
 /// Async wrapper for add command to leverage zsync performance
-fn addAsync(allocator: std.mem.Allocator, io: anytype, package_ref: []const u8, options: commands.AddOptions) !void {
+fn addAsync(allocator: std.mem.Allocator, io: zsync.Io, package_ref: []const u8, options: commands.AddOptions) !void {
     _ = io; // For future async operations
     try commands.add(allocator, package_ref, options);
 }
 
 /// Async wrapper for multiple package add to leverage zsync performance  
-fn addMultipleAsync(allocator: std.mem.Allocator, io: anytype, packages: []const []const u8, options: commands.AddOptions) !void {
+fn addMultipleAsync(allocator: std.mem.Allocator, io: zsync.Io, packages: []const []const u8, options: commands.AddOptions) !void {
     _ = io; // For future async operations
     try commands.addMultiple(allocator, packages, options);
 }
 
 /// Async wrapper for search command to leverage zsync performance
-fn searchAsync(allocator: std.mem.Allocator, io: anytype, args: [][:0]u8) !void {
+fn searchAsync(allocator: std.mem.Allocator, io: zsync.Io, args: [][:0]u8) !void {
     _ = io; // For future async operations  
     try commands.search(allocator, args);
 }
 
 /// Async wrapper for registry operations to leverage zsync performance
-fn registryAsync(allocator: std.mem.Allocator, io: anytype, args: [][:0]u8) !void {
+fn registryAsync(allocator: std.mem.Allocator, io: zsync.Io, args: [][:0]u8) !void {
     _ = io; // For future async operations
     try commands.registry(allocator, args);
 }
@@ -56,11 +56,11 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
 }
 
 pub fn main() !void {
-    // Use IO-focused runtime for CLI development tools
-    try zsync.runIoFocused(zionMain);
+    // Use blocking runtime for CLI development tools (zsync v0.4.0)
+    try zsync.runBlocking(zionMain, {});
 }
 
-fn zionMain(io: anytype) !void {
+fn zionMain(io: zsync.Io) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();

@@ -12,14 +12,14 @@ pub const RegistryManager = struct {
     allocator: Allocator,
     config: *ZionConfig,
     clients: std.ArrayList(RegistryClient),
-    io: zsync.ThreadPoolIo,
+    io: zsync.BlockingIo,
     
     pub fn init(allocator: Allocator, zion_config: *ZionConfig) !RegistryManager {
         return RegistryManager{
             .allocator = allocator,
             .config = zion_config,
             .clients = std.ArrayList(RegistryClient).init(allocator),
-            .io = try zsync.ThreadPoolIo.init(allocator, .{}),
+            .io = zsync.createBlockingIo(allocator),
         };
     }
     
