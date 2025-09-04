@@ -30,7 +30,7 @@ pub const HttpClient = struct {
     }
     
     pub fn deinit(self: *HttpClient) void {
-        self.persistent_client.deinit();
+        self.persistent_client.deinit(allocator);
         self.allocator.free(self.header_buffer);
         self.allocator.destroy(self);
     }
@@ -97,7 +97,7 @@ pub const HttpClient = struct {
                 else => error.HttpRequestFailed,
             };
         };
-        defer req.deinit();
+        defer req.deinit(allocator);
         
         // Set timeout if needed
         // Note: Zig's std.http.Client doesn't have built-in timeout support yet
@@ -230,7 +230,7 @@ pub const HttpResponse = struct {
             self.allocator.free(entry.key_ptr.*);
             self.allocator.free(entry.value_ptr.*);
         }
-        self.headers.deinit();
+        self.headers.deinit(allocator);
     }
     
     /// Check if response indicates success

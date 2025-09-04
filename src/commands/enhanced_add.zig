@@ -13,7 +13,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
     }
     
     var package_names = std.ArrayList([]const u8).init(allocator);
-    defer package_names.deinit();
+    defer package_names.deinit(allocator);
     
     var prefer_ziglibs = false;
     var specific_version: ?[]const u8 = null;
@@ -37,7 +37,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
                 i += 1;
             }
         } else if (!std.mem.startsWith(u8, arg, "-")) {
-            try package_names.append(arg);
+            try package_names.append(allocator, arg);
         }
     }
     
@@ -61,7 +61,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
     
     var success_count: u32 = 0;
     var failed_packages = std.ArrayList([]const u8).init(allocator);
-    defer failed_packages.deinit();
+    defer failed_packages.deinit(allocator);
     
     for (package_names.items) |package_name| {
         if (try addSinglePackage(allocator, &manager, package_name, .{
@@ -71,7 +71,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
         })) {
             success_count += 1;
         } else {
-            try failed_packages.append(package_name);
+            try failed_packages.append(allocator, package_name);
         }
     }
     
@@ -205,7 +205,7 @@ fn addSinglePackage(allocator: Allocator, manager: *RegistryManager, package_nam
 
 fn addToBuildZon(allocator: Allocator, package: Package, version_override: ?[]const u8) !void {
     // Read current build.zig.zon
-    const file_content = std.fs.cwd().readFileAlloc(allocator, "build.zig.zon", 1024 * 1024) catch |err| switch (err) {
+    const file_content = std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ build.zig.zon not found. Run 'zion init' first.\n", .{});
             return;

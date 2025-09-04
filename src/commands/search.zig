@@ -42,7 +42,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
     var search_options = SearchOptions{};
     const search_term: []const u8 = args[2];
     var filters_list = std.ArrayList([]const u8).init(allocator);
-    defer filters_list.deinit();
+    defer filters_list.deinit(allocator);
     
     // Process additional arguments
     var i: usize = 3;
@@ -304,7 +304,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
     
     // Make HTTP request to Zigistry API
     var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     var header_buffer: [16384]u8 = undefined;
     var req = client.open(.GET, std.Uri.parse(search_url) catch {
@@ -316,7 +316,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
         std.debug.print("  ❌ Failed to connect to Zigistry\n", .{});
         return;
     };
-    defer req.deinit();
+    defer req.deinit(allocator);
     
     req.send() catch {
         std.debug.print("  ❌ Failed to send request to Zigistry\n", .{});
@@ -337,7 +337,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
     }
     
     var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
@@ -363,7 +363,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
         std.debug.print("  ❌ Failed to parse Zigistry response\n", .{});
         return;
     };
-    defer parsed.deinit();
+    defer parsed.deinit(allocator);
     
     if (parsed.value != .array) {
         std.debug.print("  ⚠️ Unexpected Zigistry response format\n", .{});

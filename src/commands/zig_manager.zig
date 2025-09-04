@@ -299,7 +299,7 @@ fn getCurrentVersion(allocator: Allocator) ![]const u8 {
     const current_file = try std.fmt.allocPrint(allocator, "{s}/.zion/current-zig", .{home_dir});
     defer allocator.free(current_file);
     
-    const content = try fs.cwd().readFileAlloc(allocator, current_file, 256);
+    const content = try fs.cwd().readFileAlloc(current_file, allocator, @enumFromInt(256));
     return std.mem.trim(u8, content, " \t\n\r");
 }
 
@@ -462,14 +462,14 @@ fn verifyZigVersion(allocator: Allocator, expected_version: []const u8) !void {
     
     try child.spawn();
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
     }
     
     const stdout = try allocator.dupe(u8, output_buf.items);
@@ -544,8 +544,8 @@ fn detectSystemZig(allocator: Allocator) ![]const u8 {
     
     child.spawn() catch return error.SystemZigNotFound;
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     const stdout = blk: {
@@ -555,7 +555,7 @@ fn detectSystemZig(allocator: Allocator) ![]const u8 {
                 return error.SystemZigNotFound;
             };
             if (bytes_read == 0) break;
-            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch {
                 _ = child.wait() catch {};
                 return error.SystemZigNotFound;
             };
@@ -590,8 +590,8 @@ fn getZigVersionFromPath(allocator: Allocator, zig_path: []const u8) ![]const u8
     
     child.spawn() catch return error.VersionDetectionFailed;
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     const stdout = blk: {
@@ -601,7 +601,7 @@ fn getZigVersionFromPath(allocator: Allocator, zig_path: []const u8) ![]const u8
                 return error.VersionDetectionFailed;
             };
             if (bytes_read == 0) break;
-            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch {
                 _ = child.wait() catch {};
                 return error.VersionDetectionFailed;
             };

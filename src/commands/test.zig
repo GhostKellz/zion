@@ -32,26 +32,26 @@ pub fn test_command(allocator: Allocator, args: [][:0]u8) !void {
     std.debug.print("...\n", .{});
     
     // Build test command
-    var test_args = std.ArrayList([]const u8).init(allocator);
-    defer test_args.deinit();
+    var test_args: std.ArrayList([]const u8) = .{};
+    defer test_args.deinit(allocator);
     
-    try test_args.append("zig");
-    try test_args.append("test");
+    try test_args.append(allocator, "zig");
+    try test_args.append(allocator, "test");
     
     if (verbose) {
-        try test_args.append("--verbose");
+        try test_args.append(allocator, "--verbose");
     }
     
     // Add filter if specified
     if (filter) |f| {
-        try test_args.append("--test-filter");
-        try test_args.append(f);
+        try test_args.append(allocator, "--test-filter");
+        try test_args.append(allocator, f);
     }
     
     // Find test files or use src/main.zig as default
     const test_file = try findTestFile(allocator);
     defer allocator.free(test_file);
-    try test_args.append(test_file);
+    try test_args.append(allocator, test_file);
     
     // Execute zig test
     var child = std.process.Child.init(test_args.items, allocator);

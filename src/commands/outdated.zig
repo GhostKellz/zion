@@ -37,12 +37,12 @@ pub fn outdated(allocator: Allocator, args: [][:0]u8) !void {
         std.debug.print("🔍 Checking for outdated dependencies...\n\n", .{});
     }
     
-    var outdated_packages = std.ArrayList(OutdatedPackage).init(allocator);
+    var outdated_packages: std.ArrayList(OutdatedPackage) = .{};
     defer {
         for (outdated_packages.items) |*pkg| {
             pkg.deinit(allocator);
         }
-        outdated_packages.deinit();
+        outdated_packages.deinit(allocator);
     }
     
     var it = zon_file.dependencies.iterator();
@@ -80,7 +80,7 @@ pub fn outdated(allocator: Allocator, args: [][:0]u8) !void {
             const current_version = extractVersionFromUrl(allocator, current_dep.url) catch "unknown";
             defer if (!std.mem.eql(u8, current_version, "unknown")) allocator.free(current_version);
             
-            try outdated_packages.append(OutdatedPackage{
+            try outdated_packages.append(allocator, OutdatedPackage{
                 .name = try allocator.dupe(u8, pkg_name),
                 .current_version = try allocator.dupe(u8, current_version),
                 .latest_version = try allocator.dupe(u8, latest_version.version),

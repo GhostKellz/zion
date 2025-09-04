@@ -20,8 +20,8 @@ test "Performance: concurrent operations benchmark" {
         const start = std.time.nanoTimestamp();
         
         // Simulate concurrent operations
-        var tasks = std.ArrayList(std.Thread).init(allocator);
-        defer tasks.deinit();
+        var tasks = std.ArrayList(std.Thread){};
+        defer tasks.deinit(allocator);
         
         for (0..4) |_| {
             const thread = try std.Thread.spawn(.{}, struct {
@@ -30,7 +30,7 @@ test "Performance: concurrent operations benchmark" {
                     std.time.sleep(1000000); // 1ms
                 }
             }.work, .{});
-            try tasks.append(thread);
+            try tasks.append(allocator, thread);
         }
         
         for (tasks.items) |thread| {
@@ -61,8 +61,8 @@ test "Memory: allocation stress test" {
     }
     
     // Test concurrent allocations
-    var threads = std.ArrayList(std.Thread).init(allocator);
-    defer threads.deinit();
+    var threads = std.ArrayList(std.Thread){};
+    defer threads.deinit(allocator);
     
     for (0..4) |_| {
         const thread = try std.Thread.spawn(.{}, struct {
@@ -74,7 +74,7 @@ test "Memory: allocation stress test" {
                 }
             }
         }.allocTest, .{allocator});
-        try threads.append(thread);
+        try threads.append(allocator, thread);
     }
     
     for (threads.items) |thread| {
@@ -86,15 +86,15 @@ test "Integration: full workflow simulation" {
     const allocator = std.testing.allocator;
     
     // Simulate a complete package resolution workflow
-    var workflow_steps = std.ArrayList([]const u8).init(allocator);
-    defer workflow_steps.deinit();
+    var workflow_steps = std.ArrayList([]const u8){};
+    defer workflow_steps.deinit(allocator);
     
-    try workflow_steps.append("1. Initialize registry manager");
-    try workflow_steps.append("2. Search for packages");
-    try workflow_steps.append("3. Resolve dependencies");
-    try workflow_steps.append("4. Download packages");
-    try workflow_steps.append("5. Verify integrity");
-    try workflow_steps.append("6. Cache results");
+    try workflow_steps.append(allocator, "1. Initialize registry manager");
+    try workflow_steps.append(allocator, "2. Search for packages");
+    try workflow_steps.append(allocator, "3. Resolve dependencies");
+    try workflow_steps.append(allocator, "4. Download packages");
+    try workflow_steps.append(allocator, "5. Verify integrity");
+    try workflow_steps.append(allocator, "6. Cache results");
     
     std.debug.print("\nWorkflow simulation:\n", .{});
     for (workflow_steps.items) |step| {
@@ -143,8 +143,8 @@ test "Concurrency: race condition detection" {
     var shared_counter: u32 = 0;
     var mutex = std.Thread.Mutex{};
     
-    var threads = std.ArrayList(std.Thread).init(allocator);
-    defer threads.deinit();
+    var threads = std.ArrayList(std.Thread){};
+    defer threads.deinit(allocator);
     
     // Spawn threads that increment counter
     for (0..10) |_| {
@@ -157,7 +157,7 @@ test "Concurrency: race condition detection" {
                 }
             }
         }.increment, .{ &shared_counter, &mutex });
-        try threads.append(thread);
+        try threads.append(allocator, thread);
     }
     
     // Wait for all threads

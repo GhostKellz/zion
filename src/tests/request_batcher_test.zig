@@ -8,10 +8,10 @@ test "RequestBatcher: initialization and cleanup" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = request_batcher.BatchConfig{
         .max_batch_size = 10,
@@ -21,7 +21,7 @@ test "RequestBatcher: initialization and cleanup" {
     };
     
     const batcher = try request_batcher.RequestBatcher.init(allocator, &runtime, client, config);
-    defer batcher.deinit();
+    defer batcher.deinit(allocator);
     
     // Verify initialization
     try testing.expect(batcher.config.max_batch_size == 10);
@@ -32,14 +32,14 @@ test "RequestBatcher: batch key generation" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = request_batcher.BatchConfig{};
     const batcher = try request_batcher.RequestBatcher.init(allocator, &runtime, client, config);
-    defer batcher.deinit();
+    defer batcher.deinit(allocator);
     
     // Test batch key generation for different request types
     const search_request = request_batcher.BatchableRequest{
@@ -65,7 +65,7 @@ test "RequestBatch: should execute logic" {
     };
     
     var batch = request_batcher.RequestBatch.init(allocator, "test:batch", config);
-    defer batch.deinit();
+    defer batch.deinit(allocator);
     
     // Initially should not execute
     try testing.expect(!batch.shouldExecute());
@@ -93,7 +93,7 @@ test "RequestBatch: time-based execution" {
     };
     
     var batch = request_batcher.RequestBatch.init(allocator, "test:batch", config);
-    defer batch.deinit();
+    defer batch.deinit(allocator);
     
     // Add one request
     const request = request_batcher.BatchableRequest{
@@ -175,10 +175,10 @@ test "RequestBatcher: batch execution structure" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = request_batcher.BatchConfig{
         .max_batch_size = 2,
@@ -186,14 +186,14 @@ test "RequestBatcher: batch execution structure" {
     };
     
     const batcher = try request_batcher.RequestBatcher.init(allocator, &runtime, client, config);
-    defer batcher.deinit();
+    defer batcher.deinit(allocator);
     
     // Reset stats
     batcher.resetStats();
     
     // Create multiple search requests
     var futures = std.ArrayList(*zsync.Future(request_batcher.BatchedResult)).init(allocator);
-    defer futures.deinit();
+    defer futures.deinit(allocator);
     
     for (0..2) |i| {
         const query = try std.fmt.allocPrint(allocator, "query{}", .{i});
@@ -206,7 +206,7 @@ test "RequestBatcher: batch execution structure" {
         );
         
         const future = try batcher.addRequest(request);
-        try futures.append(future);
+        try futures.append(allocator, future);
     }
     
     // Force flush to execute batch
@@ -222,10 +222,10 @@ test "RequestBatcher: flush all batches" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = request_batcher.BatchConfig{
         .max_batch_size = 100, // High limit to prevent auto-execution
@@ -233,7 +233,7 @@ test "RequestBatcher: flush all batches" {
     };
     
     const batcher = try request_batcher.RequestBatcher.init(allocator, &runtime, client, config);
-    defer batcher.deinit();
+    defer batcher.deinit(allocator);
     
     // Add requests to different batch types
     const search_req = try request_batcher.BatchableRequest.createSearchRequest(
@@ -266,7 +266,7 @@ test "Future: basic operations" {
     };
     
     const future = try request_batcher.Future.init(allocator, TestResult);
-    defer future.deinit();
+    defer future.deinit(allocator);
     
     // Complete future in a separate thread
     const thread = try std.Thread.spawn(.{}, struct {

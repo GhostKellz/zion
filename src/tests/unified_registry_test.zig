@@ -35,11 +35,11 @@ test "UnifiedRegistryManager: connection pooling" {
     
     // Acquire multiple connections
     var connections = std.ArrayList(*http_client.HttpClient).init(allocator);
-    defer connections.deinit();
+    defer connections.deinit(allocator);
     
     for (0..5) |_| {
         const conn = try pool.acquire();
-        try connections.append(conn);
+        try connections.append(allocator, conn);
     }
     
     // Release connections

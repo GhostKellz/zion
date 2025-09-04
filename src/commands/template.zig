@@ -218,7 +218,7 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\
             \\pub fn main() !void {
             \\    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-            \\    defer _ = gpa.deinit();
+            \\    defer _ = gpa.deinit(allocator);
             \\    const allocator = gpa.allocator();
             \\
             \\    const params = comptime clap.parseParamsComptime(
@@ -243,7 +243,7 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\        },
             \\        else => return err,
             \\    };
-            \\    defer res.deinit();
+            \\    defer res.deinit(allocator);
             \\
             \\    if (res.args.help != 0) {
             \\        var buffer2: [4096]u8 = undefined;
@@ -268,14 +268,14 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\
             \\pub fn main() !void {
             \\    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-            \\    defer _ = gpa.deinit();
+            \\    defer _ = gpa.deinit(allocator);
             \\    const allocator = gpa.allocator();
             \\
             \\    var server = try httpz.Server().init(allocator, .{
             \\        .port = 3000,
             \\        .address = "127.0.0.1",
             \\    });
-            \\    defer server.deinit();
+            \\    defer server.deinit(allocator);
             \\
             \\    // Routes
             \\    var router = server.router();

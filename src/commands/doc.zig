@@ -38,31 +38,31 @@ pub fn doc(allocator: Allocator, args: [][:0]u8) !void {
     std.debug.print("...\n", .{});
     
     // Build documentation command
-    var doc_args = std.ArrayList([]const u8).init(allocator);
-    defer doc_args.deinit();
+    var doc_args: std.ArrayList([]const u8) = .{};
+    defer doc_args.deinit(allocator);
     
-    try doc_args.append("zig");
+    try doc_args.append(allocator, "zig");
     
     if (package_name) |pkg| {
         // Generate docs for a specific package
-        try doc_args.append("build-lib");
+        try doc_args.append(allocator, "build-lib");
         
         // Find the package source file
         const src_file = try findPackageSource(allocator, pkg);
         defer allocator.free(src_file);
-        try doc_args.append(src_file);
+        try doc_args.append(allocator, src_file);
     } else {
         // Generate docs for the main project
-        try doc_args.append("build");
-        try doc_args.append("--zig-lib-dir");
-        try doc_args.append("/usr/lib/zig/lib"); // Adjust as needed
+        try doc_args.append(allocator, "build");
+        try doc_args.append(allocator, "--zig-lib-dir");
+        try doc_args.append(allocator, "/usr/lib/zig/lib"); // Adjust as needed
     }
     
     // Add documentation flags
-    try doc_args.append("-femit-docs");
+    try doc_args.append(allocator, "-femit-docs");
     const docs_path = try std.fmt.allocPrint(allocator, "-femit-docs={s}", .{output_dir});
     defer allocator.free(docs_path);
-    try doc_args.append(docs_path);
+    try doc_args.append(allocator, docs_path);
     
     // Execute zig documentation generation
     var child = std.process.Child.init(doc_args.items, allocator);
@@ -72,27 +72,27 @@ pub fn doc(allocator: Allocator, args: [][:0]u8) !void {
     
     try child.spawn();
     
-    var stdout_output_buf = std.ArrayList(u8).init(allocator);
-    defer stdout_output_buf.deinit();
+    var stdout_output_buf: std.ArrayList(u8) = .{};
+    defer stdout_output_buf.deinit(allocator);
     
     var stdout_read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(stdout_read_buf[0..]);
         if (bytes_read == 0) break;
-        try stdout_output_buf.appendSlice(stdout_read_buf[0..bytes_read]);
+        try stdout_output_buf.appendSlice(allocator, stdout_read_buf[0..bytes_read]);
     }
     
     const stdout = try allocator.dupe(u8, stdout_output_buf.items);
     defer allocator.free(stdout);
     
-    var stderr_output_buf = std.ArrayList(u8).init(allocator);
-    defer stderr_output_buf.deinit();
+    var stderr_output_buf: std.ArrayList(u8) = .{};
+    defer stderr_output_buf.deinit(allocator);
     
     var stderr_read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stderr.?.readAll(stderr_read_buf[0..]);
         if (bytes_read == 0) break;
-        try stderr_output_buf.appendSlice(stderr_read_buf[0..bytes_read]);
+        try stderr_output_buf.appendSlice(allocator, stderr_read_buf[0..bytes_read]);
     }
     
     const stderr = try allocator.dupe(u8, stderr_output_buf.items);

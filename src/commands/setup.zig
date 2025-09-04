@@ -120,21 +120,21 @@ fn setupZig(allocator: Allocator, args: [][:0]u8) !void {
         defer allocator.free(version_z);
         
         var install_args = std.ArrayList([:0]u8).init(allocator);
-        defer install_args.deinit();
+        defer install_args.deinit(allocator);
         try install_args.append(try allocator.dupeZ(u8, "zion"));
         try install_args.append(try allocator.dupeZ(u8, "zig"));
         try install_args.append(try allocator.dupeZ(u8, "install"));
-        try install_args.append(version_z);
+        try install_args.append(allocator, version_z);
         
         try zig_manager.zig_manager(allocator, install_args.items);
         
         std.debug.print("  🔗 Setting as active version...\n", .{});
         var use_args = std.ArrayList([:0]u8).init(allocator);
-        defer use_args.deinit();
+        defer use_args.deinit(allocator);
         try use_args.append(try allocator.dupeZ(u8, "zion"));
         try use_args.append(try allocator.dupeZ(u8, "zig"));
         try use_args.append(try allocator.dupeZ(u8, "use"));
-        try use_args.append(version_z);
+        try use_args.append(allocator, version_z);
         
         try zig_manager.zig_manager(allocator, use_args.items);
         
@@ -361,7 +361,7 @@ fn setupShellPath(allocator: Allocator, shell: []const u8) !void {
     defer allocator.free(export_line);
     
     // Check if already added
-    const existing_content = fs.cwd().readFileAlloc(allocator, shell_config, 1024 * 1024) catch "";
+    const existing_content = fs.cwd().readFileAlloc(shell_config, allocator, @enumFromInt(1024 * 1024)) catch "";
     defer allocator.free(existing_content);
     
     if (std.mem.indexOf(u8, existing_content, "# Added by zion") != null) {

@@ -124,7 +124,7 @@ fn handleBenchmark(allocator: Allocator, args: []const []const u8) !void {
 
     // Simulate benchmark results
     const start_time = std.time.milliTimestamp();
-    std.time.sleep(1000 * std.time.ns_per_ms); // Simulate 1 second of work
+    std.Thread.sleep(1000 * std.time.ns_per_ms); // Simulate 1 second of work
     const end_time = std.time.milliTimestamp();
 
     std.debug.print("\n📊 Benchmark Results:\n", .{});

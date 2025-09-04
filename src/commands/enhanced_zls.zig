@@ -75,7 +75,7 @@ fn zlsDoctor(allocator: Allocator) !void {
     var issues = std.ArrayList([]const u8).init(allocator);
     defer {
         for (issues.items) |issue| allocator.free(issue);
-        issues.deinit();
+        issues.deinit(allocator);
     }
     
     // Check ZLS installation
@@ -386,7 +386,7 @@ fn checkDependencyHealth(allocator: Allocator, issues: *std.ArrayList([]const u8
     const has_zon = std.fs.cwd().access("build.zig.zon", .{}) catch false;
     
     if (has_zon) {
-        const zon_content = try std.fs.cwd().readFileAlloc(allocator, "build.zig.zon", 1024 * 1024);
+        const zon_content = try std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024));
         defer allocator.free(zon_content);
         
         const dep_count = std.mem.count(u8, zon_content, ".url");
@@ -451,7 +451,7 @@ fn generateOptimalZlsConfig(allocator: Allocator) !void {
 fn showCurrentZlsConfig(allocator: Allocator) !void {
     print("⚙️ Current ZLS Configuration\n\n", .{});
     
-    const config_content = std.fs.cwd().readFileAlloc(allocator, "zls.json", 1024 * 1024) catch |err| switch (err) {
+    const config_content = std.fs.cwd().readFileAlloc("zls.json", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No zls.json found in current directory\n", .{});
             print("💡 Run 'zion zls config --generate' to create one\n", .{});
@@ -498,7 +498,7 @@ fn showDependencyStatus(allocator: Allocator) !void {
         return;
     }
     
-    const zon_content = try std.fs.cwd().readFileAlloc(allocator, "build.zig.zon", 1024 * 1024);
+    const zon_content = try std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024));
     defer allocator.free(zon_content);
     
     // Simple dependency parsing
@@ -538,7 +538,7 @@ fn generateCompletionData(allocator: Allocator, packages: []const Package) ![]co
     var completion_list = std.ArrayList([]const u8).init(allocator);
     defer {
         for (completion_list.items) |item| allocator.free(item);
-        completion_list.deinit();
+        completion_list.deinit(allocator);
     }
     
     for (packages) |pkg| {
@@ -550,7 +550,7 @@ fn generateCompletionData(allocator: Allocator, packages: []const Package) ![]co
             \\  }}
         , .{ pkg.name, pkg.version, pkg.description orelse "No description" });
         
-        try completion_list.append(entry);
+        try completion_list.append(allocator, entry);
     }
     
     // Join all entries

@@ -12,7 +12,7 @@ pub fn fmt(allocator: Allocator, args: []const []const u8) !void {
 
     var options = FmtOptions{};
     var target_files = std.ArrayList([]const u8).init(allocator);
-    defer target_files.deinit();
+    defer target_files.deinit(allocator);
 
     // Parse arguments
     var i: usize = 2;
@@ -32,7 +32,7 @@ pub fn fmt(allocator: Allocator, args: []const []const u8) !void {
             return;
         } else {
             // It's a file or directory
-            try target_files.append(arg);
+            try target_files.append(allocator, arg);
         }
         
         i += 1;
@@ -87,7 +87,7 @@ fn formatProject(allocator: Allocator, options: FmtOptions) !void {
     }
 
     var formatter = ProjectFormatter.init(allocator, options);
-    defer formatter.deinit();
+    defer formatter.deinit(allocator);
 
     // Discover all .zig files in the project
     try formatter.discoverFiles(".");
@@ -115,7 +115,7 @@ fn formatTargets(allocator: Allocator, targets: []const []const u8, options: Fmt
     }
 
     var formatter = ProjectFormatter.init(allocator, options);
-    defer formatter.deinit();
+    defer formatter.deinit(allocator);
 
     // Process each target
     for (targets) |target| {
@@ -168,7 +168,7 @@ const ProjectFormatter = struct {
         for (self.files.items) |file| {
             self.allocator.free(file);
         }
-        self.files.deinit();
+        self.files.deinit(allocator);
     }
 
     /// Recursively discover .zig files in a directory
@@ -268,13 +268,13 @@ const ProjectFormatter = struct {
         // Read any error output
         if (child_format.stderr) |stderr_pipe| {
             var output_buf = std.ArrayList(u8).init(self.allocator);
-            defer output_buf.deinit();
+            defer output_buf.deinit(allocator);
             
             var read_buf: [4096]u8 = undefined;
             while (true) {
                 const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
                 if (bytes_read == 0) break;
-                try output_buf.appendSlice(read_buf[0..bytes_read]);
+                try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
             }
             
             const stderr_data = try self.allocator.dupe(u8, output_buf.items);

@@ -105,7 +105,7 @@ fn handleSign(allocator: Allocator, args: []const []const u8) !void {
     };
 
     // Check if private key exists
-    const private_key_data = fs.cwd().readFileAlloc(allocator, ".zion/keys/private.key", 1024) catch |err| {
+    const private_key_data = fs.cwd().readFileAlloc(".zion/keys/private.key", allocator, @enumFromInt(1024)) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: Private key not found. Run 'zion security keygen' first.\n", .{});
             return;
@@ -187,7 +187,7 @@ fn handleVerify(allocator: Allocator, args: []const []const u8) !void {
     const sig_path = try std.fmt.allocPrint(allocator, "{s}.sig", .{package_path});
     defer allocator.free(sig_path);
 
-    const sig_content = fs.cwd().readFileAlloc(allocator, sig_path, 10 * 1024) catch |err| {
+    const sig_content = fs.cwd().readFileAlloc(sig_path, allocator, @enumFromInt(10 * 1024)) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: Signature file '{s}' not found\n", .{sig_path});
             return;
@@ -215,7 +215,7 @@ fn handleVerify(allocator: Allocator, args: []const []const u8) !void {
     var step: u32 = 0;
     while (step < verify_steps) : (step += 1) {
         spinner.tick();
-        std.time.sleep(150_000_000); // 150ms per step
+        std.Thread.sleep(150_000_000); // 150ms per step
     }
     
     const verification_result = verifyPackageSignature(allocator, package_path, signature_data) catch |err| {
@@ -348,7 +348,7 @@ const VerificationResult = struct {
 
 /// Parse signature file and extract data
 fn parseSignatureFile(allocator: Allocator, sig_path: []const u8) !SignatureData {
-    const sig_content = std.fs.cwd().readFileAlloc(allocator, sig_path, 1024 * 1024) catch {
+    const sig_content = std.fs.cwd().readFileAlloc(sig_path, allocator, @enumFromInt(1024 * 1024)) catch {
         return error.SignatureFileReadError;
     };
     defer allocator.free(sig_content);
@@ -399,7 +399,7 @@ fn parseSignatureFile(allocator: Allocator, sig_path: []const u8) !SignatureData
 /// Verify package signature using Ed25519
 fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, sig_data: SignatureData) !VerificationResult {
     // Read package file for verification
-    const package_content = std.fs.cwd().readFileAlloc(allocator, package_path, 100 * 1024 * 1024) catch {
+    const package_content = std.fs.cwd().readFileAlloc(package_path, allocator, @enumFromInt(100 * 1024 * 1024)) catch {
         return VerificationResult{
             .valid = false,
             .trusted = false,
@@ -515,7 +515,7 @@ fn checkSignerTrust(allocator: Allocator, signer_id: []const u8) !bool {
     const trust_file_path = ".zion/trusted_signers.json";
     
     // Read trusted signers file
-    const trust_content = std.fs.cwd().readFileAlloc(allocator, trust_file_path, 1024 * 1024) catch {
+    const trust_content = std.fs.cwd().readFileAlloc(trust_file_path, allocator, @enumFromInt(1024 * 1024)) catch {
         // No trust file means no trusted signers
         return false;
     };

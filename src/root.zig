@@ -15,6 +15,10 @@ pub const security = @import("security.zig");
 pub const parallel_downloader = @import("parallel_downloader.zig");
 pub const zion_v7 = @import("zion_v7.zig");
 
+// v1.2.0 Zeke AI Integration
+pub const zeke_client = @import("zeke_client_simple.zig");
+pub const enhanced_add_zeke = @import("commands/enhanced_add_zeke.zig").enhancedAdd;
+
 // Legacy compatibility
 pub const config = @import("config.zig");
 pub const registry = @import("registry.zig");

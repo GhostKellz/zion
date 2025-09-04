@@ -9,11 +9,11 @@ test "AsyncDownloader: initialization and cleanup" {
     
     // Initialize runtime
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     // Initialize HTTP client
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Create downloader with config
     const config = async_downloader.DownloadConfig{
@@ -25,7 +25,7 @@ test "AsyncDownloader: initialization and cleanup" {
     };
     
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Verify initialization
     try testing.expect(downloader.config.max_concurrent == 4);
@@ -36,14 +36,14 @@ test "AsyncDownloader: cache path generation" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Test cache path generation
     const cache_path = try downloader.generateCachePath("test/package");
@@ -57,14 +57,14 @@ test "AsyncDownloader: package name sanitization" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Test sanitization of special characters
     const sanitized = try downloader.sanitizePackageName("test/package:name*with?chars");
@@ -81,14 +81,14 @@ test "AsyncDownloader: statistics tracking" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Test stats initialization
     try testing.expect(downloader.stats.total_packages == 0);
@@ -106,14 +106,14 @@ test "AsyncDownloader: cancellation token" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Test cancellation
     try testing.expect(!downloader.cancellation_token.is_cancelled());
@@ -126,14 +126,14 @@ test "AsyncDownloader: empty request handling" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Test empty request list
     const empty_requests = &[_]async_downloader.DownloadRequest{};
@@ -147,14 +147,14 @@ test "AsyncDownloader: hash calculation simulation" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{ .show_progress = false };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Create a test file
     const test_content = "test file content for hashing";
@@ -181,17 +181,17 @@ test "AsyncDownloader: concurrent download structure" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const config = async_downloader.DownloadConfig{
         .max_concurrent = 2,
         .show_progress = false,
     };
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Create test requests
     var requests = [_]async_downloader.DownloadRequest{

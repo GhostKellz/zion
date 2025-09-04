@@ -33,10 +33,10 @@ pub const RequestBatcher = struct {
         var iterator = self.batches.iterator();
         while (iterator.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
-            entry.value_ptr.*.deinit();
+            entry.value_ptr.*.deinit(allocator);
             self.allocator.destroy(entry.value_ptr.*);
         }
-        self.batches.deinit();
+        self.batches.deinit(allocator);
         
         self.allocator.destroy(self);
     }
@@ -114,11 +114,11 @@ pub const RequestBatcher = struct {
     /// Execute a batch of search requests
     fn executeBatchSearch(self: *Self, batch: *RequestBatch) !void {
         // Combine all search queries into a single request
-        var combined_query = std.ArrayList([]const u8).init(self.allocator);
-        defer combined_query.deinit();
+        var combined_query: std.ArrayList([]const u8) = .{};
+        defer combined_query.deinit(self.allocator);
         
         for (batch.requests.items) |request| {
-            try combined_query.append(request.search_query orelse "");
+            try combined_query.append(self.allocator, request.search_query orelse "");
         }
         
         // Create batch search URL
@@ -163,11 +163,11 @@ pub const RequestBatcher = struct {
     /// Execute a batch of package info requests
     fn executeBatchPackageInfo(self: *Self, batch: *RequestBatch) !void {
         // Combine all package names into a single request
-        var package_names = std.ArrayList([]const u8).init(self.allocator);
-        defer package_names.deinit();
+        var package_names: std.ArrayList([]const u8) = .{};
+        defer package_names.deinit(self.allocator);
         
         for (batch.requests.items) |request| {
-            try package_names.append(request.package_name orelse "");
+            try package_names.append(self.allocator, request.package_name orelse "");
         }
         
         // Create batch package info URL
@@ -214,19 +214,19 @@ pub const RequestBatcher = struct {
         // Downloads are typically executed individually for security/integrity
         // But we can still batch the metadata requests
         
-        var download_futures = std.ArrayList(*zsync.Future(BatchedResult)).init(self.allocator);
-        defer download_futures.deinit();
+        var download_futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+        defer download_futures.deinit(self.allocator);
         
         // Start parallel downloads
         for (batch.requests.items) |request| {
             const future = try self.downloadSingleAsync(request);
-            try download_futures.append(future);
+            try download_futures.append(self.allocator, future);
         }
         
         // Wait for all downloads to complete
         for (download_futures.items, 0..) |future, i| {
             const result = try future.await();
-            future.deinit();
+            future.deinit(allocator);
             
             // Complete the original request
             batch.requests.items[i].future.complete(result);
@@ -336,7 +336,7 @@ pub const RequestBatcher = struct {
             }
             return;
         };
-        defer parsed.deinit();
+        defer parsed.deinit(allocator);
         
         // Extract packages array
         const packages_array = if (parsed.value.object.get("packages")) |packages| 
@@ -379,7 +379,7 @@ pub const RequestBatcher = struct {
             self.handleBatchError(batch, "JSON parsing failed");
             return;
         };
-        defer parsed.deinit();
+        defer parsed.deinit(allocator);
         
         // Extract packages object
         const packages_obj = if (parsed.value.object.get("packages")) |packages| 
@@ -530,7 +530,7 @@ pub const BatchableRequest = struct {
         if (self.search_query) |query| allocator.free(query);
         if (self.package_name) |name| allocator.free(name);
         if (self.download_url) |url| allocator.free(url);
-        self.future.deinit();
+        self.future.deinit(allocator);
     }
 };
 
@@ -567,7 +567,7 @@ const RequestBatch = struct {
             .allocator = allocator,
             .key = key,
             .batch_type = batch_type,
-            .requests = std.ArrayList(BatchableRequest).init(allocator),
+            .requests = .{},
             .created_at = std.time.milliTimestamp(),
             .config = config,
         };
@@ -577,11 +577,11 @@ const RequestBatch = struct {
         for (self.requests.items) |*request| {
             request.deinit(self.allocator);
         }
-        self.requests.deinit();
+        self.requests.deinit(self.allocator);
     }
     
     fn addRequest(self: *RequestBatch, request: BatchableRequest) !*zsync.Future(BatchedResult) {
-        try self.requests.append(request);
+        try self.requests.append(allocator, request);
         return request.future;
     }
     
@@ -668,14 +668,14 @@ pub fn batchedSearch(
     registry: []const u8,
     queries: []const []const u8,
 ) ![]BatchedResult {
-    var futures = std.ArrayList(*zsync.Future(BatchedResult)).init(allocator);
-    defer futures.deinit();
+    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+    defer futures.deinit(allocator);
     
     // Submit all search requests
     for (queries) |query| {
         const request = try BatchableRequest.createSearchRequest(allocator, registry, query);
         const future = try batcher.addRequest(request);
-        try futures.append(future);
+        try futures.append(allocator, future);
     }
     
     // Force flush to ensure execution
@@ -697,14 +697,14 @@ pub fn batchedPackageInfo(
     registry: []const u8,
     package_names: []const []const u8,
 ) ![]BatchedResult {
-    var futures = std.ArrayList(*zsync.Future(BatchedResult)).init(allocator);
-    defer futures.deinit();
+    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+    defer futures.deinit(allocator);
     
     // Submit all package info requests
     for (package_names) |name| {
         const request = try BatchableRequest.createPackageInfoRequest(allocator, registry, name);
         const future = try batcher.addRequest(request);
-        try futures.append(future);
+        try futures.append(allocator, future);
     }
     
     // Force flush to ensure execution

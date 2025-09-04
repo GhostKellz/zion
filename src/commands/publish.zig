@@ -296,12 +296,12 @@ fn validateProjectForPublishing() !void {
     
     // Check for common documentation files
     const doc_files = [_][]const u8{ "README.md", "LICENSE", "CHANGELOG.md" };
-    var missing_docs = std.ArrayList([]const u8).init(std.heap.page_allocator);
-    defer missing_docs.deinit();
+    var missing_docs: std.ArrayList([]const u8) = .{};
+    defer missing_docs.deinit(std.heap.page_allocator);
     
     for (doc_files) |file| {
         fs.cwd().access(file, .{}) catch {
-            try missing_docs.append(file);
+            try missing_docs.append(std.heap.page_allocator, file);
         };
     }
     
@@ -330,11 +330,11 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
     var license: ?[]const u8 = null;
     const homepage: ?[]const u8 = null;
     const repository: ?[]const u8 = null;
-    var keywords = std.ArrayList([]const u8).init(allocator);
-    var categories = std.ArrayList([]const u8).init(allocator);
+    var keywords: std.ArrayList([]const u8) = .{};
+    var categories: std.ArrayList([]const u8) = .{};
     
     // Try to read from README.md for description
-    if (fs.cwd().readFileAlloc(allocator, "README.md", 1024 * 1024)) |readme_content| {
+    if (fs.cwd().readFileAlloc("README.md", allocator, @enumFromInt(1024 * 1024))) |readme_content| {
         defer allocator.free(readme_content);
         
         // Extract first paragraph as description
@@ -344,7 +344,7 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
     } else |_| {}
     
     // Try to read LICENSE file
-    if (fs.cwd().readFileAlloc(allocator, "LICENSE", 1024)) |license_content| {
+    if (fs.cwd().readFileAlloc("LICENSE", allocator, @enumFromInt(1024))) |license_content| {
         defer allocator.free(license_content);
         
         if (detectLicenseType(license_content)) |license_type| {
@@ -353,8 +353,8 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
     } else |_| {}
     
     // Parse dependencies from ZON file
-    var dependencies = std.ArrayList(PackageMetadata.Dependency).init(allocator);
-    var dev_dependencies = std.ArrayList(PackageMetadata.Dependency).init(allocator);
+    var dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
+    var dev_dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
     
     // In a real implementation, would parse the ZON file structure
     
@@ -366,12 +366,12 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
         .license = license,
         .homepage = homepage,
         .repository = repository,
-        .keywords = try keywords.toOwnedSlice(),
-        .categories = try categories.toOwnedSlice(),
+        .keywords = try keywords.toOwnedSlice(allocator),
+        .categories = try categories.toOwnedSlice(allocator),
         .zig_version_min = null,
         .zig_version_max = null,
-        .dependencies = try dependencies.toOwnedSlice(),
-        .dev_dependencies = try dev_dependencies.toOwnedSlice(),
+        .dependencies = try dependencies.toOwnedSlice(allocator),
+        .dev_dependencies = try dev_dependencies.toOwnedSlice(allocator),
     };
 }
 
@@ -461,14 +461,14 @@ fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, optio
         "CHANGELOG.md",
     };
     
-    var tar_args = std.ArrayList([]const u8).init(allocator);
-    defer tar_args.deinit();
+    var tar_args: std.ArrayList([]const u8) = .{};
+    defer tar_args.deinit(allocator);
     
-    try tar_args.appendSlice(&[_][]const u8{ "tar", "-czf", package_path });
+    try tar_args.appendSlice(allocator, &[_][]const u8{ "tar", "-czf", package_path });
     
     for (include_files) |file| {
         fs.cwd().access(file, .{}) catch continue;
-        try tar_args.append(file);
+        try tar_args.append(allocator, file);
     }
     
     std.debug.print("   Creating package archive...\n", .{});
@@ -537,7 +537,7 @@ fn uploadPackage(
     const start_time = std.time.milliTimestamp();
     
     // Read package file
-    const package_data = try fs.cwd().readFileAlloc(allocator, package_path, 100 * 1024 * 1024);
+    const package_data = try fs.cwd().readFileAlloc(package_path, allocator, @enumFromInt(100 * 1024 * 1024));
     defer allocator.free(package_data);
     
     // Prepare metadata JSON
@@ -547,26 +547,26 @@ fn uploadPackage(
     // Create multipart form data
     const boundary = "----ZionPackageUpload";
     
-    var form_data = std.ArrayList(u8).init(allocator);
-    defer form_data.deinit();
+    var form_data: std.ArrayList(u8) = .{};
+    defer form_data.deinit(allocator);
     
     // Add metadata
-    try form_data.appendSlice("--");
-    try form_data.appendSlice(boundary);
-    try form_data.appendSlice("\r\nContent-Disposition: form-data; name=\"metadata\"\r\n");
-    try form_data.appendSlice("Content-Type: application/json\r\n\r\n");
-    try form_data.appendSlice(metadata_json);
-    try form_data.appendSlice("\r\n");
+    try form_data.appendSlice(allocator, "--");
+    try form_data.appendSlice(allocator, boundary);
+    try form_data.appendSlice(allocator, "\r\nContent-Disposition: form-data; name=\"metadata\"\r\n");
+    try form_data.appendSlice(allocator, "Content-Type: application/json\r\n\r\n");
+    try form_data.appendSlice(allocator, metadata_json);
+    try form_data.appendSlice(allocator, "\r\n");
     
     // Add package file
-    try form_data.appendSlice("--");
-    try form_data.appendSlice(boundary);
-    try form_data.appendSlice("\r\nContent-Disposition: form-data; name=\"package\"; filename=\"package.tar.gz\"\r\n");
-    try form_data.appendSlice("Content-Type: application/gzip\r\n\r\n");
-    try form_data.appendSlice(package_data);
-    try form_data.appendSlice("\r\n--");
-    try form_data.appendSlice(boundary);
-    try form_data.appendSlice("--\r\n");
+    try form_data.appendSlice(allocator, "--");
+    try form_data.appendSlice(allocator, boundary);
+    try form_data.appendSlice(allocator, "\r\nContent-Disposition: form-data; name=\"package\"; filename=\"package.tar.gz\"\r\n");
+    try form_data.appendSlice(allocator, "Content-Type: application/gzip\r\n\r\n");
+    try form_data.appendSlice(allocator, package_data);
+    try form_data.appendSlice(allocator, "\r\n--");
+    try form_data.appendSlice(allocator, boundary);
+    try form_data.appendSlice(allocator, "--\r\n");
     
     // Get API URL for package upload
     const api_url = try client.config.getApiUrl(allocator);

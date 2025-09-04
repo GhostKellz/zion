@@ -115,12 +115,12 @@ fn cleanupBuildZig(allocator: Allocator) !bool {
     };
     
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc(allocator, "build.zig", 10 * 1024 * 1024);
+    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
     defer allocator.free(build_content);
     
     // Check if there are any zion-added dependencies that no longer exist
-    var cleaned_content = std.ArrayList(u8).init(allocator);
-    defer cleaned_content.deinit();
+    var cleaned_content: std.ArrayList(u8) = .{};
+    defer cleaned_content.deinit(allocator);
     
     var lines = std.mem.splitScalar(u8, build_content, '\n');
     var skip_until_end = false;
@@ -139,8 +139,8 @@ fn cleanupBuildZig(allocator: Allocator) !bool {
                 // Check if this package still exists in .zion/deps/
                 const deps_path = std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name}) catch |alloc_err| {
                     std.debug.print("⚠️  Memory allocation failed for deps path: {}\n", .{alloc_err});
-                    try cleaned_content.appendSlice(line);
-                    try cleaned_content.append('\n');
+                    try cleaned_content.appendSlice(allocator, line);
+                    try cleaned_content.append(allocator, '\n');
                     continue;
                 };
                 defer allocator.free(deps_path);
@@ -175,8 +175,8 @@ fn cleanupBuildZig(allocator: Allocator) !bool {
         }
         
         // Add the line to cleaned content
-        try cleaned_content.appendSlice(line);
-        try cleaned_content.append('\n');
+        try cleaned_content.appendSlice(allocator, line);
+        try cleaned_content.append(allocator, '\n');
     }
     
     if (found_orphans) {
@@ -203,11 +203,11 @@ fn resetBuildZig(allocator: Allocator) !bool {
     };
     
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc(allocator, "build.zig", 10 * 1024 * 1024);
+    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
     defer allocator.free(build_content);
     
-    var cleaned_content = std.ArrayList(u8).init(allocator);
-    defer cleaned_content.deinit();
+    var cleaned_content: std.ArrayList(u8) = .{};
+    defer cleaned_content.deinit(allocator);
     
     var lines = std.mem.splitScalar(u8, build_content, '\n');
     var skip_zion_block = false;
@@ -218,8 +218,8 @@ fn resetBuildZig(allocator: Allocator) !bool {
         
         // Skip zion marker and everything after until exe definition
         if (std.mem.indexOf(u8, trimmed, "// zion:deps") != null) {
-            try cleaned_content.appendSlice(line);
-            try cleaned_content.append('\n');
+            try cleaned_content.appendSlice(allocator, line);
+            try cleaned_content.append(allocator, '\n');
             skip_zion_block = true;
             found_zion_content = true;
             continue;
@@ -227,7 +227,7 @@ fn resetBuildZig(allocator: Allocator) !bool {
         
         // Stop skipping when we hit the exe definition
         if (skip_zion_block and std.mem.indexOf(u8, trimmed, "const exe = b.addExecutable") != null) {
-            try cleaned_content.append('\n'); // Add blank line
+            try cleaned_content.append(allocator, '\n'); // Add blank line
             skip_zion_block = false;
         }
         
@@ -239,8 +239,8 @@ fn resetBuildZig(allocator: Allocator) !bool {
         }
         
         if (!skip_zion_block) {
-            try cleaned_content.appendSlice(line);
-            try cleaned_content.append('\n');
+            try cleaned_content.appendSlice(allocator, line);
+            try cleaned_content.append(allocator, '\n');
         } else {
             found_zion_content = true;
         }

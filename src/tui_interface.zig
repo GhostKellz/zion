@@ -39,7 +39,7 @@ pub const ZionTUI = struct {
             .current_view = .main_menu,
             .search_results = &[_]Package{},
             .selected_index = 0,
-            .search_query = std.ArrayList(u8).init(allocator),
+            .search_query = .{},
         };
         
         try tui.setupWidgets();
@@ -48,8 +48,8 @@ pub const ZionTUI = struct {
     
     pub fn deinit(self: *ZionTUI) void {
         self.allocator.free(self.search_results);
-        self.search_query.deinit();
-        self.app.deinit();
+        self.search_query.deinit(allocator);
+        self.app.deinit(allocator);
         self.allocator.destroy(self);
     }
     
@@ -143,7 +143,7 @@ pub const ZionTUI = struct {
                 .vtable = &SearchWidget.vtable,
             },
             .allocator = self.allocator,
-            .query = std.ArrayList(u8).init(self.allocator),
+            .query = .{},
             .results = &[_]Package{},
             .selected = 0,
             .searching = false,
@@ -434,7 +434,7 @@ const SearchWidget = struct {
     
     fn deinitWidget(widget: *phantom.widgets.Widget) void {
         const self = @fieldParentPtr("widget", widget);
-        self.query.deinit();
+        self.query.deinit(allocator);
         self.allocator.destroy(self);
     }
 };

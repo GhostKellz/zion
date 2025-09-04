@@ -146,7 +146,7 @@ pub const MultiProgress = struct {
 
     pub fn init(allocator: std.mem.Allocator) Self {
         return Self{
-            .bars = std.ArrayList(*ProgressBar).init(allocator),
+            .bars = .{},
             .allocator = allocator,
             .active = true,
         };
@@ -156,13 +156,13 @@ pub const MultiProgress = struct {
         for (self.bars.items) |bar| {
             self.allocator.destroy(bar);
         }
-        self.bars.deinit();
+        self.bars.deinit(self.allocator);
     }
 
     pub fn addBar(self: *Self, title: []const u8, total: u64) !*ProgressBar {
         const bar = try self.allocator.create(ProgressBar);
         bar.* = ProgressBar.init(self.allocator, title, total);
-        try self.bars.append(bar);
+        try self.bars.append(self.allocator, bar);
         return bar;
     }
 

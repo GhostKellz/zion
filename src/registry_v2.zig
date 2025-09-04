@@ -377,7 +377,7 @@ pub const RegistryClient = struct {
             
             // Exponential backoff
             const backoff_ms = std.math.pow(u32, 2, retry_count) * 1000;
-            std.time.sleep(backoff_ms * std.time.ns_per_ms);
+            std.Thread.sleep(backoff_ms * std.time.ns_per_ms);
         }
         
         return error.MaxRetriesExceeded;
@@ -400,26 +400,28 @@ pub const RegistryClient = struct {
     
     // URL builders for different registry types
     fn buildGitHubSearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
-        var url_buffer = std.ArrayList(u8).init(self.allocator);
-        defer url_buffer.deinit();
+        var url_buffer: std.ArrayList(u8) = .{};
+        defer url_buffer.deinit(self.allocator);
         
-        try url_buffer.appendSlice(api_url);
-        try url_buffer.appendSlice("/search/repositories?q=");
-        try url_buffer.appendSlice(query);
+        try url_buffer.appendSlice(self.allocator, api_url);
+        try url_buffer.appendSlice(self.allocator, "/search/repositories?q=");
+        try url_buffer.appendSlice(self.allocator, query);
         
         if (filters.language) |lang| {
-            try url_buffer.appendSlice("+language:");
-            try url_buffer.appendSlice(lang);
+            try url_buffer.appendSlice(self.allocator, "+language:");
+            try url_buffer.appendSlice(self.allocator, lang);
         }
         
         if (filters.license) |license| {
-            try url_buffer.appendSlice("+license:");
-            try url_buffer.appendSlice(license);
+            try url_buffer.appendSlice(self.allocator, "+license:");
+            try url_buffer.appendSlice(self.allocator, license);
         }
         
         if (filters.min_stars) |min_stars| {
-            try url_buffer.appendSlice("+stars:>=");
-            try std.fmt.format(url_buffer.writer(), "{d}", .{min_stars});
+            try url_buffer.appendSlice(self.allocator, "+stars:>=");
+            const stars_str = try std.fmt.allocPrint(self.allocator, "{d}", .{min_stars});
+            defer self.allocator.free(stars_str);
+            try url_buffer.appendSlice(self.allocator, stars_str);
         }
         
         const sort_field = switch (filters.sort_by) {
@@ -432,46 +434,50 @@ pub const RegistryClient = struct {
         };
         
         if (sort_field.len > 0) {
-            try url_buffer.appendSlice("&sort=");
-            try url_buffer.appendSlice(sort_field);
+            try url_buffer.appendSlice(self.allocator, "&sort=");
+            try url_buffer.appendSlice(self.allocator, sort_field);
         }
         
-        try url_buffer.appendSlice("&order=");
-        try url_buffer.appendSlice(if (filters.order == .desc) "desc" else "asc");
+        try url_buffer.appendSlice(self.allocator, "&order=");
+        try url_buffer.appendSlice(self.allocator, if (filters.order == .desc) "desc" else "asc");
         
-        try std.fmt.format(url_buffer.writer(), "&per_page={d}&page={d}", .{ filters.per_page, filters.page });
+        const pagination_str = try std.fmt.allocPrint(self.allocator, "&per_page={d}&page={d}", .{ filters.per_page, filters.page });
+        defer self.allocator.free(pagination_str);
+        try url_buffer.appendSlice(self.allocator, pagination_str);
         
-        return url_buffer.toOwnedSlice();
+        return url_buffer.toOwnedSlice(self.allocator);
     }
     
     fn buildZigistrySearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
-        var url_buffer = std.ArrayList(u8).init(self.allocator);
-        defer url_buffer.deinit();
+        var url_buffer: std.ArrayList(u8) = .{};
+        defer url_buffer.deinit(self.allocator);
         
-        try url_buffer.appendSlice(api_url);
-        try url_buffer.appendSlice("/api/searchPackages?q=");
-        try url_buffer.appendSlice(query);
+        try url_buffer.appendSlice(self.allocator, api_url);
+        try url_buffer.appendSlice(self.allocator, "/api/searchPackages?q=");
+        try url_buffer.appendSlice(self.allocator, query);
         
         // Add Zigistry-specific filters
         if (filters.categories.len > 0) {
-            try url_buffer.appendSlice("&filter=");
+            try url_buffer.appendSlice(self.allocator, "&filter=");
             for (filters.categories, 0..) |category, i| {
-                if (i > 0) try url_buffer.append(',');
-                try url_buffer.appendSlice(category);
+                if (i > 0) try url_buffer.append(self.allocator, ',');
+                try url_buffer.appendSlice(self.allocator, category);
             }
         }
         
         if (filters.zig_version) |version| {
-            try url_buffer.appendSlice("&zigVersion=");
-            try url_buffer.appendSlice(version);
+            try url_buffer.appendSlice(self.allocator, "&zigVersion=");
+            try url_buffer.appendSlice(self.allocator, version);
         }
         
-        try std.fmt.format(url_buffer.writer(), "&limit={d}&offset={d}", .{
+        const limit_str = try std.fmt.allocPrint(self.allocator, "&limit={d}&offset={d}", .{
             filters.per_page,
             (filters.page - 1) * filters.per_page,
         });
+        defer self.allocator.free(limit_str);
+        try url_buffer.appendSlice(self.allocator, limit_str);
         
-        return url_buffer.toOwnedSlice();
+        return url_buffer.toOwnedSlice(self.allocator);
     }
     
     fn buildGenericSearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
@@ -523,15 +529,15 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.items) |item| {
             // Clone topics/categories
-            var categories = std.ArrayList([]const u8).init(self.allocator);
+            var categories: std.ArrayList([]const u8) = .{};
             for (item.topics) |topic| {
-                try categories.append(try self.allocator.dupe(u8, topic));
+                try categories.append(self.allocator, try self.allocator.dupe(u8, topic));
             }
             
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, item.name),
                 .full_name = try self.allocator.dupe(u8, item.full_name),
                 .description = if (item.description) |desc| 
@@ -547,11 +553,11 @@ pub const RegistryClient = struct {
                     try self.allocator.dupe(u8, hp) else null,
                 .stars = item.stargazers_count,
                 .last_updated = try self.allocator.dupe(u8, item.updated_at),
-                .categories = try categories.toOwnedSlice(),
+                .categories = try categories.toOwnedSlice(self.allocator),
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
     
     fn parseZigistrySearchResults(self: *RegistryClient, response: []const u8) ![]Package {
@@ -569,15 +575,15 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.results) |result| {
             // Clone topics
-            var categories = std.ArrayList([]const u8).init(self.allocator);
+            var categories: std.ArrayList([]const u8) = .{};
             for (result.topics) |topic| {
-                try categories.append(try self.allocator.dupe(u8, topic));
+                try categories.append(self.allocator, try self.allocator.dupe(u8, topic));
             }
             
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, result.name),
                 .full_name = try self.allocator.dupe(u8, result.name),
                 .description = if (result.description) |desc| 
@@ -590,11 +596,11 @@ pub const RegistryClient = struct {
                 .author = try self.allocator.dupe(u8, result.author),
                 .download_count = result.downloads,
                 .last_updated = try self.allocator.dupe(u8, ""),
-                .categories = try categories.toOwnedSlice(),
+                .categories = try categories.toOwnedSlice(self.allocator),
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
     
     fn parseGenericSearchResults(self: *RegistryClient, response: []const u8) ![]Package {
@@ -604,29 +610,29 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
         
         // Deep clone packages
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.items) |pkg| {
             // Clone all string fields
-            var keywords = std.ArrayList([]const u8).init(self.allocator);
+            var keywords: std.ArrayList([]const u8) = .{};
             for (pkg.keywords) |kw| {
-                try keywords.append(try self.allocator.dupe(u8, kw));
+                try keywords.append(self.allocator, try self.allocator.dupe(u8, kw));
             }
             
-            var categories = std.ArrayList([]const u8).init(self.allocator);
+            var categories: std.ArrayList([]const u8) = .{};
             for (pkg.categories) |cat| {
-                try categories.append(try self.allocator.dupe(u8, cat));
+                try categories.append(self.allocator, try self.allocator.dupe(u8, cat));
             }
             
-            var dependencies = std.ArrayList(Dependency).init(self.allocator);
+            var dependencies: std.ArrayList(Dependency) = .{};
             for (pkg.dependencies) |dep| {
-                try dependencies.append(Dependency{
+                try dependencies.append(self.allocator, Dependency{
                     .name = try self.allocator.dupe(u8, dep.name),
                     .version_requirement = try self.allocator.dupe(u8, dep.version_requirement),
                     .optional = dep.optional,
                 });
             }
             
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, pkg.name),
                 .full_name = try self.allocator.dupe(u8, pkg.full_name),
                 .description = if (pkg.description) |desc| 
@@ -645,8 +651,8 @@ pub const RegistryClient = struct {
                     try self.allocator.dupe(u8, url) else null,
                 .author = if (pkg.author) |auth| 
                     try self.allocator.dupe(u8, auth) else null,
-                .keywords = try keywords.toOwnedSlice(),
-                .dependencies = try dependencies.toOwnedSlice(),
+                .keywords = try keywords.toOwnedSlice(self.allocator),
+                .dependencies = try dependencies.toOwnedSlice(self.allocator),
                 .download_count = pkg.download_count,
                 .stars = pkg.stars,
                 .last_updated = try self.allocator.dupe(u8, pkg.last_updated),
@@ -654,11 +660,11 @@ pub const RegistryClient = struct {
                     try self.allocator.dupe(u8, ver) else null,
                 .zig_version_max = if (pkg.zig_version_max) |ver| 
                     try self.allocator.dupe(u8, ver) else null,
-                .categories = try categories.toOwnedSlice(),
+                .categories = try categories.toOwnedSlice(self.allocator),
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
     
     fn parseDependencies(self: *RegistryClient, response: []const u8) ![]Dependency {
@@ -671,16 +677,16 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var deps = std.ArrayList(Dependency).init(self.allocator);
+        var deps: std.ArrayList(Dependency) = .{};
         for (parsed.value.dependencies) |dep| {
-            try deps.append(Dependency{
+            try deps.append(self.allocator, Dependency{
                 .name = try self.allocator.dupe(u8, dep.name),
                 .version_requirement = try self.allocator.dupe(u8, dep.version),
                 .optional = dep.optional,
             });
         }
         
-        return deps.toOwnedSlice();
+        return deps.toOwnedSlice(self.allocator);
     }
 };
 
@@ -720,7 +726,9 @@ pub const PackageCache = struct {
             return null; // Cache expired
         }
         
-        const content = try file.readToEndAlloc(self.allocator, 1024);
+        const file_size = try file.getEndPos();
+        const content = try self.allocator.alloc(u8, file_size);
+        _ = try file.readAll(content);
         return content;
     }
     

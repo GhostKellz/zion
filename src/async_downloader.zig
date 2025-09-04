@@ -48,8 +48,8 @@ pub const AsyncDownloader = struct {
         // Create download futures
         var futures = std.ArrayList(*zsync.Future(SingleDownloadResult)).init(self.allocator);
         defer {
-            for (futures.items) |future| future.deinit();
-            futures.deinit();
+            for (futures.items) |future| future.deinit(allocator);
+            futures.deinit(allocator);
         }
         
         // Create semaphore for concurrency control
@@ -60,12 +60,12 @@ pub const AsyncDownloader = struct {
             if (self.cancellation_token.is_cancelled()) break;
             
             const future = try self.downloadSingleAsync(request, &semaphore);
-            try futures.append(future);
+            try futures.append(allocator, future);
         }
         
         // Collect results
         var results = std.ArrayList(DownloadResult).init(self.allocator);
-        defer results.deinit();
+        defer results.deinit(allocator);
         
         for (futures.items) |future| {
             if (self.cancellation_token.is_cancelled()) break;
@@ -95,7 +95,7 @@ pub const AsyncDownloader = struct {
                 .bytes_downloaded = single_result.bytes_downloaded,
             };
             
-            try results.append(result);
+            try results.append(allocator, result);
             
             // Show progress
             if (self.config.show_progress) {
@@ -519,7 +519,7 @@ pub fn downloadPackagesAsync(
 ) ![]DownloadResult {
     const config = DownloadConfig{};
     var downloader = try AsyncDownloader.init(allocator, runtime, http_client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     return try downloader.downloadPackages(requests);
 }

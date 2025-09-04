@@ -45,7 +45,7 @@ pub const ZionConfig = struct {
     pub fn init(allocator: Allocator) ZionConfig {
         return ZionConfig{
             .allocator = allocator,
-            .registries = std.ArrayList(RegistryConfig).init(allocator),
+            .registries = .{},
             .cache_dir = "/tmp/zion-cache", // Default
         };
     }
@@ -55,7 +55,7 @@ pub const ZionConfig = struct {
         if (std.posix.getenv("ZION_REGISTRY_URL")) |registry_url| {
             const auth_token = std.posix.getenv("ZION_REGISTRY_TOKEN");
             
-            try self.registries.append(RegistryConfig{
+            try self.registries.append(self.allocator, RegistryConfig{
                 .name = try self.allocator.dupe(u8, "custom"),
                 .base_url = try self.allocator.dupe(u8, registry_url),
                 .auth_token = if (auth_token) |token| 
@@ -72,7 +72,7 @@ pub const ZionConfig = struct {
             while (it.next()) |registry_url| {
                 const trimmed = std.mem.trim(u8, registry_url, " ");
                 if (trimmed.len > 0) {
-                    try self.registries.append(RegistryConfig{
+                    try self.registries.append(self.allocator, RegistryConfig{
                         .name = try std.fmt.allocPrint(self.allocator, "registry-{}", .{priority}),
                         .base_url = try self.allocator.dupe(u8, trimmed),
                         .priority = priority,
@@ -84,7 +84,7 @@ pub const ZionConfig = struct {
         
         // Add Zigistry as preferred registry (if not already configured)
         if (self.registries.items.len == 0 or !self.hasRegistry("zigistry")) {
-            try self.registries.append(RegistryConfig{
+            try self.registries.append(self.allocator, RegistryConfig{
                 .name = try self.allocator.dupe(u8, "zigistry"),
                 .base_url = try self.allocator.dupe(u8, "https://zigistry-api.hf.space"),
                 .priority = 1,
@@ -92,7 +92,7 @@ pub const ZionConfig = struct {
         }
         
         // Always add GitHub as fallback (lowest priority)
-        try self.registries.append(RegistryConfig{
+        try self.registries.append(self.allocator, RegistryConfig{
             .name = try self.allocator.dupe(u8, "github"),
             .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
             .api_version = try self.allocator.dupe(u8, ""), // GitHub doesn't use /api/v1 prefix
@@ -121,7 +121,7 @@ pub const ZionConfig = struct {
         for (self.registries.items) |registry| {
             registry.deinit(self.allocator);
         }
-        self.registries.deinit();
+        self.registries.deinit(self.allocator);
         
         if (self.github_username) |username| {
             self.allocator.free(username);

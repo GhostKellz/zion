@@ -53,8 +53,8 @@ pub const EnhancedRegistryManager = struct {
         }
         self.registries.deinit();
         
-        self.http_client.deinit();
-        self.runtime.deinit();
+        self.http_client.deinit(allocator);
+        self.runtime.deinit(allocator);
         self.allocator.destroy(self.runtime);
         self.allocator.destroy(self);
     }
@@ -69,7 +69,7 @@ pub const EnhancedRegistryManager = struct {
                     .enabled = reg_config.enabled,
                     .priority = @intCast(reg_config.priority),
                 };
-                try self.registries.append(endpoint);
+                try self.registries.append(allocator, endpoint);
             }
         }
         
@@ -89,14 +89,14 @@ pub const EnhancedRegistryManager = struct {
         // Use parallel async resolution
         var futures = std.ArrayList(*zsync.Future(PackageResult)).init(self.allocator);
         defer {
-            for (futures.items) |future| future.deinit();
-            futures.deinit();
+            for (futures.items) |future| future.deinit(allocator);
+            futures.deinit(allocator);
         }
         
         // Start parallel resolution across all registries
         for (self.registries.items) |registry| {
             const future = try self.resolveFromRegistryAsync(registry, package_name);
-            try futures.append(future);
+            try futures.append(allocator, future);
         }
         
         // Wait for first successful result
@@ -118,19 +118,19 @@ pub const EnhancedRegistryManager = struct {
         
         var search_futures = std.ArrayList(*zsync.Future(SearchResult)).init(self.allocator);
         defer {
-            for (search_futures.items) |future| future.deinit();
-            search_futures.deinit();
+            for (search_futures.items) |future| future.deinit(allocator);
+            search_futures.deinit(allocator);
         }
         
         // Start parallel search across all registries
         for (self.registries.items) |registry| {
             const future = try self.searchInRegistryAsync(registry, query);
-            try search_futures.append(future);
+            try search_futures.append(allocator, future);
         }
         
         // Collect and aggregate results
         var all_packages = std.ArrayList(Package).init(self.allocator);
-        defer all_packages.deinit();
+        defer all_packages.deinit(allocator);
         
         for (search_futures.items) |future| {
             const result = try future.await();
@@ -150,7 +150,7 @@ pub const EnhancedRegistryManager = struct {
                     }
                     
                     if (!is_duplicate) {
-                        try all_packages.append(pkg);
+                        try all_packages.append(allocator, pkg);
                     }
                 }
             }
@@ -195,13 +195,13 @@ pub const EnhancedRegistryManager = struct {
         // Use parallel metadata requests
         var metadata_futures = std.ArrayList(*zsync.Future(?PackageMetadata)).init(self.allocator);
         defer {
-            for (metadata_futures.items) |future| future.deinit();
-            metadata_futures.deinit();
+            for (metadata_futures.items) |future| future.deinit(allocator);
+            metadata_futures.deinit(allocator);
         }
         
         for (self.registries.items) |registry| {
             const future = try self.fetchMetadataAsync(registry, owner, repo);
-            try metadata_futures.append(future);
+            try metadata_futures.append(allocator, future);
         }
         
         // Return first successful metadata

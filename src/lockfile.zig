@@ -40,7 +40,7 @@ pub const LockFile = struct {
     /// Initialize a new, empty lock file
     pub fn init(allocator: Allocator) LockFile {
         return LockFile{
-            .packages = std.ArrayList(LockedPackage).init(allocator),
+            .packages = .{},
             .allocator = allocator,
         };
     }
@@ -50,7 +50,7 @@ pub const LockFile = struct {
         for (self.packages.items) |*pkg| {
             pkg.deinit(self.allocator);
         }
-        self.packages.deinit();
+        self.packages.deinit(self.allocator);
     }
 
     /// Add a package to the lock file
@@ -129,7 +129,7 @@ pub const LockFile = struct {
             .timestamp = std.time.timestamp(),
         };
 
-        try self.packages.append(new_pkg);
+        try self.packages.append(self.allocator, new_pkg);
     }
 
     /// Load lock file from disk
@@ -147,7 +147,7 @@ pub const LockFile = struct {
         };
 
         // Read file
-        const file_content = try cwd.readFileAlloc(allocator, lock_path, 10 * 1024 * 1024);
+        const file_content = try cwd.readFileAlloc(lock_path, allocator, @enumFromInt(10 * 1024 * 1024));
         defer allocator.free(file_content);
 
         // Parse JSON using new API
@@ -235,7 +235,7 @@ pub const LockFile = struct {
                                 break :blk null;
                             } else null;
 
-                            try lock_file.packages.append(LockedPackage{
+                            try lock_file.packages.append(allocator, LockedPackage{
                                 .name = try allocator.dupe(u8, name),
                                 .url = try allocator.dupe(u8, url),
                                 .hash = try allocator.dupe(u8, hash),

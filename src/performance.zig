@@ -136,7 +136,7 @@ pub const SmartCache = struct {
         const cache_path = self.getCachePath(url) catch return null;
         defer self.allocator.free(cache_path);
 
-        const content = fs.cwd().readFileAlloc(self.allocator, cache_path, 100 * 1024 * 1024) catch return null;
+        const content = fs.cwd().readFileAlloc(self.allocator, cache_path, @enumFromInt(100 * 1024 * 1024)) catch return null;
 
         self.metrics.cache_hits += 1;
         return content;
@@ -214,7 +214,7 @@ pub const ParallelDownloader = struct {
             .allocator = allocator,
             .cache = cache,
             .connection_pool = ConnectionPool.init(allocator, max_workers),
-            .job_queue = std.ArrayList(DownloadJob).init(allocator),
+            .job_queue = .{},
             .workers = try allocator.alloc(Thread, max_workers),
             .mutex = Mutex{},
             .running = false,
@@ -223,7 +223,7 @@ pub const ParallelDownloader = struct {
 
     pub fn deinit(self: *ParallelDownloader) void {
         self.stop();
-        self.job_queue.deinit();
+        self.job_queue.deinit(self.allocator);
         self.allocator.free(self.workers);
     }
 
@@ -305,7 +305,7 @@ pub const ParallelDownloader = struct {
         };
 
         // Cache the downloaded content
-        const content = fs.cwd().readFileAlloc(self.allocator, job.output_path, 100 * 1024 * 1024) catch return;
+        const content = fs.cwd().readFileAlloc(self.allocator, job.output_path, @enumFromInt(100 * 1024 * 1024)) catch return;
         defer self.allocator.free(content);
 
         self.cache.store(job.url, content) catch {};

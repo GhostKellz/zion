@@ -153,9 +153,9 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
         
         // Deep clone the releases
-        var releases = std.ArrayList(Release).init(self.allocator);
+        var releases: std.ArrayList(Release) = .{};
         for (parsed.value) |release| {
-            try releases.append(Release{
+            try releases.append(self.allocator, Release{
                 .tag_name = try self.allocator.dupe(u8, release.tag_name),
                 .name = try self.allocator.dupe(u8, release.name),
                 .published_at = try self.allocator.dupe(u8, release.published_at),
@@ -166,7 +166,7 @@ pub const RegistryClient = struct {
             });
         }
         
-        return releases.toOwnedSlice();
+        return releases.toOwnedSlice(self.allocator);
     }
     
     /// Search packages with enhanced metadata
@@ -222,9 +222,9 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.items) |item| {
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, item.name),
                 .full_name = try self.allocator.dupe(u8, item.full_name),
                 .description = if (item.description) |desc| 
@@ -238,7 +238,7 @@ pub const RegistryClient = struct {
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
     
     fn parseZigistrySearchResults(self: *RegistryClient, response: []const u8) ![]Package {
@@ -258,11 +258,11 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.packages) |pkg| {
             const is_ziglibs = std.mem.eql(u8, pkg.owner, "ziglibs");
             
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, pkg.name),
                 .full_name = try self.allocator.dupe(u8, pkg.full_name),
                 .description = if (pkg.description) |desc| 
@@ -281,7 +281,7 @@ pub const RegistryClient = struct {
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
     
     fn parseZepplinSearchResults(self: *RegistryClient, response: []const u8) ![]Package {
@@ -291,9 +291,9 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
         
         // Deep clone packages
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         for (parsed.value.items) |pkg| {
-            try packages.append(Package{
+            try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, pkg.name),
                 .full_name = try self.allocator.dupe(u8, pkg.full_name),
                 .description = if (pkg.description) |desc| 
@@ -307,6 +307,6 @@ pub const RegistryClient = struct {
             });
         }
         
-        return packages.toOwnedSlice();
+        return packages.toOwnedSlice(self.allocator);
     }
 };

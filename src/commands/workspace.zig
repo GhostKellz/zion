@@ -166,14 +166,14 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
     }
     
     // Filter members if specific package requested
-    var build_targets = std.ArrayList([]const u8).init(allocator);
-    defer build_targets.deinit();
+    var build_targets: std.ArrayList([]const u8) = .{};
+    defer build_targets.deinit(allocator);
     
     if (target_package) |pkg| {
         // Build only specific package
         for (members) |member| {
             if (std.mem.eql(u8, member, pkg)) {
-                try build_targets.append(member);
+                try build_targets.append(allocator, member);
                 break;
             }
         }
@@ -184,7 +184,7 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
     } else {
         // Build all packages
         for (members) |member| {
-            try build_targets.append(member);
+            try build_targets.append(allocator, member);
         }
     }
     
@@ -405,16 +405,16 @@ fn getWorkspaceMembers(allocator: Allocator) ![][]const u8 {
     };
     defer dir.close();
     
-    var members = std.ArrayList([]const u8).init(allocator);
+    var members: std.ArrayList([]const u8) = .{};
     var iterator = dir.iterate();
     while (try iterator.next()) |entry| {
         if (entry.kind == .directory) {
             const name = try allocator.dupe(u8, entry.name);
-            try members.append(name);
+            try members.append(allocator, name);
         }
     }
     
-    return members.toOwnedSlice();
+    return members.toOwnedSlice(allocator);
 }
 
 fn printWorkspaceHelp() void {
@@ -454,7 +454,7 @@ fn resolveWorkspaceDependencies(allocator: Allocator) !void {
     // Check if workspace has a shared dependency file
     const workspace_deps_path = "zion-workspace-deps.toml";
     
-    const deps_content = fs.cwd().readFileAlloc(allocator, workspace_deps_path, 1024 * 1024) catch {
+    const deps_content = fs.cwd().readFileAlloc(workspace_deps_path, allocator, @enumFromInt(1024 * 1024)) catch {
         // No workspace dependencies file - that's fine
         std.debug.print("  No workspace-level dependencies found\n", .{});
         return;
@@ -490,10 +490,10 @@ fn resolveWorkspaceDependencies(allocator: Allocator) !void {
 fn determineBuildOrder(allocator: Allocator, packages: []const []const u8) ![][]const u8 {
     // For now, return packages in original order
     // In a full implementation, this would analyze build.zig files to determine dependencies
-    var ordered_packages = std.ArrayList([]const u8).init(allocator);
+    var ordered_packages: std.ArrayList([]const u8) = .{};
     
     for (packages) |pkg| {
-        try ordered_packages.append(try allocator.dupe(u8, pkg));
+        try ordered_packages.append(allocator, try allocator.dupe(u8, pkg));
     }
     
     std.debug.print("📊 Build order determined: ", .{});
@@ -503,7 +503,7 @@ fn determineBuildOrder(allocator: Allocator, packages: []const []const u8) ![][]
     }
     std.debug.print("\n", .{});
     
-    return try ordered_packages.toOwnedSlice();
+    return try ordered_packages.toOwnedSlice(allocator);
 }
 
 /// Create workspace template scaffolding

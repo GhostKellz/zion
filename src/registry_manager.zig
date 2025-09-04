@@ -23,7 +23,7 @@ pub const RegistryManager = struct {
         return RegistryManager{
             .allocator = allocator,
             .config = zion_config,
-            .clients = std.ArrayList(RegistryClient).init(allocator),
+            .clients = .{},
             .health_monitor = HealthMonitor.init(allocator),
             .package_resolver = PackageResolver.init(allocator),
             .dependency_analyzer = DependencyAnalyzer.init(allocator),
@@ -44,7 +44,7 @@ pub const RegistryManager = struct {
                     try client.enableCache(cache_dir, self.config.cache_ttl_hours);
                 }
                 
-                try self.clients.append(client);
+                try self.clients.append(self.allocator, client);
             }
         }
         
@@ -56,7 +56,7 @@ pub const RegistryManager = struct {
         for (self.clients.items) |*client| {
             client.deinit();
         }
-        self.clients.deinit();
+        self.clients.deinit(self.allocator);
         self.health_monitor.deinit();
         self.package_resolver.deinit();
         self.dependency_analyzer.deinit();
@@ -66,12 +66,12 @@ pub const RegistryManager = struct {
     pub fn resolvePackage(self: *RegistryManager, package_name: []const u8, version: ?[]const u8) !?Package {
         std.log.info("🔍 Resolving package: {s} {s}", .{ package_name, version orelse "latest" });
         
-        var resolved_packages = std.ArrayList(Package).init(self.allocator);
+        var resolved_packages: std.ArrayList(Package) = .{};
         defer {
             for (resolved_packages.items) |pkg| {
                 pkg.deinit(self.allocator);
             }
-            resolved_packages.deinit();
+            resolved_packages.deinit(self.allocator);
         }
         
         // Try each registry in priority order
@@ -104,7 +104,7 @@ pub const RegistryManager = struct {
                 continue;
             };
             
-            try resolved_packages.append(package);
+            try resolved_packages.append(self.allocator, package);
             
             // If we found a package and it's from a high-priority registry, return it
             if (client.config.priority == 0) {
@@ -130,8 +130,8 @@ pub const RegistryManager = struct {
     pub fn searchPackages(self: *RegistryManager, query: []const u8, filters: SearchFilters) ![]Package {
         std.log.info("🔍 Searching for packages: {s}", .{query});
         
-        var all_packages = std.ArrayList(Package).init(self.allocator);
-        defer all_packages.deinit();
+        var all_packages: std.ArrayList(Package) = .{};
+        defer all_packages.deinit(self.allocator);
         
         var seen_packages = std.StringHashMap(void).init(self.allocator);
         defer seen_packages.deinit();
@@ -156,7 +156,7 @@ pub const RegistryManager = struct {
                 
                 if (!seen_packages.contains(key)) {
                     try seen_packages.put(try self.allocator.dupe(u8, key), {});
-                    try all_packages.append(try self.clonePackage(pkg));
+                    try all_packages.append(self.allocator, try self.clonePackage(pkg));
                 }
                 
                 if (all_packages.items.len >= filters.per_page) break;
@@ -176,7 +176,7 @@ pub const RegistryManager = struct {
         }.lessThan);
         
         std.log.info("✅ Found {} packages across {} registries", .{ all_packages.items.len, self.clients.items.len });
-        return all_packages.toOwnedSlice();
+        return all_packages.toOwnedSlice(self.allocator);
     }
     
     /// Analyze dependencies and check for conflicts
@@ -233,30 +233,30 @@ pub const RegistryManager = struct {
     
     /// Get registry health status
     pub fn getRegistryStatus(self: *RegistryManager) ![]RegistryHealth {
-        var statuses = std.ArrayList(RegistryHealth).init(self.allocator);
+        var statuses: std.ArrayList(RegistryHealth) = .{};
         
         for (self.clients.items) |client| {
-            try statuses.append(client.health_metrics);
+            try statuses.append(self.allocator, client.health_metrics);
         }
         
-        return statuses.toOwnedSlice();
+        return statuses.toOwnedSlice(self.allocator);
     }
     
     fn clonePackage(self: *RegistryManager, pkg: Package) !Package {
         // Deep clone a package
-        var keywords = std.ArrayList([]const u8).init(self.allocator);
+        var keywords: std.ArrayList([]const u8) = .{};
         for (pkg.keywords) |kw| {
-            try keywords.append(try self.allocator.dupe(u8, kw));
+            try keywords.append(self.allocator, try self.allocator.dupe(u8, kw));
         }
         
-        var categories = std.ArrayList([]const u8).init(self.allocator);
+        var categories: std.ArrayList([]const u8) = .{};
         for (pkg.categories) |cat| {
-            try categories.append(try self.allocator.dupe(u8, cat));
+            try categories.append(self.allocator, try self.allocator.dupe(u8, cat));
         }
         
-        var dependencies = std.ArrayList(Dependency).init(self.allocator);
+        var dependencies: std.ArrayList(Dependency) = .{};
         for (pkg.dependencies) |dep| {
-            try dependencies.append(Dependency{
+            try dependencies.append(self.allocator, Dependency{
                 .name = try self.allocator.dupe(u8, dep.name),
                 .version_requirement = try self.allocator.dupe(u8, dep.version_requirement),
                 .optional = dep.optional,
@@ -282,8 +282,8 @@ pub const RegistryManager = struct {
                 try self.allocator.dupe(u8, url) else null,
             .author = if (pkg.author) |auth| 
                 try self.allocator.dupe(u8, auth) else null,
-            .keywords = try keywords.toOwnedSlice(),
-            .dependencies = try dependencies.toOwnedSlice(),
+            .keywords = try keywords.toOwnedSlice(self.allocator),
+            .dependencies = try dependencies.toOwnedSlice(self.allocator),
             .download_count = pkg.download_count,
             .stars = pkg.stars,
             .last_updated = try self.allocator.dupe(u8, pkg.last_updated),
@@ -291,7 +291,7 @@ pub const RegistryManager = struct {
                 try self.allocator.dupe(u8, ver) else null,
             .zig_version_max = if (pkg.zig_version_max) |ver| 
                 try self.allocator.dupe(u8, ver) else null,
-            .categories = try categories.toOwnedSlice(),
+            .categories = try categories.toOwnedSlice(self.allocator),
         };
     }
 };
@@ -403,7 +403,7 @@ pub const DependencyAnalyzer = struct {
         var analysis = DependencyAnalysis{
             .root_package = try self.allocator.dupe(u8, package.full_name),
             .total_dependencies = 0,
-            .conflicts = std.ArrayList(DependencyConflict).init(self.allocator),
+            .conflicts = .{},
             .dependency_tree = std.StringHashMap([]const u8).init(self.allocator),
             .allocator = self.allocator,
         };
@@ -443,7 +443,7 @@ pub const DependencyAnalysis = struct {
         for (self.conflicts.items) |conflict| {
             conflict.deinit(self.allocator);
         }
-        self.conflicts.deinit();
+        self.conflicts.deinit(self.allocator);
         
         var iterator = self.dependency_tree.iterator();
         while (iterator.next()) |entry| {

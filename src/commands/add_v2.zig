@@ -255,11 +255,11 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     defer lock_file.deinit();
     
     // Convert dependencies to the expected format
-    var dep_names = std.ArrayList([]const u8).init(allocator);
-    defer dep_names.deinit();
+    var dep_names: std.ArrayList([]const u8) = .{};
+    defer dep_names.deinit(allocator);
     
     for (package.dependencies) |dep| {
-        try dep_names.append(try allocator.dupe(u8, dep.name));
+        try dep_names.append(allocator, try allocator.dupe(u8, dep.name));
     }
     
     try lock_file.addPackageWithMetadata(
@@ -271,7 +271,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             .registry = package.registry_name,
             .resolved_from = package.full_name,
             .integrity = download_result.hash,
-            .dependencies = if (dep_names.items.len > 0) try dep_names.toOwnedSlice() else null,
+            .dependencies = if (dep_names.items.len > 0) try dep_names.toOwnedSlice(allocator) else null,
             .dev_only = options.dev_only,
         },
     );
@@ -310,8 +310,8 @@ pub fn addMultiple(allocator: Allocator, packages: []const []const u8, options: 
     
     var success_count: usize = 0;
     var error_count: usize = 0;
-    var errors = std.ArrayList(struct { package: []const u8, err: anyerror }).init(allocator);
-    defer errors.deinit();
+    var errors: std.ArrayList(struct { package: []const u8, err: anyerror }) = .{};
+    defer errors.deinit(allocator);
     
     // Process packages
     for (packages, 0..) |package_ref, i| {
@@ -319,7 +319,7 @@ pub fn addMultiple(allocator: Allocator, packages: []const []const u8, options: 
         
         add(allocator, package_ref, options) catch |err| {
             error_count += 1;
-            try errors.append(.{ .package = package_ref, .err = err });
+            try errors.append(allocator, .{ .package = package_ref, .err = err });
             std.debug.print("❌ Failed to add {s}: {}\n\n", .{ package_ref, err });
             continue;
         };
@@ -412,14 +412,14 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     try child.spawn();
     
     const stderr = if (child.stderr) |stderr_pipe| blk: {
-        var output_buf = std.ArrayList(u8).init(allocator);
-        defer output_buf.deinit();
+        var output_buf: std.ArrayList(u8) = .{};
+        defer output_buf.deinit(allocator);
         
         var read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
             if (bytes_read == 0) break;
-            try output_buf.appendSlice(read_buf[0..bytes_read]);
+            try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
         
         break :blk try allocator.dupe(u8, output_buf.items);

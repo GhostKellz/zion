@@ -37,7 +37,7 @@ pub fn makeResilientRequest(
 
 fn makeSingleRequest(allocator: std.mem.Allocator, url: []const u8, timeout_sec: u32) ![]u8 {
     var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Set connection timeout
     const timeout_ns = @as(u64, timeout_sec) * std.time.ns_per_s;
@@ -46,7 +46,7 @@ fn makeSingleRequest(allocator: std.mem.Allocator, url: []const u8, timeout_sec:
         .server_header_buffer = &[_]u8{0} ** 16384,
         .connection = .{ .timeout_ms = @intCast(timeout_sec * 1000) },
     }) catch return HttpError.NetworkError;
-    defer req.deinit();
+    defer req.deinit(allocator);
     
     // Use timeout for operations
     const start_time = std.time.nanoTimestamp();
@@ -65,8 +65,8 @@ fn makeSingleRequest(allocator: std.mem.Allocator, url: []const u8, timeout_sec:
         return HttpError.InvalidResponse;
     }
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {

@@ -190,9 +190,7 @@ fn doctorZLS(allocator: Allocator) !void {
 }
 
 /// Show which ZLS is being used
-fn whichZLS(allocator: Allocator) !void {
-    _ = allocator;
-    
+fn whichZLS(_: Allocator) !void {
     if (!checkCommand("zls")) {
         std.debug.print("ZLS not found in PATH\n", .{});
         return;
@@ -205,14 +203,14 @@ fn whichZLS(allocator: Allocator) !void {
     
     try child.spawn();
     
-    var output_buf = std.ArrayList(u8).init(std.heap.page_allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(std.heap.page_allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
     }
     
     const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
@@ -305,14 +303,14 @@ fn showZLSVersion() !void {
     
     try child.spawn();
     
-    var output_buf = std.ArrayList(u8).init(std.heap.page_allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(std.heap.page_allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
     }
     
     const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
@@ -330,14 +328,14 @@ fn showZigVersionForZLS() !void {
     
     try child.spawn();
     
-    var output_buf = std.ArrayList(u8).init(std.heap.page_allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(std.heap.page_allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
     }
     
     const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
@@ -375,8 +373,8 @@ fn getZLSPath(allocator: Allocator) ![]const u8 {
     
     child.spawn() catch return error.ZLSNotFound;
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     const stdout = blk: {
@@ -386,7 +384,7 @@ fn getZLSPath(allocator: Allocator) ![]const u8 {
                 return error.ZLSNotFound;
             };
             if (bytes_read == 0) break;
-            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
                 _ = child.wait() catch {};
                 return error.ZLSNotFound;
             };
@@ -421,8 +419,8 @@ fn getZLSVersionString(allocator: Allocator) ![]const u8 {
     
     child.spawn() catch return error.VersionDetectionFailed;
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     const stdout = blk: {
@@ -432,7 +430,7 @@ fn getZLSVersionString(allocator: Allocator) ![]const u8 {
                 return error.VersionDetectionFailed;
             };
             if (bytes_read == 0) break;
-            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
                 _ = child.wait() catch {};
                 return error.VersionDetectionFailed;
             };
@@ -467,8 +465,8 @@ fn getZigVersionString(allocator: Allocator) ![]const u8 {
     
     child.spawn() catch return error.VersionDetectionFailed;
     
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     const stdout = blk: {
@@ -478,7 +476,7 @@ fn getZigVersionString(allocator: Allocator) ![]const u8 {
                 return error.VersionDetectionFailed;
             };
             if (bytes_read == 0) break;
-            output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
                 _ = child.wait() catch {};
                 return error.VersionDetectionFailed;
             };

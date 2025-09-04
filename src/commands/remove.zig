@@ -146,7 +146,7 @@ fn removeFromBuildZig(allocator: Allocator, package_name: []const u8) !void {
     };
 
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc(allocator, "build.zig", 10 * 1024 * 1024);
+    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
     defer allocator.free(build_content);
 
     // Look for the dependency block to remove

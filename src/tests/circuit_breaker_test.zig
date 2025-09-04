@@ -283,7 +283,7 @@ test "CircuitBreaker: concurrent access" {
     
     // Test concurrent access with multiple threads
     var threads = std.ArrayList(std.Thread).init(allocator);
-    defer threads.deinit();
+    defer threads.deinit(allocator);
     
     // Spawn threads that record failures
     for (0..3) |_| {
@@ -297,7 +297,7 @@ test "CircuitBreaker: concurrent access" {
                 }
             }
         }.recordFailures, .{&breaker});
-        try threads.append(thread);
+        try threads.append(allocator, thread);
     }
     
     // Spawn threads that record successes
@@ -312,7 +312,7 @@ test "CircuitBreaker: concurrent access" {
                 }
             }
         }.recordSuccesses, .{&breaker});
-        try threads.append(thread);
+        try threads.append(allocator, thread);
     }
     
     // Wait for all threads to complete

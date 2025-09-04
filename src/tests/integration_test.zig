@@ -14,7 +14,7 @@ test "Integration: End-to-End Package Workflow - Mock Registry" {
     
     // Initialize runtime
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     // Initialize config
     var config = ZionConfig.init(allocator);
@@ -52,7 +52,7 @@ test "Integration: Parallel Package Resolution with Multiple Registries" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     var config = ZionConfig.init(allocator);
     defer config.deinit();
@@ -77,19 +77,19 @@ test "Integration: Parallel Package Resolution with Multiple Registries" {
     };
     
     var resolution_results = std.ArrayList(?unified_registry_manager.UnifiedRegistryManager.Package).init(allocator);
-    defer resolution_results.deinit();
+    defer resolution_results.deinit(allocator);
     
     for (test_packages) |pkg_name| {
         const result = manager.resolvePackage(pkg_name) catch |err| switch (err) {
             error.NetworkError, error.PackageNotFound, error.UnknownHost => {
                 std.debug.print("  ✓ Expected error for mock package: {s}\n", .{pkg_name});
-                try resolution_results.append(null);
+                try resolution_results.append(allocator, null);
                 continue;
             },
             else => return err,
         };
         
-        try resolution_results.append(result);
+        try resolution_results.append(allocator, result);
         if (result) |pkg| {
             std.debug.print("  ✓ Resolved: {s} -> {s}\n", .{ pkg_name, pkg.full_name });
         }
@@ -109,7 +109,7 @@ test "Integration: Cache Invalidation and TTL" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     var config = ZionConfig.init(allocator);
     defer config.deinit();
@@ -186,7 +186,7 @@ test "Integration: Network Failure Recovery Scenarios" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     var config = ZionConfig.init(allocator);
     defer config.deinit();
@@ -243,10 +243,10 @@ test "Integration: Cancellation of Long-Running Operations" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     std.debug.print("\n⏹️  Testing operation cancellation...\n", .{});
     
@@ -258,7 +258,7 @@ test "Integration: Cancellation of Long-Running Operations" {
     };
     
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, config);
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Create long-running download requests
     var requests = [_]async_downloader.DownloadRequest{
@@ -298,10 +298,10 @@ test "Integration: Request Batching Optimization" {
     const allocator = testing.allocator;
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     std.debug.print("\n📊 Testing request batching optimization...\n", .{});
     
@@ -312,13 +312,13 @@ test "Integration: Request Batching Optimization" {
     };
     
     const batcher = try request_batcher.RequestBatcher.init(allocator, &runtime, client, batch_config);
-    defer batcher.deinit();
+    defer batcher.deinit(allocator);
     
     batcher.resetStats();
     
     // Create multiple similar requests that can be batched
     var futures = std.ArrayList(*zsync.Future(request_batcher.BatchedResult)).init(allocator);
-    defer futures.deinit();
+    defer futures.deinit(allocator);
     
     // Add search requests to same registry (should batch together)
     for (0..8) |i| {
@@ -332,7 +332,7 @@ test "Integration: Request Batching Optimization" {
         );
         
         const future = try batcher.addRequest(request);
-        try futures.append(future);
+        try futures.append(allocator, future);
     }
     
     std.debug.print("  ✓ Added 8 similar requests\n", .{});
@@ -356,7 +356,7 @@ test "Integration: Multi-Level Caching Performance" {
     std.debug.print("\n🚀 Testing multi-level caching performance...\n", .{});
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     var config = ZionConfig.init(allocator);
     defer config.deinit();
@@ -375,7 +375,7 @@ test "Integration: Multi-Level Caching Performance" {
         for (test_packages.items) |pkg| {
             pkg.deinit(allocator);
         }
-        test_packages.deinit();
+        test_packages.deinit(allocator);
     }
     
     // Generate test packages
@@ -400,7 +400,7 @@ test "Integration: Multi-Level Caching Performance" {
             .maintenance_status = null,
         };
         
-        try test_packages.append(pkg);
+        try test_packages.append(allocator, pkg);
     }
     
     // Benchmark cache writes
@@ -450,7 +450,7 @@ test "Integration: Complete Package Lifecycle Simulation" {
     std.debug.print("\n🔄 Testing complete package lifecycle...\n", .{});
     
     var runtime = zsync.Runtime.init(allocator, .{});
-    defer runtime.deinit();
+    defer runtime.deinit(allocator);
     
     var config = ZionConfig.init(allocator);
     defer config.deinit();
@@ -463,10 +463,10 @@ test "Integration: Complete Package Lifecycle Simulation" {
     defer manager.deinit();
     
     const client = try http_client.HttpClient.init(allocator, &runtime);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const downloader = try async_downloader.AsyncDownloader.init(allocator, &runtime, client, async_downloader.DownloadConfig{});
-    defer downloader.deinit();
+    defer downloader.deinit(allocator);
     
     // Simulate complete lifecycle: discover -> resolve -> download -> verify
     const lifecycle_steps = [_][]const u8{

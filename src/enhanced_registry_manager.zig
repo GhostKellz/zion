@@ -18,7 +18,7 @@ pub const RegistryManager = struct {
         return RegistryManager{
             .allocator = allocator,
             .config = zion_config,
-            .clients = std.ArrayList(RegistryClient).init(allocator),
+            .clients = .{},
             .io = zsync.createBlockingIo(allocator),
         };
     }
@@ -27,7 +27,7 @@ pub const RegistryManager = struct {
         for (self.config.registries.items) |reg_config| {
             if (reg_config.enabled) {
                 const client = RegistryClient.init(self.allocator, reg_config);
-                try self.clients.append(client);
+                try self.clients.append(self.allocator, client);
             }
         }
     }
@@ -36,7 +36,7 @@ pub const RegistryManager = struct {
         for (self.clients.items) |*client| {
             client.deinit();
         }
-        self.clients.deinit();
+        self.clients.deinit(self.allocator);
         self.io.deinit();
     }
     
@@ -71,8 +71,8 @@ pub const RegistryManager = struct {
         
         // For now, use sequential search across registries
         // TODO: Implement proper async search with zsync Future API
-        var all_packages = std.ArrayList(Package).init(self.allocator);
-        defer all_packages.deinit();
+        var all_packages: std.ArrayList(Package) = .{};
+        defer all_packages.deinit(self.allocator);
         
         for (self.clients.items) |*client| {
             const result = searchInRegistry(client, query) catch |err| {
@@ -96,7 +96,7 @@ pub const RegistryManager = struct {
                     }
                     
                     if (!is_duplicate) {
-                        try all_packages.append(pkg);
+                        try all_packages.append(self.allocator, pkg);
                     }
                 }
             }
@@ -124,7 +124,7 @@ pub const RegistryManager = struct {
         }.lessThan);
         
         std.log.info("📦 Found {} packages", .{all_packages.items.len});
-        return all_packages.toOwnedSlice();
+        return all_packages.toOwnedSlice(self.allocator);
     }
     
     /// Enhanced Ziglibs package search
@@ -143,17 +143,17 @@ pub const RegistryManager = struct {
                 const packages = try client.searchPackages(search_query, "zig");
                 
                 // Filter for ziglibs only
-                var ziglibs_packages = std.ArrayList(Package).init(self.allocator);
+                var ziglibs_packages: std.ArrayList(Package) = .{};
                 for (packages) |pkg| {
                     if (pkg.is_ziglibs) {
-                        try ziglibs_packages.append(pkg);
+                        try ziglibs_packages.append(self.allocator, pkg);
                     } else {
                         pkg.deinit(self.allocator);
                     }
                 }
                 self.allocator.free(packages);
                 
-                return ziglibs_packages.toOwnedSlice();
+                return ziglibs_packages.toOwnedSlice(self.allocator);
             }
         }
         

@@ -263,12 +263,12 @@ fn parseSearchOptions(options: *SearchOptions, args: []const []const u8, allocat
     for (args) |arg| {
         if (std.mem.startsWith(u8, arg, "--filter=")) {
             const filter_str = arg[9..];
-            var categories = std.ArrayList([]const u8).init(allocator);
+            var categories: std.ArrayList([]const u8) = .{};
             var it = std.mem.splitSequence(u8, filter_str, ",");
             while (it.next()) |cat| {
-                try categories.append(try allocator.dupe(u8, cat));
+                try categories.append(allocator, try allocator.dupe(u8, cat));
             }
-            options.filters.categories = try categories.toOwnedSlice();
+            options.filters.categories = try categories.toOwnedSlice(allocator);
             options.allocated_categories = true;
         } else if (std.mem.startsWith(u8, arg, "--license=")) {
             options.filters.license = try allocator.dupe(u8, arg[10..]);
@@ -355,14 +355,14 @@ pub fn interactiveSearch(allocator: Allocator) !void {
         } else if (trimmed.len > 0) {
             // Parse the search command
             var args = std.ArrayList([]const u8).init(allocator);
-            defer args.deinit();
+            defer args.deinit(allocator);
             
-            try args.append("zion");
-            try args.append("search");
+            try args.append(allocator, "zion");
+            try args.append(allocator, "search");
             
             var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
             while (it.next()) |token| {
-                try args.append(token);
+                try args.append(allocator, token);
             }
             
             search(allocator, args.items) catch |err| {

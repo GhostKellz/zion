@@ -57,18 +57,18 @@ pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]Pa
     const owner = package_ref[0..slash_index];
     const repo = package_ref[slash_index + 1..];
     
-    var versions = std.ArrayList(PackageVersion).init(allocator);
+    var versions: std.ArrayList(PackageVersion) = .{};
     errdefer {
         for (versions.items) |*version| {
             version.deinit(allocator);
         }
-        versions.deinit();
+        versions.deinit(allocator);
     }
     
     // Try primary registry first
     const primary_registry = registry.getPrimaryRegistry(allocator, &config);
     if (tryFetchFromRegistry(allocator, &primary_registry, owner, repo, &versions)) {
-        return try versions.toOwnedSlice();
+        return try versions.toOwnedSlice(allocator);
     } else |err| {
         std.debug.print("⚠️ Primary registry failed: {}\n", .{err});
     }
@@ -79,7 +79,7 @@ pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]Pa
     
     for (fallback_registries) |fallback_registry| {
         if (tryFetchFromRegistry(allocator, &fallback_registry, owner, repo, &versions)) {
-            return try versions.toOwnedSlice();
+            return try versions.toOwnedSlice(allocator);
         } else |err| {
             std.debug.print("⚠️ Fallback registry failed: {}\n", .{err});
         }
@@ -192,7 +192,7 @@ fn tryFetchFromRegistry(allocator: Allocator, reg: *const registry.RegistryClien
         // Add releases as versions
         for (releases) |release| {
             if (!release.prerelease) {
-                try versions.append(PackageVersion{
+                try versions.append(allocator, PackageVersion{
                     .version = try allocator.dupe(u8, release.tag_name),
                     .url = try allocator.dupe(u8, release.tarball_url),
                     .is_tag = false,
@@ -211,7 +211,7 @@ fn tryFetchFromRegistry(allocator: Allocator, reg: *const registry.RegistryClien
             
             // Add tags as versions
             for (tags) |tag| {
-                try versions.append(PackageVersion{
+                try versions.append(allocator, PackageVersion{
                     .version = try allocator.dupe(u8, tag.name),
                     .url = try allocator.dupe(u8, tag.tarball_url),
                     .is_tag = true,
@@ -247,7 +247,7 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
     defer parsed.deinit();
     
     const releases_array = parsed.value.array;
-    var releases = std.ArrayList(GitHubRelease).init(allocator);
+    var releases: std.ArrayList(GitHubRelease) = .{};
     
     for (releases_array.items) |release_json| {
         const release_obj = release_json.object;
@@ -259,7 +259,7 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
         const tarball_url = try allocator.dupe(u8, release_obj.get("tarball_url").?.string);
         const zipball_url = try allocator.dupe(u8, release_obj.get("zipball_url").?.string);
         
-        try releases.append(GitHubRelease{
+        try releases.append(allocator, GitHubRelease{
             .tag_name = tag_name,
             .name = name,
             .published_at = published_at,
@@ -269,7 +269,7 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
         });
     }
     
-    return releases.toOwnedSlice();
+    return releases.toOwnedSlice(allocator);
 }
 
 /// Fetch releases from registry client
@@ -296,7 +296,7 @@ fn fetchReleasesFromRegistry(allocator: Allocator, reg: *const registry.Registry
     defer parsed.deinit();
     
     const releases_array = parsed.value.array;
-    var releases = std.ArrayList(GitHubRelease).init(allocator);
+    var releases: std.ArrayList(GitHubRelease) = .{};
     
     for (releases_array.items) |release_json| {
         const release_obj = release_json.object;
@@ -308,7 +308,7 @@ fn fetchReleasesFromRegistry(allocator: Allocator, reg: *const registry.Registry
         const tarball_url = try allocator.dupe(u8, release_obj.get("tarball_url").?.string);
         const zipball_url = try allocator.dupe(u8, release_obj.get("zipball_url").?.string);
         
-        try releases.append(GitHubRelease{
+        try releases.append(allocator, GitHubRelease{
             .tag_name = tag_name,
             .name = name,
             .published_at = published_at,
@@ -318,7 +318,7 @@ fn fetchReleasesFromRegistry(allocator: Allocator, reg: *const registry.Registry
         });
     }
     
-    return releases.toOwnedSlice();
+    return releases.toOwnedSlice(allocator);
 }
 
 /// Fetch tags from registry client
@@ -345,7 +345,7 @@ fn fetchTagsFromRegistry(allocator: Allocator, reg: *const registry.RegistryClie
     defer parsed.deinit();
     
     const tags_array = parsed.value.array;
-    var tags = std.ArrayList(GitHubTag).init(allocator);
+    var tags: std.ArrayList(GitHubTag) = .{};
     
     for (tags_array.items) |tag_json| {
         const tag_obj = tag_json.object;
@@ -354,14 +354,14 @@ fn fetchTagsFromRegistry(allocator: Allocator, reg: *const registry.RegistryClie
         const tarball_url = try allocator.dupe(u8, tag_obj.get("tarball_url").?.string);
         const zipball_url = try allocator.dupe(u8, tag_obj.get("zipball_url").?.string);
         
-        try tags.append(GitHubTag{
+        try tags.append(allocator, GitHubTag{
             .name = name,
             .tarball_url = tarball_url,
             .zipball_url = zipball_url,
         });
     }
     
-    return tags.toOwnedSlice();
+    return tags.toOwnedSlice(allocator);
 }
 
 /// Fetch tags from GitHub API using curl (legacy)
@@ -388,7 +388,7 @@ fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHu
     defer parsed.deinit();
     
     const tags_array = parsed.value.array;
-    var tags = std.ArrayList(GitHubTag).init(allocator);
+    var tags: std.ArrayList(GitHubTag) = .{};
     
     for (tags_array.items) |tag_json| {
         const tag_obj = tag_json.object;
@@ -397,14 +397,14 @@ fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHu
         const tarball_url = try allocator.dupe(u8, tag_obj.get("tarball_url").?.string);
         const zipball_url = try allocator.dupe(u8, tag_obj.get("zipball_url").?.string);
         
-        try tags.append(GitHubTag{
+        try tags.append(allocator, GitHubTag{
             .name = name,
             .tarball_url = tarball_url,
             .zipball_url = zipball_url,
         });
     }
     
-    return tags.toOwnedSlice();
+    return tags.toOwnedSlice(allocator);
 }
 
 /// Fetch JSON data using curl (fallback for HTTP client issues)
@@ -425,23 +425,23 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
     try child.spawn();
     
     // Use direct file readAll with pre-allocated buffers
-    var stdout_buf = std.ArrayList(u8).init(allocator);
-    defer stdout_buf.deinit();
-    var stderr_buf = std.ArrayList(u8).init(allocator);
-    defer stderr_buf.deinit();
+    var stdout_buf: std.ArrayList(u8) = .{};
+    defer stdout_buf.deinit(allocator);
+    var stderr_buf: std.ArrayList(u8) = .{};
+    defer stderr_buf.deinit(allocator);
     
     // Read data in chunks
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try stdout_buf.appendSlice(read_buf[0..bytes_read]);
+        try stdout_buf.appendSlice(allocator, read_buf[0..bytes_read]);
     }
     
     while (true) {
         const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try stderr_buf.appendSlice(read_buf[0..bytes_read]);
+        try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
     }
     
     const stdout = try allocator.dupe(u8, stdout_buf.items);

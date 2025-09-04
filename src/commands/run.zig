@@ -6,8 +6,8 @@ const Allocator = std.mem.Allocator;
 pub fn run(allocator: Allocator, args: [][:0]u8) !void {
     // Parse arguments
     var bin_name: ?[]const u8 = null;
-    var run_args = std.ArrayList([]const u8).init(allocator);
-    defer run_args.deinit();
+    var run_args: std.ArrayList([]const u8) = .{};
+    defer run_args.deinit(allocator);
     
     var i: usize = 2; // Skip "zion" and "run"
     var found_separator = false;
@@ -26,14 +26,14 @@ pub fn run(allocator: Allocator, args: [][:0]u8) !void {
             bin_name = args[i];
         } else if (!found_separator) {
             // If we haven't found --, this might be a run argument
-            try run_args.append(arg);
+            try run_args.append(allocator, arg);
         }
         i += 1;
     }
     
     // Add remaining args after --
     while (i < args.len) {
-        try run_args.append(args[i]);
+        try run_args.append(allocator, args[i]);
         i += 1;
     }
     
@@ -63,12 +63,12 @@ pub fn run(allocator: Allocator, args: [][:0]u8) !void {
     // Run the executable
     std.debug.print("🚀 Running {s}...\n", .{executable_name});
     
-    var cmd_args = std.ArrayList([]const u8).init(allocator);
-    defer cmd_args.deinit();
+    var cmd_args: std.ArrayList([]const u8) = .{};
+    defer cmd_args.deinit(allocator);
     
-    try cmd_args.append(exe_path);
+    try cmd_args.append(allocator, exe_path);
     for (run_args.items) |arg| {
-        try cmd_args.append(arg);
+        try cmd_args.append(allocator, arg);
     }
     
     // Execute the binary
@@ -99,7 +99,7 @@ fn getDefaultExecutableName(allocator: Allocator) ![]const u8 {
     const cwd = fs.cwd();
     
     // Try to read build.zig.zon to get the project name
-    const zon_content = cwd.readFileAlloc(allocator, "build.zig.zon", 1024 * 1024) catch |err| {
+    const zon_content = cwd.readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| {
         if (err == error.FileNotFound) {
             return allocator.dupe(u8, "main"); // Default fallback
         }

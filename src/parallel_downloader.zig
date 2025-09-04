@@ -434,14 +434,14 @@ fn downloadWithEnhancedCurl(allocator: Allocator, url: []const u8, output_path: 
     // Read stderr for error messages
     const stderr = if (child.stderr) |stderr_pipe|
         blk: {
-            var output_buf = std.ArrayList(u8).init(allocator);
-            defer output_buf.deinit();
+            var output_buf: std.ArrayList(u8) = .{};
+            defer output_buf.deinit(allocator);
             
             var read_buf: [4096]u8 = undefined;
             while (true) {
                 const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
                 if (bytes_read == 0) break;
-                try output_buf.appendSlice(read_buf[0..bytes_read]);
+                try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
             }
             
             break :blk try allocator.dupe(u8, output_buf.items);

@@ -30,8 +30,8 @@ fn printUpdateHelp() void {
 pub fn update(allocator: Allocator, args: [][:0]u8) !void {
     // Parse command line arguments
     var dry_run = false;
-    var specific_packages = std.ArrayList([]const u8).init(allocator);
-    defer specific_packages.deinit();
+    var specific_packages = std.ArrayList([]const u8){};
+    defer specific_packages.deinit(allocator);
     
     // Process arguments starting from index 2 (skip "zion update")
     var i: usize = 2;
@@ -44,7 +44,7 @@ pub fn update(allocator: Allocator, args: [][:0]u8) !void {
             return;
         } else {
             // Assume it's a package name
-            try specific_packages.append(arg);
+            try specific_packages.append(allocator, arg);
         }
     }
     
@@ -86,20 +86,20 @@ pub fn update(allocator: Allocator, args: [][:0]u8) !void {
 
     std.debug.print("Checking {d} dependencies for updates...\n", .{zon_file.dependencies.count()});
 
-    var updated_packages = std.ArrayList([]const u8).init(allocator);
+    var updated_packages = std.ArrayList([]const u8){};
     defer {
         for (updated_packages.items) |pkg_name| {
             allocator.free(pkg_name);
         }
-        updated_packages.deinit();
+        updated_packages.deinit(allocator);
     }
 
-    var unchanged_packages = std.ArrayList([]const u8).init(allocator);
+    var unchanged_packages = std.ArrayList([]const u8){};
     defer {
         for (unchanged_packages.items) |pkg_name| {
             allocator.free(pkg_name);
         }
-        unchanged_packages.deinit();
+        unchanged_packages.deinit(allocator);
     }
 
     var zon_updated = false;
@@ -140,14 +140,14 @@ pub fn update(allocator: Allocator, args: [][:0]u8) !void {
         if (std.mem.eql(u8, current_dep.hash, download_result.hash)) {
             // No change
             std.debug.print("  ✓ Up to date (hash: {s})\n", .{download_result.hash[0..16]});
-            try unchanged_packages.append(try allocator.dupe(u8, pkg_name));
+            try unchanged_packages.append(allocator, try allocator.dupe(u8, pkg_name));
         } else {
             // Hash changed - need to update
             if (dry_run) {
                 std.debug.print("  📋 Would update! (dry run)\n", .{});
                 std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
                 std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
-                try updated_packages.append(try allocator.dupe(u8, pkg_name));
+                try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
             } else {
                 std.debug.print("  🔄 Hash changed! Updating...\n", .{});
                 std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
@@ -171,7 +171,7 @@ pub fn update(allocator: Allocator, args: [][:0]u8) !void {
                 std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
                 try extractTarball(allocator, download_result.cache_path, deps_path);
 
-                try updated_packages.append(try allocator.dupe(u8, pkg_name));
+                try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
             }
         }
     }
@@ -289,14 +289,14 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     const term = try child.wait();
 
     // Read stderr for error messages
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf = std.ArrayList(u8){};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
     }
     
     const stderr = try allocator.dupe(u8, output_buf.items);

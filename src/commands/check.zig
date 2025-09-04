@@ -18,11 +18,11 @@ pub const PackageHealth = struct {
     status: HealthStatus,
     issues: std.ArrayList([]const u8),
     
-    pub fn init(allocator: Allocator, name: []const u8) PackageHealth {
+    pub fn init(_: Allocator, name: []const u8) PackageHealth {
         return PackageHealth{
             .name = name,
             .status = .healthy,
-            .issues = std.ArrayList([]const u8).init(allocator),
+            .issues = .{},
         };
     }
     
@@ -30,11 +30,11 @@ pub const PackageHealth = struct {
         for (self.issues.items) |issue| {
             allocator.free(issue);
         }
-        self.issues.deinit();
+        self.issues.deinit(allocator);
     }
     
     pub fn addIssue(self: *PackageHealth, allocator: Allocator, severity: HealthStatus, message: []const u8) !void {
-        try self.issues.append(try allocator.dupe(u8, message));
+        try self.issues.append(allocator, try allocator.dupe(u8, message));
         if (severity == .@"error" or (severity == .warning and self.status == .healthy)) {
             self.status = severity;
         }
@@ -66,12 +66,12 @@ pub fn check(allocator: Allocator) !void {
     
     std.debug.print("📋 Analyzing {d} dependencies...\n\n", .{zon_file.dependencies.count()});
     
-    var package_healths = std.ArrayList(PackageHealth).init(allocator);
+    var package_healths: std.ArrayList(PackageHealth) = .{};
     defer {
         for (package_healths.items) |*health| {
             health.deinit(allocator);
         }
-        package_healths.deinit();
+        package_healths.deinit(allocator);
     }
     
     var overall_status = HealthStatus.healthy;
@@ -210,7 +210,7 @@ pub fn check(allocator: Allocator) !void {
             overall_status = .warning;
         }
         
-        try package_healths.append(health);
+        try package_healths.append(allocator, health);
         std.debug.print("\n", .{});
     }
     
@@ -322,27 +322,27 @@ fn checkUrlAccessibility(allocator: Allocator, url: []const u8) !bool {
     const term = try child.wait();
     
     // Read and discard output
-    var stdout_output_buf = std.ArrayList(u8).init(allocator);
-    defer stdout_output_buf.deinit();
+    var stdout_output_buf: std.ArrayList(u8) = .{};
+    defer stdout_output_buf.deinit(allocator);
     
     var stdout_read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stdout.?.readAll(stdout_read_buf[0..]);
         if (bytes_read == 0) break;
-        try stdout_output_buf.appendSlice(stdout_read_buf[0..bytes_read]);
+        try stdout_output_buf.appendSlice(allocator, stdout_read_buf[0..bytes_read]);
     }
     
     const stdout = try allocator.dupe(u8, stdout_output_buf.items);
     defer allocator.free(stdout);
     
-    var stderr_output_buf = std.ArrayList(u8).init(allocator);
-    defer stderr_output_buf.deinit();
+    var stderr_output_buf: std.ArrayList(u8) = .{};
+    defer stderr_output_buf.deinit(allocator);
     
     var stderr_read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stderr.?.readAll(stderr_read_buf[0..]);
         if (bytes_read == 0) break;
-        try stderr_output_buf.appendSlice(stderr_read_buf[0..bytes_read]);
+        try stderr_output_buf.appendSlice(allocator, stderr_read_buf[0..bytes_read]);
     }
     
     const stderr = try allocator.dupe(u8, stderr_output_buf.items);

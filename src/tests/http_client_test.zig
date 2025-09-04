@@ -6,7 +6,7 @@ test "HttpClient: initialization and cleanup" {
     const allocator = testing.allocator;
     
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Verify default values
     try testing.expect(client.max_retries == 3);
@@ -18,7 +18,7 @@ test "HttpClient: retry configuration" {
     const allocator = testing.allocator;
     
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Test configuration methods
     client.setTimeout(60000);
@@ -32,7 +32,7 @@ test "HttpResponse: helper methods" {
     const allocator = testing.allocator;
     
     var headers = std.StringHashMap([]const u8).init(allocator);
-    defer headers.deinit();
+    defer headers.deinit(allocator);
     
     try headers.put(try allocator.dupe(u8, "Content-Type"), try allocator.dupe(u8, "application/json"));
     
@@ -95,12 +95,12 @@ test "HttpClient: memory management" {
     // Test multiple client creation/destruction
     for (0..10) |_| {
         const client = try http_client.HttpClient.init(allocator, undefined);
-        client.deinit();
+        client.deinit(allocator);
     }
     
     // Test header buffer reuse
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Verify header buffer is pre-allocated
     try testing.expect(client.header_buffer.len > 0);
@@ -119,7 +119,7 @@ test "HttpClient: error handling" {
     const allocator = testing.allocator;
     
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Test invalid URL
     const result = client.get("not-a-valid-url");
@@ -141,7 +141,7 @@ test "HttpResponse: JSON parsing" {
     const json_body = try allocator.dupe(u8, "{\"name\":\"test\",\"value\":42}");
     
     var headers = std.StringHashMap([]const u8).init(allocator);
-    defer headers.deinit();
+    defer headers.deinit(allocator);
     
     var response = http_client.HttpResponse{
         .allocator = allocator,
@@ -164,7 +164,7 @@ test "HttpClient: request with retry simulation" {
     const allocator = testing.allocator;
     
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     // Set low retry count for testing
     client.setMaxRetries(2);
@@ -184,7 +184,7 @@ test "HttpClient: POST request structure" {
     const allocator = testing.allocator;
     
     const client = try http_client.HttpClient.init(allocator, undefined);
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     const test_data = "{\"test\": \"data\"}";
     

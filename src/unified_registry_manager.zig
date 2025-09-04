@@ -51,7 +51,7 @@ pub const UnifiedRegistryManager = struct {
             .config = zion_config,
             .runtime = runtime,
             .connection_pool = connection_pool,
-            .registries = std.ArrayList(RegistryEndpoint).init(allocator),
+            .registries = .{},
             .circuit_breakers = std.HashMap(u32, *CircuitBreaker).init(allocator),
             .cache = cache,
         };
@@ -68,24 +68,24 @@ pub const UnifiedRegistryManager = struct {
             self.allocator.free(registry.base_url);
             if (registry.api_token) |token| self.allocator.free(token);
         }
-        self.registries.deinit();
+        self.registries.deinit(self.allocator);
         
         // Cleanup circuit breakers
         var circuit_iterator = self.circuit_breakers.iterator();
         while (circuit_iterator.next()) |entry| {
-            entry.value_ptr.*.deinit();
+            entry.value_ptr.*.deinit(allocator);
             self.allocator.destroy(entry.value_ptr.*);
         }
         self.circuit_breakers.deinit();
         
         // Cleanup other resources
-        self.cache.deinit();
+        self.cache.deinit(allocator);
         self.allocator.destroy(self.cache);
         
-        self.connection_pool.deinit();
+        self.connection_pool.deinit(allocator);
         self.allocator.destroy(self.connection_pool);
         
-        self.runtime.deinit();
+        self.runtime.deinit(allocator);
         self.allocator.destroy(self.runtime);
         
         self.allocator.destroy(self);
@@ -104,7 +104,7 @@ pub const UnifiedRegistryManager = struct {
                     .last_response_time = null,
                     .failure_count = 0,
                 };
-                try self.registries.append(endpoint);
+                try self.registries.append(self.allocator, endpoint);
             }
         }
         
@@ -140,10 +140,10 @@ pub const UnifiedRegistryManager = struct {
         }
         
         // Create futures for parallel resolution
-        var futures = std.ArrayList(*zsync.Future(PackageResult)).init(self.allocator);
+        var futures: std.ArrayList(*zsync.Future(PackageResult)) = .{};
         defer {
-            for (futures.items) |future| future.deinit();
-            futures.deinit();
+            for (futures.items) |future| future.deinit(allocator);
+            futures.deinit(self.allocator);
         }
         
         // Start parallel resolution across healthy registries
@@ -159,7 +159,7 @@ pub const UnifiedRegistryManager = struct {
             }
             
             const future = try self.resolveFromRegistryAsync(registry, package_name);
-            try futures.append(future);
+            try futures.append(self.allocator, future);
         }
         
         // Wait for first successful result with timeout
@@ -217,10 +217,10 @@ pub const UnifiedRegistryManager = struct {
         }
         
         // Create futures for parallel search
-        var search_futures = std.ArrayList(*zsync.Future(SearchResult)).init(self.allocator);
+        var search_futures: std.ArrayList(*zsync.Future(SearchResult)) = .{};
         defer {
-            for (search_futures.items) |future| future.deinit();
-            search_futures.deinit();
+            for (search_futures.items) |future| future.deinit(allocator);
+            search_futures.deinit(self.allocator);
         }
         
         // Start parallel search across healthy registries
@@ -233,7 +233,7 @@ pub const UnifiedRegistryManager = struct {
             }
             
             const future = try self.searchInRegistryAsync(registry, query, max_results);
-            try search_futures.append(future);
+            try search_futures.append(self.allocator, future);
         }
         
         // Collect and aggregate results with improved deduplication
@@ -243,7 +243,7 @@ pub const UnifiedRegistryManager = struct {
             while (iterator.next()) |entry| {
                 entry.value_ptr.deinit(self.allocator);
             }
-            result_map.deinit();
+            result_map.deinit(allocator);
         }
         
         const start_time = std.time.milliTimestamp();
@@ -289,19 +289,19 @@ pub const UnifiedRegistryManager = struct {
         }
         
         // Convert to sorted array
-        var final_results = std.ArrayList(Package).init(self.allocator);
-        defer final_results.deinit();
+        var final_results: std.ArrayList(Package) = .{};
+        defer final_results.deinit(self.allocator);
         
         var iterator = result_map.iterator();
         while (iterator.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
-            try final_results.append(entry.value_ptr.*);
+            try final_results.append(self.allocator, entry.value_ptr.*);
         }
         
         // Sort by quality and relevance
         std.sort.block(Package, final_results.items, {}, packageComparator);
         
-        const results = final_results.toOwnedSlice();
+        const results = final_results.toOwnedSlice(self.allocator);
         
         // Cache the results
         try self.cache.putSearchResults(cache_key, results, 1800); // Cache for 30 minutes
@@ -543,7 +543,7 @@ pub const UnifiedRegistryManager = struct {
             std.debug.print("Failed to parse package JSON\n", .{});
             return error.JsonParsingFailed;
         };
-        defer parsed.deinit();
+        defer parsed.deinit(allocator);
         
         const root_obj = parsed.value.object;
         
@@ -607,7 +607,7 @@ pub const UnifiedRegistryManager = struct {
             std.debug.print("Failed to parse search JSON\n", .{});
             return error.JsonParsingFailed;
         };
-        defer parsed.deinit();
+        defer parsed.deinit(allocator);
         
         // Handle different response formats
         var packages_array: std.json.Array = undefined;
@@ -625,7 +625,7 @@ pub const UnifiedRegistryManager = struct {
             return error.InvalidJsonFormat;
         }
         
-        var packages = std.ArrayList(Package).init(self.allocator);
+        var packages: std.ArrayList(Package) = .{};
         
         for (packages_array.items) |item| {
             if (item != .object) continue;
@@ -680,10 +680,10 @@ pub const UnifiedRegistryManager = struct {
                 .rating = if (pkg_obj.get("rating")) |r| @floatCast(r.float) else null,
             };
             
-            try packages.append(package);
+            try packages.append(self.allocator, package);
         }
         
-        return try packages.toOwnedSlice();
+        return try packages.toOwnedSlice(self.allocator);
     }
 
     fn packageComparator(context: void, a: Package, b: Package) bool {
@@ -717,8 +717,8 @@ const ConnectionPool = struct {
         const pool = try allocator.create(ConnectionPool);
         pool.* = .{
             .allocator = allocator,
-            .connections = std.ArrayList(*http_client.HttpClient).init(allocator),
-            .available = std.ArrayList(*http_client.HttpClient).init(allocator),
+            .connections = .{},
+            .available = .{},
             .max_connections = max_connections,
             .mutex = std.Thread.Mutex{},
         };
@@ -726,8 +726,8 @@ const ConnectionPool = struct {
         // Pre-create connections
         for (0..max_connections) |_| {
             const client = try http_client.HttpClient.init(allocator, undefined);
-            try pool.connections.append(client);
-            try pool.available.append(client);
+            try pool.connections.append(allocator, client);
+            try pool.available.append(allocator, client);
         }
         
         return pool;
@@ -735,10 +735,10 @@ const ConnectionPool = struct {
     
     fn deinit(self: *ConnectionPool) void {
         for (self.connections.items) |client| {
-            client.deinit();
+            client.deinit(allocator);
         }
-        self.connections.deinit();
-        self.available.deinit();
+        self.connections.deinit(self.allocator);
+        self.available.deinit(self.allocator);
         self.allocator.destroy(self);
     }
     
@@ -761,7 +761,7 @@ const ConnectionPool = struct {
         // Check if this is one of our pooled connections
         for (self.connections.items) |pooled_client| {
             if (client == pooled_client) {
-                self.available.append(client) catch {
+                self.available.append(self.allocator, client) catch {
                     // If we can't add it back, just ignore
                 };
                 return;
@@ -769,7 +769,7 @@ const ConnectionPool = struct {
         }
         
         // This was a temporary connection - clean it up
-        client.deinit();
+        client.deinit(allocator);
     }
 };
 
@@ -880,7 +880,7 @@ const AsyncCache = struct {
             self.allocator.free(entry.key_ptr.*);
             entry.value_ptr.package.deinit(self.allocator);
         }
-        self.cache.deinit();
+        self.cache.deinit(allocator);
         
         // Clean up search cache
         var search_iterator = self.search_cache.iterator();
@@ -891,7 +891,7 @@ const AsyncCache = struct {
             }
             self.allocator.free(entry.value_ptr.packages);
         }
-        self.search_cache.deinit();
+        self.search_cache.deinit(allocator);
     }
     
     fn get(self: *AsyncCache, key: []const u8) !?Package {

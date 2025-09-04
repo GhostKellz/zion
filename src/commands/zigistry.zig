@@ -127,7 +127,7 @@ fn zigistryPublish(allocator: Allocator, args: [][:0]u8) !void {
     };
     
     // Verify build.zig.zon exists
-    const zon_content = std.fs.cwd().readFileAlloc(allocator, "build.zig.zon", 1024 * 1024) catch |err| switch (err) {
+    const zon_content = std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No build.zig.zon found\n", .{});
             print("💡 Run 'zion init' to create a project\n", .{});
@@ -545,10 +545,10 @@ fn showZigistryPackageAnalytics(allocator: Allocator, package_name: []const u8) 
 
 fn fetchTrendingPackages(allocator: Allocator) ![]Package {
     // Would fetch trending packages from Zigistry API
-    var packages = std.ArrayList(Package).init(allocator);
+    var packages: std.ArrayList(Package) = .{};
     
     // Mock trending packages
-    try packages.append(Package{
+    try packages.append(allocator, Package{
         .name = try allocator.dupe(u8, "http"),
         .full_name = try allocator.dupe(u8, "ziglibs/http"),
         .description = try allocator.dupe(u8, "HTTP client and server library"),
@@ -565,5 +565,5 @@ fn fetchTrendingPackages(allocator: Allocator) ![]Package {
         .rating = 4.8,
     });
     
-    return packages.toOwnedSlice();
+    return packages.toOwnedSlice(allocator);
 }

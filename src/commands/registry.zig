@@ -113,7 +113,7 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
     
     // Make HTTP request
     var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     var header_buffer: [4096]u8 = undefined;
     var req = client.open(.GET, std.Uri.parse(test_url) catch {
@@ -125,7 +125,7 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
         std.debug.print("❌ Connection failed\n", .{});
         return;
     };
-    defer req.deinit();
+    defer req.deinit(allocator);
     
     req.send() catch {
         std.debug.print("❌ Request failed\n", .{});

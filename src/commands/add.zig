@@ -76,13 +76,13 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
     
     // Make HTTP request to resolve alias
     var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit();
+    defer client.deinit(allocator);
     
     var header_buffer: [16384]u8 = undefined;
     var req = client.open(.GET, std.Uri.parse(alias_url) catch return null, .{
         .server_header_buffer = &header_buffer,
     }) catch return null;
-    defer req.deinit();
+    defer req.deinit(allocator);
     
     req.send() catch return null;
     req.finish() catch return null;
@@ -93,7 +93,7 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
     }
     
     var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
@@ -111,7 +111,7 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
         full_name: []const u8,
         resolved: bool,
     }, allocator, body, .{}) catch return null;
-    defer parsed.deinit();
+    defer parsed.deinit(allocator);
     
     if (parsed.value.resolved) {
         return allocator.dupe(u8, parsed.value.full_name) catch null;
@@ -191,7 +191,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // Step 3: Load and update build.zig.zon
     std.debug.print("Updating build.zig.zon...\n", .{});
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
-    defer zon_file.deinit();
+    defer zon_file.deinit(allocator);
 
     // Add the dependency
     try zon_file.addDependency(package_name, download_result.url, download_result.hash);
@@ -202,7 +202,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // Step 4: Update lock file
     std.debug.print("Updating lock file...\n", .{});
     var lock_file = try LockFile.loadFromFile(allocator);
-    defer lock_file.deinit();
+    defer lock_file.deinit(allocator);
 
     try lock_file.addPackage(package_name, download_result.url, download_result.hash, null);
     try lock_file.saveToFile();
@@ -300,13 +300,13 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     // Read stderr for error messages (must be done before wait)
     const stderr = if (child.stderr) |stderr_pipe| blk: {
         var output_buf = std.ArrayList(u8).init(allocator);
-        defer output_buf.deinit();
+        defer output_buf.deinit(allocator);
         
         var read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
             if (bytes_read == 0) break;
-            try output_buf.appendSlice(read_buf[0..bytes_read]);
+            try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
         
         break :blk try allocator.dupe(u8, output_buf.items);
@@ -405,7 +405,7 @@ fn modifyBuildZig(allocator: Allocator, package_name: []const u8, deps_path: []c
     };
 
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc(allocator, "build.zig", 10 * 1024 * 1024);
+    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
     defer allocator.free(build_content);
 
     // Check if dependency already exists

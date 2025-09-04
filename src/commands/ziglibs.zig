@@ -100,7 +100,7 @@ fn listZiglibsPackages(allocator: Allocator, category: ?[]const u8) !void {
         var it = categorized.iterator();
         while (it.next()) |entry| {
             allocator.free(entry.key_ptr.*);
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(allocator);
         }
         categorized.deinit();
     }
@@ -108,8 +108,8 @@ fn listZiglibsPackages(allocator: Allocator, category: ?[]const u8) !void {
     for (packages) |pkg| {
         const cat = try inferCategory(allocator, pkg);
         
-        var entry = try categorized.getOrPutValue(cat, std.ArrayList(Package).init(allocator));
-        try entry.value_ptr.append(pkg);
+        var entry = try categorized.getOrPutValue(cat, std.ArrayList(Package){});
+        try entry.value_ptr.append(allocator, pkg);
     }
     
     // Display categorized packages
@@ -206,7 +206,7 @@ fn showZiglibsStatus(allocator: Allocator) !void {
     print("📈 Ziglibs Status for Current Project\n\n", .{});
     
     // Read build.zig.zon to check current dependencies
-    const zon_content = std.fs.cwd().readFileAlloc(allocator, "build.zig.zon", 1024 * 1024) catch |err| switch (err) {
+    const zon_content = std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No build.zig.zon found. Run 'zion init' first.\n", .{});
             return;
@@ -216,10 +216,10 @@ fn showZiglibsStatus(allocator: Allocator) !void {
     defer allocator.free(zon_content);
     
     // Simple parsing to find ziglibs dependencies
-    var ziglibs_deps = std.ArrayList([]const u8).init(allocator);
+    var ziglibs_deps: std.ArrayList([]const u8) = .{};
     defer {
         for (ziglibs_deps.items) |dep| allocator.free(dep);
-        ziglibs_deps.deinit();
+        ziglibs_deps.deinit(allocator);
     }
     
     var lines = std.mem.splitScalar(u8, zon_content, '\n');
@@ -234,7 +234,7 @@ fn showZiglibsStatus(allocator: Allocator) !void {
                     const dep_start = start + ziglibs_start;
                     if (std.mem.indexOf(u8, trimmed[dep_start..], "/archive")) |end| {
                         const dep_name = trimmed[dep_start..dep_start + end];
-                        try ziglibs_deps.append(try allocator.dupe(u8, dep_name));
+                        try ziglibs_deps.append(allocator, try allocator.dupe(u8, dep_name));
                     }
                 }
             }

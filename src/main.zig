@@ -50,6 +50,8 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "dbg")) return "debug";
     if (std.mem.eql(u8, command, "tui")) return "interface";
     if (std.mem.eql(u8, command, "ui")) return "interface";
+    if (std.mem.eql(u8, command, "kr")) return "keyring";
+    if (std.mem.eql(u8, command, "key")) return "keyring";
     
     // Return original command if no alias found
     return command;
@@ -199,6 +201,35 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "interface")) {
         try commands.interface(allocator);
     
+    // v1.0.5 Production-ready Features
+    } else if (std.mem.eql(u8, command, "verify")) {
+        try commands.signature_verify(allocator, args);
+    } else if (std.mem.eql(u8, command, "cache")) {
+        try commands.cache(allocator, args);
+    } else if (std.mem.eql(u8, command, "tui") or std.mem.eql(u8, command, "interactive")) {
+        try commands.tui(allocator, args);
+    
+    // v1.2.0 Zeke AI Integration Commands
+    } else if (std.mem.eql(u8, command, "status")) {
+        try commands.status(allocator, io, args);
+    } else if (std.mem.eql(u8, command, "ai-search")) {
+        try commands.ai_search(allocator, io, args);
+    } else if (std.mem.eql(u8, command, "ai-chat")) {
+        try commands.ai_chat(allocator, io, args);
+    } else if (std.mem.eql(u8, command, "ai-add")) {
+        if (args.len < 3) {
+            std.debug.print("Error: 'zion ai-add' requires a package query\n", .{});
+            std.debug.print("Usage: zion ai-add <query|package>\n", .{});
+            std.debug.print("Examples:\n", .{});
+            std.debug.print("  zion ai-add \"HTTP client for REST APIs\"\n", .{});
+            std.debug.print("  zion ai-add mitchellh/libxev\n", .{});
+            return;
+        }
+        // For now, just use regular add with AI feedback
+        std.debug.print("🤖 AI-powered add not yet implemented, using regular add\n", .{});
+        const options = commands.AddOptions{};
+        try commands.add(allocator, args[2], options);
+    
     // v0.8.0 New Commands
     } else if (std.mem.eql(u8, command, "setup")) {
         try commands.setup(allocator, args);
@@ -210,6 +241,8 @@ fn zionMain(io: zsync.Io) !void {
         try commands.ziglibs(allocator, args[2..]);
     } else if (std.mem.eql(u8, command, "zigistry")) {
         try commands.zigistry(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "keyring")) {
+        try commands.keyring(allocator, args);
     } else {
         std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});
         

@@ -167,8 +167,8 @@ test "v1.0.3: Connection pooling simulation" {
             for (0..max) |i| {
                 const conn = try alloc.create(Connection);
                 conn.* = .{ .id = @intCast(i), .in_use = false };
-                try pool.connections.append(conn);
-                try pool.available.append(conn);
+                try pool.connections.append(allocator, conn);
+                try pool.available.append(allocator, conn);
             }
             
             return pool;
@@ -178,8 +178,8 @@ test "v1.0.3: Connection pooling simulation" {
             for (self.connections.items) |conn| {
                 alloc.destroy(conn);
             }
-            self.connections.deinit();
-            self.available.deinit();
+            self.connections.deinit(allocator);
+            self.available.deinit(allocator);
         }
         
         pub fn acquire(self: *@This()) ?*Connection {
@@ -202,11 +202,11 @@ test "v1.0.3: Connection pooling simulation" {
     
     // Test acquiring connections
     var acquired = std.ArrayList(*ConnectionPool.Connection).init(allocator);
-    defer acquired.deinit();
+    defer acquired.deinit(allocator);
     
     for (0..5) |_| {
         if (pool.acquire()) |conn| {
-            try acquired.append(conn);
+            try acquired.append(allocator, conn);
         }
     }
     
@@ -246,11 +246,11 @@ test "v1.0.3: Request batching simulation" {
         }
         
         pub fn deinit(self: *@This()) void {
-            self.requests.deinit();
+            self.requests.deinit(allocator);
         }
         
         pub fn addRequest(self: *@This(), req: Request) !void {
-            try self.requests.append(req);
+            try self.requests.append(allocator, req);
         }
         
         pub fn shouldExecute(self: *const @This()) bool {
@@ -263,7 +263,7 @@ test "v1.0.3: Request batching simulation" {
     };
     
     var batch = RequestBatch.init(allocator, 3);
-    defer batch.deinit();
+    defer batch.deinit(allocator);
     
     // Add requests
     try batch.addRequest(.{ .id = 1, .data = "req1" });

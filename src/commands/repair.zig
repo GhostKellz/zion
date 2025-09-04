@@ -38,20 +38,20 @@ pub fn repair(allocator: Allocator) !void {
     var error_count: usize = 0;
     var verified_count: usize = 0;
     
-    var repaired_packages = std.ArrayList([]const u8).init(allocator);
+    var repaired_packages: std.ArrayList([]const u8) = .{};
     defer {
         for (repaired_packages.items) |pkg_name| {
             allocator.free(pkg_name);
         }
-        repaired_packages.deinit();
+        repaired_packages.deinit(allocator);
     }
     
-    var failed_packages = std.ArrayList([]const u8).init(allocator);
+    var failed_packages: std.ArrayList([]const u8) = .{};
     defer {
         for (failed_packages.items) |pkg_name| {
             allocator.free(pkg_name);
         }
-        failed_packages.deinit();
+        failed_packages.deinit(allocator);
     }
     
     // Process each dependency
@@ -114,7 +114,7 @@ pub fn repair(allocator: Allocator) !void {
                 // Recalculate hash
                 const new_hash = downloader.calculateFileHash(allocator, cache_path) catch |err| {
                     std.debug.print("  ❌ Failed to compute new hash: {}\n", .{err});
-                    try failed_packages.append(try allocator.dupe(u8, package_name));
+                    try failed_packages.append(allocator, try allocator.dupe(u8, package_name));
                     error_count += 1;
                     continue;
                 };
@@ -131,7 +131,7 @@ pub fn repair(allocator: Allocator) !void {
                     try lock_file.addPackage(package_name, dep.url, new_hash, null);
                     
                     std.debug.print("  ✅ Hash updated: {s}\n", .{new_hash[0..16]});
-                    try repaired_packages.append(try allocator.dupe(u8, package_name));
+                    try repaired_packages.append(allocator, try allocator.dupe(u8, package_name));
                     repaired_count += 1;
                 } else {
                     // Just downloaded, verify it matches expected hash
@@ -142,7 +142,7 @@ pub fn repair(allocator: Allocator) !void {
                         std.debug.print("  ❌ Downloaded hash still doesn't match!\n", .{});
                         std.debug.print("     Expected: {s}\n", .{dep.hash[0..16]});
                         std.debug.print("     Downloaded: {s}\n", .{new_hash[0..16]});
-                        try failed_packages.append(try allocator.dupe(u8, package_name));
+                        try failed_packages.append(allocator, try allocator.dupe(u8, package_name));
                         error_count += 1;
                     }
                 }
@@ -160,7 +160,7 @@ pub fn repair(allocator: Allocator) !void {
                 
             } else |err| {
                 std.debug.print("  ❌ Download failed: {}\n", .{err});
-                try failed_packages.append(try allocator.dupe(u8, package_name));
+                try failed_packages.append(allocator, try allocator.dupe(u8, package_name));
                 error_count += 1;
             }
         }
@@ -237,14 +237,14 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     const term = try child.wait();
     
     // Read stderr for error messages
-    var output_buf = std.ArrayList(u8).init(allocator);
-    defer output_buf.deinit();
+    var output_buf: std.ArrayList(u8) = .{};
+    defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
         if (bytes_read == 0) break;
-        try output_buf.appendSlice(read_buf[0..bytes_read]);
+        try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
     }
     
     const stderr = try allocator.dupe(u8, output_buf.items);

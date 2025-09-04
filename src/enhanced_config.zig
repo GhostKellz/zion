@@ -67,10 +67,10 @@ pub const ZionConfig = struct {
     
     pub fn init(allocator: Allocator) ZionConfig {
         var config = ZionConfig{
-            .github_orgs = std.ArrayList([]const u8).init(allocator),
-            .fallback_registries = std.ArrayList([]const u8).init(allocator),
+            .github_orgs = .{},
+            .fallback_registries = .{},
             .dependency_aliases = std.StringHashMap(std.ArrayList([]const u8)).init(allocator),
-            .registries = std.ArrayList(RegistryConfig).init(allocator),
+            .registries = .{},
             .registry_auth_tokens = std.StringHashMap([]const u8).init(allocator),
             .allocator = allocator,
             .trust_level_required = "medium",
@@ -90,13 +90,13 @@ pub const ZionConfig = struct {
         for (self.github_orgs.items) |org| {
             self.allocator.free(org);
         }
-        self.github_orgs.deinit();
+        self.github_orgs.deinit(self.allocator);
         
         // Clean up fallback registries
         for (self.fallback_registries.items) |registry| {
             self.allocator.free(registry);
         }
-        self.fallback_registries.deinit();
+        self.fallback_registries.deinit(self.allocator);
         
         // Clean up registry_url if allocated
         if (self.registry_url) |url| {
@@ -110,7 +110,7 @@ pub const ZionConfig = struct {
             for (entry.value_ptr.items) |dep| {
                 self.allocator.free(dep);
             }
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(self.allocator);
         }
         self.dependency_aliases.deinit();
         
@@ -125,7 +125,7 @@ pub const ZionConfig = struct {
                 self.allocator.free(registry.api_version);
             }
         }
-        self.registries.deinit();
+        self.registries.deinit(self.allocator);
         
         // Clean up registry auth tokens
         var auth_iterator = self.registry_auth_tokens.iterator();
@@ -177,7 +177,7 @@ pub const ZionConfig = struct {
             while (it.next()) |org| {
                 const trimmed = std.mem.trim(u8, org, " ");
                 if (trimmed.len > 0) {
-                    try self.github_orgs.append(try self.allocator.dupe(u8, trimmed));
+                    try self.github_orgs.append(self.allocator, try self.allocator.dupe(u8, trimmed));
                 }
             }
         }
@@ -210,7 +210,7 @@ pub const ZionConfig = struct {
             self.registry_url = try self.allocator.dupe(u8, registry_url);
             const auth_token = std.posix.getenv("ZION_REGISTRY_TOKEN");
             
-            try self.registries.append(RegistryConfig{
+            try self.registries.append(self.allocator, RegistryConfig{
                 .name = try self.allocator.dupe(u8, "custom"),
                 .base_url = try self.allocator.dupe(u8, registry_url),
                 .auth_token = if (auth_token) |token| 
@@ -241,7 +241,7 @@ pub const ZionConfig = struct {
                     defer self.allocator.free(auth_env_name);
                     const auth_token = std.posix.getenv(auth_env_name);
                     
-                    try self.registries.append(RegistryConfig{
+                    try self.registries.append(self.allocator, RegistryConfig{
                         .name = registry_name,
                         .base_url = try self.allocator.dupe(u8, trimmed),
                         .priority = priority,
@@ -261,7 +261,7 @@ pub const ZionConfig = struct {
         
         // Always add GitHub as fallback (lowest priority)
         const github_token = std.posix.getenv("ZION_GITHUB_TOKEN") orelse std.posix.getenv("GITHUB_TOKEN");
-        try self.registries.append(RegistryConfig{
+        try self.registries.append(self.allocator, RegistryConfig{
             .name = try self.allocator.dupe(u8, "github"),
             .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
             .api_version = try self.allocator.dupe(u8, ""), // GitHub doesn't use /api/v1 prefix
@@ -288,7 +288,7 @@ pub const ZionConfig = struct {
             while (it.next()) |registry| {
                 const trimmed = std.mem.trim(u8, registry, " ");
                 if (trimmed.len > 0) {
-                    try self.fallback_registries.append(try self.allocator.dupe(u8, trimmed));
+                    try self.fallback_registries.append(self.allocator, try self.allocator.dupe(u8, trimmed));
                 }
             }
         }
@@ -312,7 +312,7 @@ pub const ZionConfig = struct {
     /// Load configuration from zion.json file
     fn loadFromJsonFile(self: *ZionConfig) !void {
         const cwd = fs.cwd();
-        const config_data = try cwd.readFileAlloc(self.allocator, "zion.json", 1024 * 1024);
+        const config_data = try cwd.readFileAlloc("zion.json", self.allocator, @enumFromInt(1024 * 1024));
         defer self.allocator.free(config_data);
         
         var parsed = try json.parseFromSlice(json.Value, self.allocator, config_data, .{});
@@ -330,7 +330,7 @@ pub const ZionConfig = struct {
             
             if (github_obj.object.get("organizations")) |orgs_array| {
                 for (orgs_array.array.items) |org_val| {
-                    try self.github_orgs.append(try self.allocator.dupe(u8, org_val.string));
+                    try self.github_orgs.append(self.allocator, try self.allocator.dupe(u8, org_val.string));
                 }
             }
         }
@@ -352,7 +352,7 @@ pub const ZionConfig = struct {
     /// Load configuration from zion.lua file (simple key-value parser)
     fn loadFromLuaFile(self: *ZionConfig) !void {
         const cwd = fs.cwd();
-        const lua_data = try cwd.readFileAlloc(self.allocator, "zion.lua", 1024 * 1024);
+        const lua_data = try cwd.readFileAlloc("zion.lua", self.allocator, @enumFromInt(1024 * 1024));
         defer self.allocator.free(lua_data);
         
         std.debug.print("📋 Loading Lua configuration...\n", .{});
@@ -394,7 +394,7 @@ pub const ZionConfig = struct {
                     while (orgs.next()) |org| {
                         const clean_org = std.mem.trim(u8, org, " \t\"");
                         if (clean_org.len > 0) {
-                            try self.github_orgs.append(try self.allocator.dupe(u8, clean_org));
+                            try self.github_orgs.append(self.allocator, try self.allocator.dupe(u8, clean_org));
                         }
                     }
                 }
@@ -439,35 +439,35 @@ pub const ZionConfig = struct {
     /// Set up default dependency aliases for common use cases
     fn setupDefaultAliases(self: *ZionConfig) !void {
         // Crypto libraries bundle
-        var crypto_deps = std.ArrayList([]const u8).init(self.allocator);
-        try crypto_deps.append(try self.allocator.dupe(u8, "ghostkellz/zcrypto"));
-        try crypto_deps.append(try self.allocator.dupe(u8, "jedisct1/libsodium"));
-        try crypto_deps.append(try self.allocator.dupe(u8, "ziglang/crypto"));
+        var crypto_deps: std.ArrayList([]const u8) = .{};
+        try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "ghostkellz/zcrypto"));
+        try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "jedisct1/libsodium"));
+        try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/crypto"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "crypto"), crypto_deps);
         
         // HTTP/Network libraries bundle
-        var http_deps = std.ArrayList([]const u8).init(self.allocator);
-        try http_deps.append(try self.allocator.dupe(u8, "karlseguin/http.zig"));
-        try http_deps.append(try self.allocator.dupe(u8, "mitchellh/libxev"));
-        try http_deps.append(try self.allocator.dupe(u8, "ziglang/http"));
+        var http_deps: std.ArrayList([]const u8) = .{};
+        try http_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/http.zig"));
+        try http_deps.append(self.allocator, try self.allocator.dupe(u8, "mitchellh/libxev"));
+        try http_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/http"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "http"), http_deps);
         
         // Database libraries bundle
-        var db_deps = std.ArrayList([]const u8).init(self.allocator);
-        try db_deps.append(try self.allocator.dupe(u8, "vrischmann/zig-sqlite"));
-        try db_deps.append(try self.allocator.dupe(u8, "karlseguin/pg.zig"));
+        var db_deps: std.ArrayList([]const u8) = .{};
+        try db_deps.append(self.allocator, try self.allocator.dupe(u8, "vrischmann/zig-sqlite"));
+        try db_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/pg.zig"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "db"), db_deps);
         
         // Gaming/Graphics libraries bundle
-        var game_deps = std.ArrayList([]const u8).init(self.allocator);
-        try game_deps.append(try self.allocator.dupe(u8, "hexops/mach"));
-        try game_deps.append(try self.allocator.dupe(u8, "ziglang/raylib"));
+        var game_deps: std.ArrayList([]const u8) = .{};
+        try game_deps.append(self.allocator, try self.allocator.dupe(u8, "hexops/mach"));
+        try game_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/raylib"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "game"), game_deps);
         
         // JSON/Serialization libraries bundle
-        var json_deps = std.ArrayList([]const u8).init(self.allocator);
-        try json_deps.append(try self.allocator.dupe(u8, "ziglang/json"));
-        try json_deps.append(try self.allocator.dupe(u8, "karlseguin/json.zig"));
+        var json_deps: std.ArrayList([]const u8) = .{};
+        try json_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/json"));
+        try json_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/json.zig"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "json"), json_deps);
     }
     
@@ -481,9 +481,9 @@ pub const ZionConfig = struct {
     
     /// Add a custom alias
     pub fn addAlias(self: *ZionConfig, alias: []const u8, dependencies: []const []const u8) !void {
-        var deps = std.ArrayList([]const u8).init(self.allocator);
+        var deps: std.ArrayList([]const u8) = .{};
         for (dependencies) |dep| {
-            try deps.append(try self.allocator.dupe(u8, dep));
+            try deps.append(self.allocator, try self.allocator.dupe(u8, dep));
         }
         try self.dependency_aliases.put(try self.allocator.dupe(u8, alias), deps);
     }

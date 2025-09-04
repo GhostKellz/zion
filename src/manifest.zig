@@ -102,7 +102,7 @@ pub const ZonFile = struct {
     /// Load ZON file from disk
     pub fn loadFromFile(allocator: Allocator, file_path: []const u8) !ZonFile {
         const cwd = fs.cwd();
-        const content = try cwd.readFileAlloc(allocator, file_path, 10 * 1024 * 1024);
+        const content = try cwd.readFileAlloc(file_path, allocator, @enumFromInt(10 * 1024 * 1024));
         defer allocator.free(content);
 
         return parseZonContent(allocator, content);
