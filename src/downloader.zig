@@ -241,9 +241,9 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
 
     std.debug.print("Calculating SHA256 hash for {s}...\n", .{file_path});
 
-    // Calculate the hash
+    // Calculate the hash with larger buffer for better I/O performance
     var hash = crypto.hash.sha2.Sha256.init(.{});
-    var buffer: [8192]u8 = undefined;
+    var buffer: [65536]u8 = undefined; // Increased from 8KB to 64KB
 
     while (true) {
         const bytes_read = try file.readAll(buffer[0..]);

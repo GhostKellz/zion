@@ -2,25 +2,37 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const registry = @import("../registry.zig");
 const enhanced_config = @import("../enhanced_config.zig");
+const zion = @import("zion");
+const qol = zion.qol_enhancements;
 
 /// Package search functionality
 /// Searches for Zig packages across multiple sources
 
-/// Case-insensitive substring search
+/// Optimized case-insensitive substring search using Boyer-Moore-like approach
 fn containsIgnoreCase(haystack: []const u8, needle: []const u8) bool {
     if (needle.len == 0) return true;
     if (haystack.len < needle.len) return false;
     
+    const first_char_lower = std.ascii.toLower(needle[0]);
     var i: usize = 0;
-    while (i <= haystack.len - needle.len) : (i += 1) {
+    
+    while (i <= haystack.len - needle.len) {
+        // Quick first char check
+        if (std.ascii.toLower(haystack[i]) != first_char_lower) {
+            i += 1;
+            continue;
+        }
+        
+        // Full match check only if first char matches
         var match = true;
-        for (needle, 0..) |c, j| {
+        for (needle[1..], 1..) |c, j| {
             if (std.ascii.toLower(haystack[i + j]) != std.ascii.toLower(c)) {
                 match = false;
                 break;
             }
         }
         if (match) return true;
+        i += 1;
     }
     return false;
 }
@@ -51,9 +63,9 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         
         if (std.mem.startsWith(u8, arg, "--filter=")) {
             const filter_str = arg[9..];
-            var filter_it = std.mem.split(u8, filter_str, ",");
+            var filter_it = std.mem.splitSequence(u8, filter_str, ",");
             while (filter_it.next()) |filter| {
-                try filters_list.append(std.mem.trim(u8, filter, " "));
+                try filters_list.append(allocator, std.mem.trim(u8, filter, " "));
             }
         } else if (std.mem.startsWith(u8, arg, "--limit=")) {
             search_options.limit = std.fmt.parseInt(usize, arg[8..], 10) catch 10;
@@ -74,7 +86,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         }
     }
     
-    search_options.filters = try filters_list.toOwnedSlice();
+    search_options.filters = try filters_list.toOwnedSlice(allocator);
     defer allocator.free(search_options.filters);
 
     // Display search configuration
@@ -87,12 +99,26 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         }
         std.debug.print(")", .{});
     }
-    std.debug.print("...\n", .{});
-
-    // Search multiple registries
-    try searchRegistries(allocator, search_term, search_options);
-    try searchZigPackageIndex(allocator, search_term, search_options);
-    try searchAwesome(allocator, search_term, search_options);
+    
+    // Use progress indicator for better user experience
+    var progress = qol.ProgressIndicator.init(3); // 3 search sources
+    
+    progress.update(0, "Searching registries...");
+    searchRegistries(allocator, search_term, search_options) catch |err| {
+        std.debug.print("⚠️ Registry search failed: {}\n", .{err});
+    };
+    
+    progress.update(1, "Searching Zig package index...");
+    searchZigPackageIndex(allocator, search_term, search_options) catch |err| {
+        std.debug.print("⚠️ Package index search failed: {}\n", .{err});
+    };
+    
+    progress.update(2, "Searching awesome-zig...");
+    searchAwesome(allocator, search_term, search_options) catch |err| {
+        std.debug.print("⚠️ Awesome-zig search failed: {}\n", .{err});
+    };
+    
+    progress.finish("Search completed");
 }
 
 fn printSearchHelp() void {

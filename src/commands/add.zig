@@ -405,7 +405,7 @@ fn modifyBuildZig(allocator: Allocator, package_name: []const u8, deps_path: []c
     };
 
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
+    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(1024 * 1024)); // Reduced from 10MB to 1MB
     defer allocator.free(build_content);
 
     // Check if dependency already exists

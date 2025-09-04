@@ -2,6 +2,7 @@ const std = @import("std");
 const zsync = @import("zsync");
 const zion = @import("zion");
 const commands = zion.commands;
+const qol = zion.qol_enhancements;
 
 /// Async wrapper for add command to leverage zsync performance
 fn addAsync(allocator: std.mem.Allocator, io: zsync.Io, package_ref: []const u8, options: commands.AddOptions) !void {
@@ -52,6 +53,7 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "ui")) return "interface";
     if (std.mem.eql(u8, command, "kr")) return "keyring";
     if (std.mem.eql(u8, command, "key")) return "keyring";
+    if (std.mem.eql(u8, command, "archver")) return "archver";
     
     // Return original command if no alias found
     return command;
@@ -63,7 +65,7 @@ pub fn main() !void {
 }
 
 fn zionMain(io: zsync.Io) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .retain_metadata = false }){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -243,20 +245,33 @@ fn zionMain(io: zsync.Io) !void {
         try commands.zigistry(allocator, args[2..]);
     } else if (std.mem.eql(u8, command, "keyring")) {
         try commands.keyring(allocator, args);
+    } else if (std.mem.eql(u8, command, "archver")) {
+        // Standalone Arch verification command - same as keyring archver
+        const archver_str = try allocator.dupeZ(u8, "archver");
+        defer allocator.free(archver_str);
+        var archver_args = [_][:0]u8{ args[0], args[1], archver_str };
+        try commands.keyring(allocator, &archver_args);
     } else {
         std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});
         
-        // Suggest similar commands
-        if (std.mem.startsWith(u8, raw_command, "se")) {
-            std.debug.print("💡 Did you mean: 'zion search' or 'zion security'?\n\n", .{});
-        } else if (std.mem.startsWith(u8, raw_command, "ad")) {
-            std.debug.print("💡 Did you mean: 'zion add'?\n\n", .{});
-        } else if (std.mem.startsWith(u8, raw_command, "li")) {
-            std.debug.print("💡 Did you mean: 'zion list'?\n\n", .{});
-        } else if (std.mem.startsWith(u8, raw_command, "re")) {
-            std.debug.print("💡 Did you mean: 'zion remove' or 'zion registry'?\n\n", .{});
+        // Use smart command suggestions
+        const suggester = qol.CommandSuggester.init();
+        if (suggester.suggestCommand(raw_command)) |suggestion| {
+            std.debug.print("💡 Did you mean: 'zion {s}'?\n\n", .{suggestion});
         } else {
-            std.debug.print("💡 Run 'zion help' or 'zion --help' for available commands\n\n", .{});
+            // Try multiple suggestions
+            const suggestions = suggester.suggestCommands(allocator, raw_command) catch &[_][]const u8{};
+            defer allocator.free(suggestions);
+            
+            if (suggestions.len > 0) {
+                std.debug.print("💡 Similar commands:\n", .{});
+                for (suggestions) |cmd| {
+                    std.debug.print("  zion {s}\n", .{cmd});
+                }
+                std.debug.print("\n", .{});
+            } else {
+                std.debug.print("💡 Run 'zion help' or 'zion --help' for available commands\n\n", .{});
+            }
         }
         
         std.debug.print("🚀 Common commands:\n", .{});

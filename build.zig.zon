@@ -1,7 +1,7 @@
 .{
     .name = .zion,
     .fingerprint = 0x2aaf547c00a3154e,
-    .version = "1.0.5",
+    .version = "1.0.6",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .zsync = .{

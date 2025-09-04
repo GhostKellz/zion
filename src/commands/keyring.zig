@@ -18,7 +18,7 @@ pub fn keyring(allocator: Allocator, args: [][:0]u8) !void {
             return;
         }
         try trustFingerprint(allocator, args[3]);
-    } else if (std.mem.eql(u8, subcommand, "verify-arch")) {
+    } else if (std.mem.eql(u8, subcommand, "archver")) {
         try verifyArchKeyrings(allocator);
     } else if (std.mem.eql(u8, subcommand, "status")) {
         try showKeyringsStatus(allocator);
@@ -36,14 +36,14 @@ fn printUsage() void {
     std.debug.print("Commands:\n", .{});
     std.debug.print("  list          - List all available GPG keys\n", .{});
     std.debug.print("  trust <fp>    - Mark a fingerprint as trusted\n", .{});
-    std.debug.print("  verify-arch   - Verify Arch Linux keyrings\n", .{});
+    std.debug.print("  archver       - Verify Arch Linux keyrings\n", .{});
     std.debug.print("  status        - Show keyring status\n", .{});
     std.debug.print("  refresh       - Refresh keyrings from system\n", .{});
     std.debug.print("\n", .{});
     std.debug.print("Examples:\n", .{});
     std.debug.print("  zion keyring list\n", .{});
     std.debug.print("  zion keyring trust 478D3EFD1D9694F6BAD0AC1F777538754BA2B57D\n", .{});
-    std.debug.print("  zion keyring verify-arch\n", .{});
+    std.debug.print("  zion keyring archver\n", .{});
 }
 
 fn listKeys(allocator: Allocator) !void {

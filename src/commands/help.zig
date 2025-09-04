@@ -5,7 +5,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
     _ = allocator; // unused but required for API consistency
 
     const help_text =
-        \\Zion v0.9.0 - A Modern Zig Package Manager
+        \\Zion v1.0.6 - A Modern Zig Package Manager
         \\
         \\USAGE:
         \\    zion <COMMAND>
@@ -46,15 +46,16 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zls         ZLS (Zig Language Server) integration
         \\    workspace   Cargo-style workspace management
         \\    setup       One Nation Under Zig - complete setup wizard
+        \\    keyring     GPG keyring management and signature verification
         \\    help        Show this help message
         \\
-        \\🚀 NEW IN v0.9.0:
-        \\    Production ready     All temporary workarounds removed
-        \\    Zig API updates      Compatible with latest Zig (0.15.0-dev)
-        \\    TokioZ integration   Full async support with updated tokioZ
-        \\    Stability fixes      Enhanced error handling and memory management
-        \\    HTTP timeouts        Proper timeout handling for network requests
-        \\    Interactive search   Fully working with proper stdin/stdout handling
+        \\🔥 NEW IN v1.0.6:
+        \\    GPG Integration      Full GPG keyring support with signature verification
+        \\    Arch Linux Support   Native Arch Linux keystore integration
+        \\    Zig v0.16.0 Ready    Compatible with latest Zig development version
+        \\    Enhanced Security    Package signature verification and trust management
+        \\    Build Cache System   Intelligent caching with source hash validation
+        \\    Production Polish    Enterprise-grade features and stability
         \\
         \\🚀 ENHANCED IN v0.7.0:
         \\    add                 Now with multi-registry support and dependency analysis
@@ -102,6 +103,9 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion zig list --remote      # List available Zig versions
         \\    zion registry list          # List configured registries
         \\    zion registry test          # Test all registry connections
+        \\    zion keyring status         # Show GPG keyring status and health
+        \\    zion keyring list           # List all available GPG keys
+        \\    zion keyring archver        # Verify Arch Linux system keyrings
         \\
         \\🚀 v0.7.0 EXAMPLES:
         \\    zion publish --registry=zigistry --sign    # Publish with signing
