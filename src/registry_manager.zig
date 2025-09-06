@@ -86,7 +86,7 @@ pub const RegistryManager = struct {
             
             // First resolve alias if it's a short name
             const full_name = client.resolveAlias(package_name) catch |err| {
-                std.log.warn("Failed to resolve alias in {s}: {}", .{ client.config.name, err });
+                std.log.warn("Failed to resolve alias in {s}: {any}", .{ client.config.name, err });
                 continue;
             };
             defer if (full_name) |name| self.allocator.free(name);
@@ -100,7 +100,7 @@ pub const RegistryManager = struct {
             
             // Try to fetch package metadata
             const package = client.fetchPackageMetadata(owner, repo) catch |err| {
-                std.log.debug("Failed to fetch package from {s}: {}", .{ client.config.name, err });
+                std.log.debug("Failed to fetch package from {s}: {any}", .{ client.config.name, err });
                 continue;
             };
             
@@ -141,7 +141,7 @@ pub const RegistryManager = struct {
             if (client.health_metrics.status == .unhealthy) continue;
             
             const packages = client.searchPackages(query, filters) catch |err| {
-                std.log.warn("Search failed in {s}: {}", .{ client.config.name, err });
+                std.log.warn("Search failed in {s}: {any}", .{ client.config.name, err });
                 continue;
             };
             defer {
@@ -175,7 +175,7 @@ pub const RegistryManager = struct {
             }
         }.lessThan);
         
-        std.log.info("✅ Found {} packages across {} registries", .{ all_packages.items.len, self.clients.items.len });
+        std.log.info("✅ Found {d} packages across {d} registries", .{ all_packages.items.len, self.clients.items.len });
         return all_packages.toOwnedSlice(self.allocator);
     }
     
@@ -329,7 +329,7 @@ pub const HealthMonitor = struct {
         // For now, we'll just do a one-time check
         for (clients.items) |*client| {
             client.checkHealth() catch |err| {
-                std.log.warn("Health check failed for {s}: {}", .{ client.config.name, err });
+                std.log.warn("Health check failed for {s}: {any}", .{ client.config.name, err });
             };
         }
     }

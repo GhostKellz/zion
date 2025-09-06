@@ -86,7 +86,7 @@ pub const RequestBatcher = struct {
         self.stats.batches_executed += 1;
         self.stats.total_requests += batch.requests.items.len;
         
-        std.log.debug("🔄 Executing batch '{}' with {} requests", .{ batch.key, batch.requests.items.len });
+        std.log.debug("🔄 Executing batch '{s}' with {d} requests", .{ batch.key, batch.requests.items.len });
         
         // Execute batch based on type
         switch (batch.batch_type) {
@@ -108,7 +108,7 @@ pub const RequestBatcher = struct {
         
         self.stats.api_calls_saved += potential_calls - actual_calls;
         
-        std.log.debug("✅ Batch executed in {}ms ({}% API call reduction)", .{ duration, @as(u32, @intFromFloat(reduction * 100)) });
+        std.log.debug("✅ Batch executed in {d}ms ({d}% API call reduction)", .{ duration, @as(u32, @intFromFloat(reduction * 100)) });
     }
     
     /// Execute a batch of search requests

@@ -159,7 +159,7 @@ pub const EnhancedRegistryManager = struct {
         // Sort by quality and relevance
         std.sort.block(Package, all_packages.items, {}, packageComparator);
         
-        std.log.info("📦 Found {} packages via HTTP", .{all_packages.items.len});
+        std.log.info("📦 Found {d} packages via HTTP", .{all_packages.items.len});
         return all_packages.toOwnedSlice();
     }
     
@@ -180,7 +180,7 @@ pub const EnhancedRegistryManager = struct {
             defer file.close();
             try file.writeAll(body);
             
-            std.log.info("✅ Download complete: {s} ({} bytes)", .{ dest_path, body.len });
+            std.log.info("✅ Download complete: {s} ({d} bytes)", .{ dest_path, body.len });
         } else {
             return error.EmptyResponse;
         }

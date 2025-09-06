@@ -38,7 +38,7 @@ pub const AsyncDownloader = struct {
         if (requests.len == 0) return &[_]DownloadResult{};
         
         if (self.config.show_progress) {
-            std.log.info("🚀 Starting async download of {} packages with {} concurrency", .{ requests.len, self.config.max_concurrent });
+            std.log.info("🚀 Starting async download of {d} packages with {d} concurrency", .{ requests.len, self.config.max_concurrent });
         }
         
         self.stats.reset();
@@ -328,7 +328,7 @@ pub const AsyncDownloader = struct {
             (self.stats.completed * 1000) / @as(u64, @intCast(elapsed))
         else 0;
         
-        std.log.info("📊 Progress: {}/{} ({}%) - {}/s - {} MB total", .{
+        std.log.info("📊 Progress: {d}/{d} ({d}%) - {d}/s - {d} MB total", .{
             self.stats.completed,
             self.stats.total_packages,
             percent,
@@ -349,10 +349,10 @@ pub const AsyncDownloader = struct {
         else 0.0;
         
         std.log.info("🎉 Download complete!");
-        std.log.info("   ✅ Successful: {}", .{self.stats.successful});
-        std.log.info("   ❌ Failed: {}", .{self.stats.failed});
+        std.log.info("   ✅ Successful: {d}", .{self.stats.successful});
+        std.log.info("   ❌ Failed: {d}", .{self.stats.failed});
         std.log.info("   📦 Total size: {d:.1} MB", .{total_mb});
-        std.log.info("   ⏱️  Total time: {}ms", .{total_time});
+        std.log.info("   ⏱️  Total time: {d}ms", .{total_time});
         std.log.info("   🚀 Average speed: {d:.1} MB/s", .{speed_mbps});
     }
     

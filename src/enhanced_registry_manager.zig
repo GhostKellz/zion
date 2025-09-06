@@ -48,7 +48,7 @@ pub const RegistryManager = struct {
         // TODO: Implement proper async resolution with zsync Future API
         for (self.clients.items) |*client| {
             const result = resolveFromRegistry(client, package_name) catch |err| {
-                std.log.debug("❌ {s}: {}", .{ client.config.name, err });
+                std.log.debug("❌ {s}: {any}", .{ client.config.name, err });
                 continue;
             };
             
@@ -123,7 +123,7 @@ pub const RegistryManager = struct {
             }
         }.lessThan);
         
-        std.log.info("📦 Found {} packages", .{all_packages.items.len});
+        std.log.info("📦 Found {d} packages", .{all_packages.items.len});
         return all_packages.toOwnedSlice(self.allocator);
     }
     

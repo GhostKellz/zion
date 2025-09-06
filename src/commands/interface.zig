@@ -10,19 +10,19 @@ pub fn interface(allocator: std.mem.Allocator) !void {
     
     // Initialize ecosystems for demonstration
     var ghostkellz = GhostKellzEcosystem.init(allocator) catch |err| {
-        std.log.err("❌ Failed to initialize GhostLibs: {}", .{err});
+        std.log.err("❌ Failed to initialize GhostLibs: {any}", .{err});
         return;
     };
     defer ghostkellz.deinit();
     
     var ziglibs = ZigLibsIntegration.init(allocator) catch |err| {
-        std.log.err("❌ Failed to initialize ZigLibs: {}", .{err});
+        std.log.err("❌ Failed to initialize ZigLibs: {any}", .{err});
         return;
     };
     defer ziglibs.deinit();
     
     // Display available ecosystems
-    std.log.info("👻 GhostLibs Ecosystem ({} packages available):", .{ghostkellz.packages.items.len});
+    std.log.info("👻 GhostLibs Ecosystem ({d} packages available):", .{ghostkellz.packages.items.len});
     std.log.info("  • phantom - Advanced TUI framework", .{});
     std.log.info("  • http_client - Standard HTTP client (replaced ghostnet)", .{});
     std.log.info("  • zcrypto - Quantum-resistant cryptography", .{});
@@ -36,7 +36,7 @@ pub fn interface(allocator: std.mem.Allocator) !void {
     std.log.info("  • zwallet - Cryptocurrency wallet framework", .{});
     std.log.info("  • zledger - Distributed ledger technology", .{});
     
-    std.log.info("🦎 ZigLibs Integration ({} packages, {} tools):", .{ ziglibs.packages.items.len, ziglibs.tools.items.len });
+    std.log.info("🦎 ZigLibs Integration ({d} packages, {d} tools):", .{ ziglibs.packages.items.len, ziglibs.tools.items.len });
     std.log.info("  • 25+ curated packages from ziglibs repository", .{});
     std.log.info("  • Development tools and utilities", .{});
     std.log.info("  • Comprehensive ecosystem support", .{});

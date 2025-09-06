@@ -293,7 +293,7 @@ pub const ZionTUIv3 = struct {
     pub fn processInstallationQueue(self: *ZionTUIv3) !void {
         if (self.installation_queue.items.len == 0) return;
         
-        std.log.info("🚀 Processing {} packages in installation queue", .{self.installation_queue.items.len});
+        std.log.info("🚀 Processing {d} packages in installation queue", .{self.installation_queue.items.len});
         
         for (self.installation_queue.items) |*install| {
             if (install.status != .pending) continue;
@@ -301,14 +301,14 @@ pub const ZionTUIv3 = struct {
             install.status = .downloading;
             self.current_installation = install.*;
             
-            std.log.info("📦 Installing {} from {s}", .{ install.name, install.ecosystem.getDisplayName() });
+            std.log.info("📦 Installing {s} from {s}", .{ install.name, install.ecosystem.getDisplayName() });
             
             // Execute zig fetch command (in real implementation)
             // For now, simulate success
             std.time.sleep(1000000000); // 1 second delay
             install.status = .completed;
             
-            std.log.info("✅ {} installed successfully", .{install.name});
+            std.log.info("✅ {s} installed successfully", .{install.name});
         }
         
         self.current_installation = null;

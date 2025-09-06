@@ -1,7 +1,7 @@
 .{
     .name = .zion,
     .fingerprint = 0x2aaf547c00a3154e,
-    .version = "1.0.6",
+    .version = "1.0.7",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .zsync = .{
@@ -10,7 +10,7 @@
         },
         .phantom = .{
             .url = "https://github.com/ghostkellz/phantom/archive/refs/heads/main.tar.gz",
-            .hash = "phantom-0.3.2-E0eWBBZICAA33xwmFeWlNQL4sNYt1MC4ZsLu0yjPL0WS",
+            .hash = "phantom-0.3.2-E0eWBCFICAC20J1jhO0hBUKysjQ9Gs2W2nCQw9NP6wfi",
         },
     },
     .paths = .{

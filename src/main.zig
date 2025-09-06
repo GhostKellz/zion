@@ -3,6 +3,7 @@ const zsync = @import("zsync");
 const zion = @import("zion");
 const commands = zion.commands;
 const qol = zion.qol_enhancements;
+const AsyncCommandHandler = @import("async_command_handler.zig").AsyncCommandHandler;
 
 /// Async wrapper for add command to leverage zsync performance
 fn addAsync(allocator: std.mem.Allocator, io: zsync.Io, package_ref: []const u8, options: commands.AddOptions) !void {
@@ -55,13 +56,19 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "key")) return "keyring";
     if (std.mem.eql(u8, command, "archver")) return "archver";
     
+    // v1.0.7 aliases
+    if (std.mem.eql(u8, command, "hc")) return "health";
+    if (std.mem.eql(u8, command, "bench")) return "benchmark";
+    if (std.mem.eql(u8, command, "perf")) return "benchmark";
+    
     // Return original command if no alias found
     return command;
 }
 
 pub fn main() !void {
-    // Use blocking runtime for CLI development tools (zsync v0.4.0)
-    try zsync.runBlocking(zionMain, {});
+    // Use high-performance runtime for optimal performance (zsync v0.5.4)
+    // Leverages platform-specific optimizations and advanced I/O
+    try zsync.runHighPerf(zionMain, .{});
 }
 
 fn zionMain(io: zsync.Io) !void {
@@ -71,6 +78,35 @@ fn zionMain(io: zsync.Io) !void {
 
     // Initialize logging system
     zion.logger.init();
+
+    // Initialize async command handler for v1.0.7 features  
+    var async_handler = AsyncCommandHandler.init(allocator, io) catch |err| {
+        std.debug.print("⚠️  Async features unavailable: {}\n", .{err});
+        std.debug.print("   Falling back to synchronous operations\n", .{});
+        
+        // Handle fallback synchronously
+        const args = try std.process.argsAlloc(allocator);
+        defer std.process.argsFree(allocator, args);
+
+        if (args.len < 2) {
+            try commands.help(allocator);
+            return;
+        }
+
+        const raw_command = args[1];
+        const command = resolveCommandAlias(raw_command);
+        
+        // Handle basic commands synchronously
+        if (std.mem.eql(u8, command, "version")) {
+            try commands.version(allocator);
+        } else if (std.mem.eql(u8, command, "help")) {
+            try commands.help(allocator);
+        } else {
+            try commands.help(allocator);
+        }
+        return;
+    };
+    defer async_handler.deinit();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -108,13 +144,20 @@ fn zionMain(io: zsync.Io) !void {
         }
 
         const packages = args[2..];
+        const options = commands.AddOptions{};
+        
         if (packages.len == 1) {
-            // Use default options for the enhanced add command
-            const options = commands.AddOptions{};
-            try addAsync(allocator, io, packages[0], options);
+            // Use enhanced async add for single package
+            async_handler.addAsync(packages[0], options) catch |err| {
+                std.debug.print("❌ Async add failed: {}, falling back to sync\n", .{err});
+                try addAsync(allocator, io, packages[0], options);
+            };
         } else {
-            const options = commands.AddOptions{};
-            try addMultipleAsync(allocator, io, packages, options);
+            // Use enhanced batch add for multiple packages
+            async_handler.addMultipleAsync(packages, options) catch |err| {
+                std.debug.print("❌ Async batch add failed: {}, falling back to sync\n", .{err});
+                try addMultipleAsync(allocator, io, packages, options);
+            };
         }
     } else if (std.mem.eql(u8, command, "remove") or std.mem.eql(u8, command, "rm")) {
         if (args.len < 3) {
@@ -183,7 +226,18 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "zig")) {
         try commands.zig_manager(allocator, args);
     } else if (std.mem.eql(u8, command, "search")) {
-        try searchAsync(allocator, io, args);
+        if (args.len < 3) {
+            std.debug.print("Error: 'zion search' requires a search query\n", .{});
+            std.debug.print("Usage: zion search <query>\n", .{});
+            std.debug.print("Example: zion search http\n", .{});
+            return;
+        }
+        
+        // Use enhanced racing search
+        async_handler.searchAsync(args[2]) catch |err| {
+            std.debug.print("❌ Async search failed: {}, falling back to sync\n", .{err});
+            try searchAsync(allocator, io, args);
+        };
     } else if (std.mem.eql(u8, command, "registry")) {
         try registryAsync(allocator, io, args);
     } else if (std.mem.eql(u8, command, "template")) {
@@ -195,6 +249,14 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "analyze")) {
         try commands.analyze(allocator, args);
     
+    // v1.0.7 Enhanced Commands (zsync v0.5.4 powered)
+    } else if (std.mem.eql(u8, command, "health")) {
+        // Registry health check using racing queries
+        try async_handler.healthCheckRegistries();
+    } else if (std.mem.eql(u8, command, "benchmark")) {
+        // Performance benchmark for new features
+        try async_handler.benchmarkPerformance();
+        
     // v0.7.0 Enhanced Commands
     } else if (std.mem.eql(u8, command, "publish")) {
         try commands.publish(allocator, args);

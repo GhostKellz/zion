@@ -190,7 +190,7 @@ pub const UnifiedRegistryManager = struct {
                 // Cache the successful result
                 try self.cache.put(cache_key, pkg, 3600); // Cache for 1 hour
                 
-                std.log.info("✅ Found package {s} from {s} in {}ms", .{ 
+                std.log.info("✅ Found package {s} from {s} in {d}ms", .{ 
                     pkg.full_name, 
                     pkg.registry_name, 
                     result.response_time orelse 0 
@@ -306,7 +306,7 @@ pub const UnifiedRegistryManager = struct {
         // Cache the results
         try self.cache.putSearchResults(cache_key, results, 1800); // Cache for 30 minutes
         
-        std.log.info("📦 Found {} packages via unified search", .{results.len});
+        std.log.info("📦 Found {d} packages via unified search", .{results.len});
         return results;
     }
     
@@ -327,7 +327,7 @@ pub const UnifiedRegistryManager = struct {
             const response = client.get(url) catch |err| {
                 retry_count += 1;
                 if (retry_count <= max_retries) {
-                    std.log.warn("⚠️ Download failed (attempt {}/{}): {}", .{ retry_count, max_retries + 1, err });
+                    std.log.warn("⚠️ Download failed (attempt {d}/{d}): {any}", .{ retry_count, max_retries + 1, err });
                     std.time.sleep(backoff_ms * 1000000); // Convert to nanoseconds
                     backoff_ms *= 2; // Exponential backoff
                     continue;
@@ -342,7 +342,7 @@ pub const UnifiedRegistryManager = struct {
             if (response.status_code != 200) {
                 retry_count += 1;
                 if (retry_count <= max_retries) {
-                    std.log.warn("⚠️ HTTP error {} (attempt {}/{})", .{ response.status_code, retry_count, max_retries + 1 });
+                    std.log.warn("⚠️ HTTP error {d} (attempt {d}/{d})", .{ response.status_code, retry_count, max_retries + 1 });
                     std.time.sleep(backoff_ms * 1000000);
                     backoff_ms *= 2;
                     continue;
@@ -356,7 +356,7 @@ pub const UnifiedRegistryManager = struct {
                 defer file.close();
                 try file.writeAll(body);
                 
-                std.log.info("✅ Download complete: {s} ({} bytes in {}ms)", .{ dest_path, body.len, elapsed });
+                std.log.info("✅ Download complete: {s} ({d} bytes in {d}ms)", .{ dest_path, body.len, elapsed });
                 return;
             } else {
                 return error.EmptyResponse;
