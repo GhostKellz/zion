@@ -1,7 +1,11 @@
+<div align="center">
+  <img src="assets/zion-logo.png" alt="Zion Logo" width="200"/>
+</div>
+
 # Zion - The Complete Zig Development Tool
 
 [![Made with Zig](https://img.shields.io/badge/Made%20with-Zig-orange.svg)](https://ziglang.org)
-[![Zig 0.15+](https://img.shields.io/badge/Zig-0.15%2B-blue.svg)](https://ziglang.org/download)
+[![Zig 0.16+](https://img.shields.io/badge/Zig-0.16%2B-blue.svg)](https://ziglang.org/download)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/Version-0.8.0-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
