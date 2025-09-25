@@ -38,7 +38,7 @@ pub const EnhancedRegistryManager = struct {
             .config = zion_config,
             .http_client = http_client_instance,
             .runtime = runtime,
-            .registries = std.ArrayList(RegistryEndpoint).init(allocator),
+            .registries = std.ArrayList(RegistryEndpoint).empty,
         };
         
         try manager.initRegistries();
@@ -51,10 +51,10 @@ pub const EnhancedRegistryManager = struct {
             self.allocator.free(registry.base_url);
             if (registry.api_token) |token| self.allocator.free(token);
         }
-        self.registries.deinit();
-        
-        self.http_client.deinit(allocator);
-        self.runtime.deinit(allocator);
+        self.registries.deinit(self.allocator);
+
+        self.http_client.deinit(self.allocator);
+        self.runtime.deinit(self.allocator);
         self.allocator.destroy(self.runtime);
         self.allocator.destroy(self);
     }
@@ -69,7 +69,7 @@ pub const EnhancedRegistryManager = struct {
                     .enabled = reg_config.enabled,
                     .priority = @intCast(reg_config.priority),
                 };
-                try self.registries.append(allocator, endpoint);
+                try self.registries.append(self.allocator, endpoint);
             }
         }
         
@@ -87,16 +87,16 @@ pub const EnhancedRegistryManager = struct {
         std.log.info("🔍 Resolving package: {s}", .{package_name});
         
         // Use parallel async resolution
-        var futures = std.ArrayList(*zsync.Future(PackageResult)).init(self.allocator);
+        var futures = std.ArrayList(*zsync.Future(PackageResult)).empty;
         defer {
-            for (futures.items) |future| future.deinit(allocator);
-            futures.deinit(allocator);
+            for (futures.items) |future| future.deinit(self.allocator);
+            futures.deinit(self.allocator);
         }
         
         // Start parallel resolution across all registries
         for (self.registries.items) |registry| {
             const future = try self.resolveFromRegistryAsync(registry, package_name);
-            try futures.append(allocator, future);
+            try futures.append(self.allocator, future);
         }
         
         // Wait for first successful result
@@ -116,10 +116,10 @@ pub const EnhancedRegistryManager = struct {
     pub fn searchPackages(self: *EnhancedRegistryManager, query: []const u8, max_results: usize) ![]Package {
         std.log.info("🔍 Searching packages: {s}", .{query});
         
-        var search_futures = std.ArrayList(*zsync.Future(SearchResult)).init(self.allocator);
+        var search_futures = std.ArrayList(*zsync.Future(SearchResult)).empty;
         defer {
-            for (search_futures.items) |future| future.deinit(allocator);
-            search_futures.deinit(allocator);
+            for (search_futures.items) |future| future.deinit(self.allocator);
+            search_futures.deinit(self.allocator);
         }
         
         // Start parallel search across all registries
@@ -129,8 +129,8 @@ pub const EnhancedRegistryManager = struct {
         }
         
         // Collect and aggregate results
-        var all_packages = std.ArrayList(Package).init(self.allocator);
-        defer all_packages.deinit(allocator);
+    var all_packages = std.ArrayList(Package).empty;
+    defer all_packages.deinit(self.allocator);
         
         for (search_futures.items) |future| {
             const result = try future.await();
@@ -150,7 +150,7 @@ pub const EnhancedRegistryManager = struct {
                     }
                     
                     if (!is_duplicate) {
-                        try all_packages.append(allocator, pkg);
+                        try all_packages.append(self.allocator, pkg);
                     }
                 }
             }
@@ -160,7 +160,7 @@ pub const EnhancedRegistryManager = struct {
         std.sort.block(Package, all_packages.items, {}, packageComparator);
         
         std.log.info("📦 Found {d} packages via HTTP", .{all_packages.items.len});
-        return all_packages.toOwnedSlice();
+    return all_packages.toOwnedSlice(self.allocator);
     }
     
     /// Download package with HTTP client
@@ -193,10 +193,10 @@ pub const EnhancedRegistryManager = struct {
         const repo = parts.next() orelse return null;
         
         // Use parallel metadata requests
-        var metadata_futures = std.ArrayList(*zsync.Future(?PackageMetadata)).init(self.allocator);
+        var metadata_futures = std.ArrayList(*zsync.Future(?PackageMetadata)).empty;
         defer {
-            for (metadata_futures.items) |future| future.deinit(allocator);
-            metadata_futures.deinit(allocator);
+            for (metadata_futures.items) |future| future.deinit(self.allocator);
+            metadata_futures.deinit(self.allocator);
         }
         
         for (self.registries.items) |registry| {

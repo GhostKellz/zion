@@ -39,6 +39,16 @@ pub const tree = @import("tree.zig").tree;
 pub const doc = @import("doc.zig").doc;
 pub const outdated = @import("outdated.zig").outdated;
 pub const zig_manager = @import("zig_manager.zig").zig_manager;
+
+pub var zig_command_override: ?fn(std.mem.Allocator, [][:0]u8) anyerror!void = null;
+
+pub fn setZigCommandHandler(handler: ?fn(std.mem.Allocator, [][:0]u8) anyerror!void) void {
+    zig_command_override = handler;
+}
+
+pub fn resetZigCommandHandler() void {
+    zig_command_override = null;
+}
 pub const nvim = @import("nvim.zig").nvim;
 pub const search = @import("search_v2.zig").search; // v0.7.0: Enhanced search is now default
 pub const registry = @import("registry_v2.zig").registryCommand; // v0.7.0: Enhanced registry is now default
@@ -46,6 +56,7 @@ pub const publish = @import("publish.zig").publish; // v0.7.0: New publishing fe
 pub const setup = @import("setup_simple.zig").setup; // v0.8.0: Simplified setup system
 pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
 pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
+pub const ghostspec = @import("ghostspec.zig").ghostspec; // v0.8.0: GhostSpec integration commands
 
 // NEW v1.0.5: Production-ready features
 pub const signature_verify = @import("signature_verify.zig").verify;
@@ -83,17 +94,18 @@ pub const registry_legacy = @import("registry.zig").registryCommand;
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
     // Convert args to the format expected by zig_manager
-    var zig_args = std.ArrayList([:0]u8).init(allocator);
+    var zig_args = try std.ArrayList([:0]u8).initCapacity(allocator, args.len + 2);
     defer zig_args.deinit(allocator);
-    
-    try zig_args.append(try allocator.dupeZ(u8, "zion"));
-    try zig_args.append(try allocator.dupeZ(u8, "zig"));
-    
+
+    try zig_args.append(allocator, try allocator.dupeZ(u8, "zion"));
+    try zig_args.append(allocator, try allocator.dupeZ(u8, "zig"));
+
     for (args) |arg| {
-        try zig_args.append(try allocator.dupeZ(u8, arg));
+        try zig_args.append(allocator, try allocator.dupeZ(u8, arg));
     }
-    
-    return zig_manager(allocator, zig_args.items);
+
+    const handler = zig_command_override orelse zig_manager;
+    return handler(allocator, zig_args.items);
 }
 
 // Search function is now imported from search.zig

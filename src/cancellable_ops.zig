@@ -162,8 +162,8 @@ pub const CancellableOps = struct {
     
     /// Search operation with early termination on cancellation
     pub fn cancellableSearch(self: *Self, query: []const u8, max_results: usize) ![][]const u8 {
-        var results = std.ArrayList([]const u8).init(self.allocator);
-        defer results.deinit();
+    var results = std.ArrayList([]const u8).empty;
+    defer results.deinit(self.allocator);
         
         std.debug.print("🔍 Searching for: {s}\n", .{query});
         
@@ -177,14 +177,14 @@ pub const CancellableOps = struct {
             
             // Simulate finding a result
             const result = try std.fmt.allocPrint(self.allocator, "Result {d} for '{s}'", .{found + 1, query});
-            try results.append(result);
+            try results.append(self.allocator, result);
             found += 1;
             
             // Simulate search delay
             std.time.sleep(50 * std.time.ns_per_ms);
         }
         
-        return try results.toOwnedSlice();
+    return try results.toOwnedSlice(self.allocator);
     }
     
     /// Run operation with automatic cancellation on timeout

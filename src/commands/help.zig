@@ -35,6 +35,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    nvim        Neovim integration setup and management
         \\    security    Package signing, verification, and trust management
         \\    performance Performance monitoring and optimization
+    \\    ghostspec   GhostSpec testing workflows (install, run, report)
         \\    search      Search for Zig packages
         \\    registry    Manage package registries and test connectivity
         \\    template    Create projects from templates
@@ -97,6 +98,8 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion zls install            # Get ZLS installation guidance
         \\    zion zls doctor             # Check ZLS health and setup
         \\    zion zls config             # Create optimal ZLS configuration
+    \\    zion ghostspec bootstrap    # Install and wire GhostSpec into the project
+    \\    zion ghostspec run          # Execute GhostSpec suites
         \\    zion workspace init         # Initialize Cargo-style workspace
         \\    zion workspace add mylib    # Add package to workspace
         \\    zion workspace build        # Build all workspace packages

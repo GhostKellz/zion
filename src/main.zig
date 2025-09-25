@@ -44,6 +44,7 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "h")) return "help";
     if (std.mem.eql(u8, command, "v")) return "version";
     if (std.mem.eql(u8, command, "f")) return "fetch";
+    if (std.mem.eql(u8, command, "gs")) return "ghostspec";
     if (std.mem.eql(u8, command, "si")) return "search-interactive";
     if (std.mem.eql(u8, command, "reg")) return "registry";
     if (std.mem.eql(u8, command, "cfg")) return "config";
@@ -301,6 +302,8 @@ fn zionMain(io: zsync.Io) !void {
         try commands.zls(allocator, args);
     } else if (std.mem.eql(u8, command, "workspace")) {
         try commands.workspace(allocator, args);
+    } else if (std.mem.eql(u8, command, "ghostspec")) {
+        try commands.ghostspec(allocator, args);
     } else if (std.mem.eql(u8, command, "ziglibs")) {
         try commands.ziglibs(allocator, args[2..]);
     } else if (std.mem.eql(u8, command, "zigistry")) {

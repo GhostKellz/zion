@@ -53,7 +53,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
     // Parse search options
     var search_options = SearchOptions{};
     const search_term: []const u8 = args[2];
-    var filters_list = std.ArrayList([]const u8).init(allocator);
+    var filters_list = std.ArrayList([]const u8).empty;
     defer filters_list.deinit(allocator);
     
     // Process additional arguments
@@ -362,7 +362,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
         return;
     }
     
-    var output_buf = std.ArrayList(u8).init(allocator);
+        var output_buf = std.ArrayList(u8).empty;
     defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
@@ -372,7 +372,7 @@ fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8
             return;
         };
         if (bytes_read == 0) break;
-        output_buf.appendSlice(read_buf[0..bytes_read]) catch {
+    output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch {
             std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
             return;
         };

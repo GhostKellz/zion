@@ -12,7 +12,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
         return;
     }
     
-    var package_names = std.ArrayList([]const u8).init(allocator);
+    var package_names = std.ArrayList([]const u8).empty;
     defer package_names.deinit(allocator);
     
     var prefer_ziglibs = false;
@@ -60,7 +60,7 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
     print("📦 Adding {} package(s)...\n\n", .{package_names.items.len});
     
     var success_count: u32 = 0;
-    var failed_packages = std.ArrayList([]const u8).init(allocator);
+    var failed_packages = std.ArrayList([]const u8).empty;
     defer failed_packages.deinit(allocator);
     
     for (package_names.items) |package_name| {

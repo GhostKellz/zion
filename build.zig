@@ -53,6 +53,15 @@ pub fn build(b: *std.Build) void {
 
     // ghostnet dependency removed - using standard HTTP client
 
+    // Import ghostspec dependency for integration helpers
+    const ghostspec_mod = b.lazyDependency("ghostspec", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    if (ghostspec_mod) |ghostspec| {
+        mod.addImport("ghostspec", ghostspec.module("ghostspec"));
+    }
+
     // Import phantom dependency for TUI components
     const phantom_mod = b.lazyDependency("phantom", .{
         .target = target,
@@ -107,6 +116,11 @@ pub fn build(b: *std.Build) void {
     // Add zsync to executable if available
     if (zsync_mod) |zsync| {
         exe.root_module.addImport("zsync", zsync.module("zsync"));
+    }
+
+    // Add ghostspec to executable if available
+    if (ghostspec_mod) |ghostspec| {
+        exe.root_module.addImport("ghostspec", ghostspec.module("ghostspec"));
     }
 
     // ghostnet dependency removed - using standard HTTP client

@@ -103,6 +103,40 @@ zion ui
 - Scripting and automation workflows
 - Package discovery and exploration
 
+### `zion ghostspec` - GhostSpec Testing Orchestrator
+
+Provides first-class GhostSpec workflows directly from Zion, covering installation, build wiring, execution, and reporting.
+
+```bash
+zion ghostspec bootstrap
+zion ghostspec run --suite regressions --seed 1337
+zion ghostspec report --open
+```
+
+**Subcommands:**
+- `bootstrap` – Install GhostSpec, add build steps, and scaffold starter suites
+- `install` / `update` / `uninstall` – Manage GhostSpec dependency lifecycle
+- `wire` – Inject GhostSpec build steps (project or workspace)
+- `scaffold` – Generate example property, fuzz, benchmark, and mock files
+- `run` / `fuzz` / `bench` – Execute suites with filters, seeds, and time budgets
+- `report` – Generate or open HTML/JSON reports from the latest runs
+- `ci` – Produce CI recipes (GitHub Actions, GitLab CI, etc.)
+- `info` / `docs` – Show compatibility matrix and documentation links
+
+**Features:**
+- Compatibility-aware installs powered by `data/ghostspec-compat.json`
+- Async execution via zsync with rich progress streaming
+- Structured result storage under `.zion/ghostspec/`
+- Failure reproduction commands with deterministic seeds
+- Tight integration with `zion setup`, workspaces, Neovim, and AI assistants
+
+**Examples:**
+- `zion ghostspec bootstrap` – end-to-end provisioning and wiring
+- `zion ghostspec run --suite fast --time-budget 30` – quick suite execution
+- `zion ghostspec report --open` – open the latest HTML dashboard
+
+---
+
 ### `zion init`
 
 Initializes a new Zig project with the necessary file structure.

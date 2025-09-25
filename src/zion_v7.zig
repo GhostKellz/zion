@@ -106,9 +106,9 @@ pub const ZionV7 = struct {
         const analysis = try self.registry_manager.analyzeDependencies(package_name);
         
         var resolution = DependencyResolution{
-            .packages = std.ArrayList(ResolvedPackage).init(self.allocator),
-            .conflicts = std.ArrayList(ConflictResolution).init(self.allocator),
-            .warnings = std.ArrayList([]const u8).init(self.allocator),
+            .packages = std.ArrayList(ResolvedPackage).empty,
+            .conflicts = std.ArrayList(ConflictResolution).empty,
+            .warnings = std.ArrayList([]const u8).empty,
             .resolution_strategy = .conservative,
         };
         
@@ -125,14 +125,14 @@ pub const ZionV7 = struct {
         var result = ValidationResult{
             .valid = true,
             .security_score = 100,
-            .issues = std.ArrayList(ValidationIssue).init(self.allocator),
-            .recommendations = std.ArrayList([]const u8).init(self.allocator),
+            .issues = std.ArrayList(ValidationIssue).empty,
+            .recommendations = std.ArrayList([]const u8).empty,
         };
         
         // Security scanning
         const threats = try self.security_scanner.scanPackage(package_path, package_name);
         for (threats) |threat| {
-            try result.issues.append(ValidationIssue{
+            try result.issues.append(self.allocator, ValidationIssue{
                 .type = .security,
                 .severity = threat.severity,
                 .message = try self.allocator.dupe(u8, threat.description),
@@ -163,8 +163,8 @@ pub const ZionV7 = struct {
         std.log.info("📦 Zion v0.7.0 - Enhanced publishing with marketplace integration");
         
         // Validate package before publishing
-        const validation = try self.validatePackage(".", options.package_name);
-        defer validation.deinit();
+    const validation = try self.validatePackage(".", options.package_name);
+    defer validation.deinit(self.allocator);
         
         if (!validation.valid and !options.force) {
             std.log.err("❌ Package validation failed. Use --force to publish anyway.");
@@ -203,23 +203,23 @@ pub const ZionV7 = struct {
         std.log.info("🗺️  Zion v0.7.0 - Interactive package exploration");
         
         var result = ExplorationResult{
-            .related_packages = std.ArrayList(registry_v2.Package).init(self.allocator),
-            .trending_packages = std.ArrayList(registry_v2.Package).init(self.allocator),
-            .recommended_packages = std.ArrayList(registry_v2.Package).init(self.allocator),
+            .related_packages = std.ArrayList(registry_v2.Package).empty,
+            .trending_packages = std.ArrayList(registry_v2.Package).empty,
+            .recommended_packages = std.ArrayList(registry_v2.Package).empty,
             .ecosystem_insights = EcosystemInsights{},
         };
         
         // Find related packages using semantic analysis
         const related = try self.findRelatedPackages(query);
-        try result.related_packages.appendSlice(related);
+        try result.related_packages.appendSlice(self.allocator, related);
         
         // Get trending packages in the same category
         const trending = try self.getTrendingPackages(query);
-        try result.trending_packages.appendSlice(trending);
+        try result.trending_packages.appendSlice(self.allocator, trending);
         
         // Generate AI-powered recommendations
         const recommendations = try self.generateRecommendations(query);
-        try result.recommended_packages.appendSlice(recommendations);
+        try result.recommended_packages.appendSlice(self.allocator, recommendations);
         
         // Provide ecosystem insights
         result.ecosystem_insights = try self.analyzeEcosystem(query);
@@ -235,9 +235,10 @@ pub const ZionV7 = struct {
             .cache_efficiency = 0,
             .download_speed = 0,
             .resolution_time = 0,
-            .registry_health = std.ArrayList(RegistryHealthMetric).init(self.allocator),
-            .recommendations = std.ArrayList([]const u8).init(self.allocator),
+            .registry_health = std.ArrayList(RegistryHealthMetric).empty,
+            .recommendations = std.ArrayList([]const u8).empty,
         };
+        errdefer report.deinit(self.allocator);
         
         // Analyze cache performance
         report.cache_efficiency = try self.analyzeCacheEfficiency();
@@ -248,7 +249,7 @@ pub const ZionV7 = struct {
         // Assess registry health
         const health_statuses = try self.registry_manager.getRegistryStatus();
         for (health_statuses) |status| {
-            try report.registry_health.append(RegistryHealthMetric{
+            try report.registry_health.append(self.allocator, RegistryHealthMetric{
                 .name = try self.allocator.dupe(u8, status.name),
                 .response_time = status.response_time_ms,
                 .uptime = status.uptime_percentage,
@@ -365,18 +366,23 @@ pub const ZionV7 = struct {
     
     fn generateOptimizationRecommendations(self: *ZionV7, report: *PerformanceReport) !void {
         if (report.cache_efficiency < 80) {
-            try report.recommendations.append("Consider clearing and rebuilding package cache");
+            const msg = try self.allocator.dupe(u8, "Consider clearing and rebuilding package cache");
+            errdefer self.allocator.free(msg);
+            try report.recommendations.append(self.allocator, msg);
         }
         
         if (report.download_speed < 5.0) {
-            try report.recommendations.append("Check network connectivity and consider using a CDN");
+            const msg = try self.allocator.dupe(u8, "Check network connectivity and consider using a CDN");
+            errdefer self.allocator.free(msg);
+            try report.recommendations.append(self.allocator, msg);
         }
         
         for (report.registry_health.items) |health| {
             if (health.response_time > 2000) {
                 const msg = try std.fmt.allocPrint(self.allocator, 
                     "Registry {s} is slow - consider using an alternative", .{health.name});
-                try report.recommendations.append(msg);
+                errdefer self.allocator.free(msg);
+                try report.recommendations.append(self.allocator, msg);
             }
         }
     }
@@ -413,17 +419,17 @@ pub const ValidationResult = struct {
     issues: std.ArrayList(ValidationIssue),
     recommendations: std.ArrayList([]const u8),
     
-    pub fn deinit(self: ValidationResult) void {
+    pub fn deinit(self: ValidationResult, allocator: std.mem.Allocator) void {
         for (self.issues.items) |issue| {
             issue.deinit();
         }
-        self.issues.deinit();
+        self.issues.deinit(allocator);
         
         for (self.recommendations.items) |rec| {
             // Would free if allocated
             _ = rec;
         }
-        self.recommendations.deinit();
+        self.recommendations.deinit(allocator);
     }
     
     pub fn getHighSeverityCount(self: ValidationResult) u32 {
@@ -513,6 +519,18 @@ pub const PerformanceReport = struct {
     resolution_time: f32,
     registry_health: std.ArrayList(RegistryHealthMetric),
     recommendations: std.ArrayList([]const u8),
+
+    pub fn deinit(self: PerformanceReport, allocator: std.mem.Allocator) void {
+        for (self.registry_health.items) |metric| {
+            allocator.free(@constCast(metric.name));
+        }
+        self.registry_health.deinit(allocator);
+
+        for (self.recommendations.items) |rec| {
+            allocator.free(@constCast(rec));
+        }
+        self.recommendations.deinit(allocator);
+    }
 };
 
 pub const RegistryHealthMetric = struct {

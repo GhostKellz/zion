@@ -92,14 +92,14 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
         return null;
     }
     
-    var output_buf = std.ArrayList(u8).init(allocator);
+    var output_buf = std.ArrayList(u8).empty;
     defer output_buf.deinit(allocator);
     
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = req.readAll(read_buf[0..]) catch return null;
         if (bytes_read == 0) break;
-        output_buf.appendSlice(read_buf[0..bytes_read]) catch return null;
+    output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch return null;
     }
     
     const body = allocator.dupe(u8, output_buf.items) catch return null;
@@ -299,7 +299,7 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     
     // Read stderr for error messages (must be done before wait)
     const stderr = if (child.stderr) |stderr_pipe| blk: {
-        var output_buf = std.ArrayList(u8).init(allocator);
+        var output_buf = std.ArrayList(u8).empty;
         defer output_buf.deinit(allocator);
         
         var read_buf: [4096]u8 = undefined;

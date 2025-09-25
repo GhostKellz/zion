@@ -3,3 +3,8 @@
 /zig-out/
 *.o
 *.exe
+CLAUDE.md
+TODO.md
+ROADMAP.md
+.zig-cache/
+ghostspec-integration/

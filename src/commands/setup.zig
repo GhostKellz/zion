@@ -3,6 +3,9 @@ const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const zig_manager = @import("zig_manager.zig");
 
+pub var zig_manager_override: ?fn(Allocator, [][:0]u8) anyerror!void = null;
+pub var check_command_override: ?fn([]const u8) bool = null;
+
 /// One Nation Under Zig - Complete development environment setup
 pub fn setup(allocator: Allocator, args: [][:0]u8) !void {
     if (args.len < 3) {
@@ -118,25 +121,26 @@ fn setupZig(allocator: Allocator, args: [][:0]u8) !void {
         // Use the existing zig_manager to install
         const version_z = try allocator.dupeZ(u8, version);
         defer allocator.free(version_z);
-        
-        var install_args = std.ArrayList([:0]u8).init(allocator);
+        const handler = zig_manager_override orelse zig_manager.zig_manager;
+
+        var install_args = try std.ArrayList([:0]u8).initCapacity(allocator, 4);
         defer install_args.deinit(allocator);
-        try install_args.append(try allocator.dupeZ(u8, "zion"));
-        try install_args.append(try allocator.dupeZ(u8, "zig"));
-        try install_args.append(try allocator.dupeZ(u8, "install"));
+        try install_args.append(allocator, try allocator.dupeZ(u8, "zion"));
+        try install_args.append(allocator, try allocator.dupeZ(u8, "zig"));
+        try install_args.append(allocator, try allocator.dupeZ(u8, "install"));
         try install_args.append(allocator, version_z);
         
-        try zig_manager.zig_manager(allocator, install_args.items);
+        try handler(allocator, install_args.items);
         
         std.debug.print("  🔗 Setting as active version...\n", .{});
-        var use_args = std.ArrayList([:0]u8).init(allocator);
+        var use_args = try std.ArrayList([:0]u8).initCapacity(allocator, 4);
         defer use_args.deinit(allocator);
-        try use_args.append(try allocator.dupeZ(u8, "zion"));
-        try use_args.append(try allocator.dupeZ(u8, "zig"));
-        try use_args.append(try allocator.dupeZ(u8, "use"));
+        try use_args.append(allocator, try allocator.dupeZ(u8, "zion"));
+        try use_args.append(allocator, try allocator.dupeZ(u8, "zig"));
+        try use_args.append(allocator, try allocator.dupeZ(u8, "use"));
         try use_args.append(allocator, version_z);
         
-        try zig_manager.zig_manager(allocator, use_args.items);
+        try handler(allocator, use_args.items);
         
         // Free allocated strings
         for (install_args.items) |arg| {
@@ -317,6 +321,10 @@ fn checkSystemZig(allocator: Allocator) bool {
 }
 
 fn checkCommand(command: []const u8) bool {
+    if (check_command_override) |override_fn| {
+        return override_fn(command);
+    }
+
     const which_args = [_][]const u8{ "which", command };
     var child = std.process.Child.init(&which_args, std.heap.page_allocator);
     child.stdout_behavior = .Ignore;

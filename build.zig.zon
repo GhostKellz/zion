@@ -1,16 +1,20 @@
 .{
     .name = .zion,
     .fingerprint = 0x2aaf547c00a3154e,
-    .version = "1.0.7",
+    .version = "1.1.0",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .zsync = .{
             .url = "https://github.com/ghostkellz/zsync/archive/refs/heads/main.tar.gz",
-            .hash = "zsync-0.5.4-KAuheV0SHQBxubuzXagj1oq5B2KE4VhMWTAAAaInwB2_",
+            .hash = "zsync-0.5.4-KAuheZ4THQAlN32uBKm76ezT7dPT6rvj4ll56NiA9z9M",
         },
         .phantom = .{
             .url = "https://github.com/ghostkellz/phantom/archive/refs/heads/main.tar.gz",
-            .hash = "phantom-0.3.2-E0eWBCFICAC20J1jhO0hBUKysjQ9Gs2W2nCQw9NP6wfi",
+            .hash = "phantom-0.3.10-E0eWBCuBCACPpNZn4EWJ4tWg7DGToHnvTJ85ehJ4D5ri",
+        },
+        .ghostspec = .{
+            .url = "https://github.com/ghostkellz/ghostspec/archive/refs/heads/main.tar.gz",
+            .hash = "ghostspec-0.9.0-beta.1-RqtjstXEAQCxVtRqVW-rjgP8QK200uKOQL8Mm13uTbP6",
         },
     },
     .paths = .{

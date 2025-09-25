@@ -1,0 +1,35 @@
+{
+  "generated_at": "2025-09-25T00:00:00Z",
+  "notes": [
+    "This matrix is a placeholder. Update during bootstrap with live data.",
+    "Use semantic version comparisons when validating toolchains."
+  ],
+  "ghostspec": {
+    "current": {
+      "version": "0.9.0-rc1",
+      "source": "https://github.com/ghostkellz/ghostspec/archive/refs/heads/main.tar.gz"
+    },
+    "zig": {
+      "minimum": "0.11.0",
+      "tested": ["0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0-dev"],
+      "recommended": "0.15.0-dev"
+    },
+    "zls": {
+      "minimum": "0.13.0",
+      "tested": ["0.13.0", "0.14.0"],
+      "notes": "GhostSpec requires ZLS with async analysis updates."
+    }
+  },
+  "ci_profiles": {
+    "default": {
+      "time_budget_seconds": 60,
+      "max_cases": 1000,
+      "fail_fast": true
+    },
+    "extended": {
+      "time_budget_seconds": 300,
+      "max_cases": 10000,
+      "fail_fast": false
+    }
+  }
+}
