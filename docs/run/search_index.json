@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/run.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/run.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/run.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "run",
+      "type": "function",
+      "file": "src/commands/run.zig",
+      "line": 6,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["run", "function"]
+    },
+    {
+      "name": "getDefaultExecutableName",
+      "type": "function",
+      "file": "src/commands/run.zig",
+      "line": 98,
+      "description": "Get the default executable name from build.zig.zon",
+      "signature": "fn(Allocator) [",
+      "keywords": ["getDefaultExecutableName", "function", "Get", "the", "default", "executable", "name", "from", "build", "zig", "zon"]
+    },
+    {
+      "name": "buildProject",
+      "type": "function",
+      "file": "src/commands/run.zig",
+      "line": 138,
+      "description": "Build the project using zig build",
+      "signature": "fn(Allocator) void",
+      "keywords": ["buildProject", "function", "Build", "the", "project", "using", "zig", "build"]
+    }
+  ]
+}

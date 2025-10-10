@@ -1,0 +1,91 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/outdated.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/outdated.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/outdated.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/outdated.zig",
+      "line": 4,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "github",
+      "type": "variable",
+      "file": "src/commands/outdated.zig",
+      "line": 5,
+      "keywords": ["github", "variable"]
+    },
+    {
+      "name": "outdated",
+      "type": "function",
+      "file": "src/commands/outdated.zig",
+      "line": 8,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["outdated", "function"]
+    },
+    {
+      "name": "OutdatedPackage",
+      "type": "struct",
+      "file": "src/commands/outdated.zig",
+      "line": 107,
+      "keywords": ["OutdatedPackage", "struct"]
+    },
+    {
+      "name": "outputHumanResults",
+      "type": "function",
+      "file": "src/commands/outdated.zig",
+      "line": 122,
+      "description": "Output results in human-readable format",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["outputHumanResults", "function", "Output", "results", "human-readable", "format"]
+    },
+    {
+      "name": "outputJsonResults",
+      "type": "function",
+      "file": "src/commands/outdated.zig",
+      "line": 145,
+      "description": "Output results in JSON format",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["outputJsonResults", "function", "Output", "results", "JSON", "format"]
+    },
+    {
+      "name": "extractPackageRefFromUrl",
+      "type": "function",
+      "file": "src/commands/outdated.zig",
+      "line": 167,
+      "description": "Extract package reference from GitHub URL",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["extractPackageRefFromUrl", "function", "Extract", "package", "reference", "from", "GitHub", "URL"]
+    },
+    {
+      "name": "extractVersionFromUrl",
+      "type": "function",
+      "file": "src/commands/outdated.zig",
+      "line": 185,
+      "description": "Extract version from GitHub URL",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["extractVersionFromUrl", "function", "Extract", "version", "from", "GitHub", "URL"]
+    }
+  ]
+}

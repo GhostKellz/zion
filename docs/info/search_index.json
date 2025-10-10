@@ -1,0 +1,81 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 4,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 5,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "github",
+      "type": "variable",
+      "file": "src/commands/info.zig",
+      "line": 6,
+      "keywords": ["github", "variable"]
+    },
+    {
+      "name": "info",
+      "type": "function",
+      "file": "src/commands/info.zig",
+      "line": 9,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["info", "function"]
+    },
+    {
+      "name": "RepoInfo",
+      "type": "struct",
+      "file": "src/commands/info.zig",
+      "line": 116,
+      "description": "Repository information extracted from URL",
+      "keywords": ["RepoInfo", "struct", "Repository", "information", "extracted", "from", "URL"]
+    },
+    {
+      "name": "extractRepoInfo",
+      "type": "function",
+      "file": "src/commands/info.zig",
+      "line": 122,
+      "description": "Extract owner and repository name from GitHub URL",
+      "signature": "fn(Allocator, ) RepoInfo",
+      "keywords": ["extractRepoInfo", "function", "Extract", "owner", "and", "repository", "name", "from", "GitHub", "URL"]
+    },
+    {
+      "name": "showEnhancedPackageInfo",
+      "type": "function",
+      "file": "src/commands/info.zig",
+      "line": 156,
+      "description": "Show enhanced package information including versions and stats",
+      "signature": "fn(Allocator, repo: [, package_name: [, ) void",
+      "keywords": ["showEnhancedPackageInfo", "function", "Show", "enhanced", "package", "information", "including", "versions", "and", "stats"]
+    }
+  ]
+}

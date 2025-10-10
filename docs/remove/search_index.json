@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "mem",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 3,
+      "keywords": ["mem", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 5,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/remove.zig",
+      "line": 6,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "remove",
+      "type": "function",
+      "file": "src/commands/remove.zig",
+      "line": 9,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["remove", "function"]
+    },
+    {
+      "name": "removeFromLockFile",
+      "type": "function",
+      "file": "src/commands/remove.zig",
+      "line": 115,
+      "description": "Remove a package from the lock file",
+      "signature": "fn(package_name: [, ) void",
+      "keywords": ["removeFromLockFile", "function", "Remove", "package", "from", "the", "lock", "file"]
+    },
+    {
+      "name": "removeFromBuildZig",
+      "type": "function",
+      "file": "src/commands/remove.zig",
+      "line": 137,
+      "description": "Remove the dependency from build.zig",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["removeFromBuildZig", "function", "Remove", "the", "dependency", "from", "build", "zig"]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/doc.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/doc.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/doc.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "doc",
+      "type": "function",
+      "file": "src/commands/doc.zig",
+      "line": 6,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["doc", "function"]
+    },
+    {
+      "name": "findPackageSource",
+      "type": "function",
+      "file": "src/commands/doc.zig",
+      "line": 143,
+      "description": "Find the source file for a given package",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["findPackageSource", "function", "Find", "the", "source", "file", "for", "given", "package"]
+    },
+    {
+      "name": "openInBrowser",
+      "type": "function",
+      "file": "src/commands/doc.zig",
+      "line": 177,
+      "description": "Attempt to open documentation in the default browser",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["openInBrowser", "function", "Attempt", "open", "documentation", "the", "default", "browser"]
+    }
+  ]
+}

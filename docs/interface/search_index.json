@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/interface.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "Config",
+      "type": "variable",
+      "file": "src/commands/interface.zig",
+      "line": 2,
+      "keywords": ["Config", "variable"]
+    },
+    {
+      "name": "ZionConfig",
+      "type": "variable",
+      "file": "src/commands/interface.zig",
+      "line": 3,
+      "keywords": ["ZionConfig", "variable"]
+    },
+    {
+      "name": "GhostKellzEcosystem",
+      "type": "variable",
+      "file": "src/commands/interface.zig",
+      "line": 4,
+      "keywords": ["GhostKellzEcosystem", "variable"]
+    },
+    {
+      "name": "ZigLibsIntegration",
+      "type": "variable",
+      "file": "src/commands/interface.zig",
+      "line": 5,
+      "keywords": ["ZigLibsIntegration", "variable"]
+    },
+    {
+      "name": "interface",
+      "type": "function",
+      "file": "src/commands/interface.zig",
+      "line": 8,
+      "signature": "fn() void",
+      "keywords": ["interface", "function"]
+    }
+  ]
+}

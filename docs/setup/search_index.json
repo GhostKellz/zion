@@ -1,0 +1,206 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "zig_manager",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 4,
+      "keywords": ["zig_manager", "variable"]
+    },
+    {
+      "name": "zig_manager_override",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 6,
+      "keywords": ["zig_manager_override", "variable"]
+    },
+    {
+      "name": "check_command_override",
+      "type": "variable",
+      "file": "src/commands/setup.zig",
+      "line": 7,
+      "keywords": ["check_command_override", "variable"]
+    },
+    {
+      "name": "setup",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 10,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setup", "function"]
+    },
+    {
+      "name": "setupAll",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 39,
+      "description": "Complete setup - the \"One Nation Under Zig\" experience",
+      "signature": "fn(Allocator) void",
+      "keywords": ["setupAll", "function", "Complete", "setup", "the", "\"One", "Nation", "Under", "Zig\"", "experience"]
+    },
+    {
+      "name": "setupZig",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 97,
+      "description": "Setup Zig version management",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setupZig", "function", "Setup", "Zig", "version", "management"]
+    },
+    {
+      "name": "setupZLS",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 158,
+      "description": "Setup ZLS (Zig Language Server)",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setupZLS", "function", "Setup", "ZLS", "(Zig", "Language", "Server)"]
+    },
+    {
+      "name": "setupShell",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 185,
+      "description": "Setup shell integration",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setupShell", "function", "Setup", "shell", "integration"]
+    },
+    {
+      "name": "setupNvim",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 215,
+      "description": "Setup Neovim integration",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setupNvim", "function", "Setup", "Neovim", "integration"]
+    },
+    {
+      "name": "setupTools",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 245,
+      "description": "Setup development tools",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["setupTools", "function", "Setup", "development", "tools"]
+    },
+    {
+      "name": "verifySetup",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 270,
+      "description": "Verify the entire setup",
+      "signature": "fn(Allocator) void",
+      "keywords": ["verifySetup", "function", "Verify", "the", "entire", "setup"]
+    },
+    {
+      "name": "checkSystemZig",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 318,
+      "signature": "fn(Allocator) bool",
+      "keywords": ["checkSystemZig", "function"]
+    },
+    {
+      "name": "checkCommand",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 323,
+      "signature": "fn() bool",
+      "keywords": ["checkCommand", "function"]
+    },
+    {
+      "name": "detectShell",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 337,
+      "signature": "fn() [",
+      "keywords": ["detectShell", "function"]
+    },
+    {
+      "name": "setupShellPath",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 352,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["setupShellPath", "function"]
+    },
+    {
+      "name": "setupShellCompletions",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 398,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["setupShellCompletions", "function"]
+    },
+    {
+      "name": "createZLSConfig",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 456,
+      "signature": "fn(Allocator) void",
+      "keywords": ["createZLSConfig", "function"]
+    },
+    {
+      "name": "createNvimConfig",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 485,
+      "signature": "fn(Allocator) void",
+      "keywords": ["createNvimConfig", "function"]
+    },
+    {
+      "name": "createDevDirectories",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 528,
+      "signature": "fn(Allocator) void",
+      "keywords": ["createDevDirectories", "function"]
+    },
+    {
+      "name": "checkZionInPath",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 552,
+      "signature": "fn() bool",
+      "keywords": ["checkZionInPath", "function"]
+    },
+    {
+      "name": "checkShellCompletions",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 556,
+      "signature": "fn(Allocator) bool",
+      "keywords": ["checkShellCompletions", "function"]
+    },
+    {
+      "name": "printSetupHelp",
+      "type": "function",
+      "file": "src/commands/setup.zig",
+      "line": 576,
+      "signature": "fn() void",
+      "keywords": ["printSetupHelp", "function"]
+    }
+  ]
+}

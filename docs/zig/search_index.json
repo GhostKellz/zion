@@ -1,0 +1,183 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/zig.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "builtin",
+      "type": "variable",
+      "file": "src/commands/zig.zig",
+      "line": 2,
+      "keywords": ["builtin", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/zig.zig",
+      "line": 3,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/zig.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "downloader",
+      "type": "variable",
+      "file": "src/commands/zig.zig",
+      "line": 5,
+      "keywords": ["downloader", "variable"]
+    },
+    {
+      "name": "zigManager",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 11,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["zigManager", "function"]
+    },
+    {
+      "name": "printZigHelp",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 56,
+      "description": "Print help for Zig version manager",
+      "signature": "fn() void",
+      "keywords": ["printZigHelp", "function", "Print", "help", "for", "Zig", "version", "manager"]
+    },
+    {
+      "name": "installZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 86,
+      "description": "Install a specific Zig version",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["installZig", "function", "Install", "specific", "Zig", "version"]
+    },
+    {
+      "name": "listZigVersions",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 112,
+      "description": "List installed Zig versions",
+      "signature": "fn(Allocator) void",
+      "keywords": ["listZigVersions", "function", "List", "installed", "Zig", "versions"]
+    },
+    {
+      "name": "useZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 155,
+      "description": "Switch to a specific Zig version",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["useZig", "function", "Switch", "specific", "Zig", "version"]
+    },
+    {
+      "name": "currentZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 182,
+      "description": "Show current active Zig version",
+      "signature": "fn(Allocator) void",
+      "keywords": ["currentZig", "function", "Show", "current", "active", "Zig", "version"]
+    },
+    {
+      "name": "removeZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 196,
+      "description": "Remove an installed Zig version",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["removeZig", "function", "Remove", "installed", "Zig", "version"]
+    },
+    {
+      "name": "availableZigVersions",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 231,
+      "description": "Show available Zig versions for download",
+      "signature": "fn(Allocator) void",
+      "keywords": ["availableZigVersions", "function", "Show", "available", "Zig", "versions", "for", "download"]
+    },
+    {
+      "name": "ensureZionDirs",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 258,
+      "description": "Helper functions",
+      "signature": "fn(Allocator) void",
+      "keywords": ["ensureZionDirs", "function", "Helper", "functions"]
+    },
+    {
+      "name": "getHomeDir",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 295,
+      "description": "Get user's home directory",
+      "signature": "fn(Allocator) [",
+      "keywords": ["getHomeDir", "function", "Get", "user's", "home", "directory"]
+    },
+    {
+      "name": "isZigInstalled",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 303,
+      "description": "Check if a Zig version is installed",
+      "signature": "fn(Allocator, ) bool",
+      "keywords": ["isZigInstalled", "function", "Check", "Zig", "version", "installed"]
+    },
+    {
+      "name": "getZigDownloadUrl",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 322,
+      "description": "Get the download URL for a Zig version",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["getZigDownloadUrl", "function", "Get", "the", "download", "URL", "for", "Zig", "version"]
+    },
+    {
+      "name": "downloadZigArchive",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 346,
+      "description": "Download Zig archive",
+      "signature": "fn(Allocator, url: [, ) [",
+      "keywords": ["downloadZigArchive", "function", "Download", "Zig", "archive"]
+    },
+    {
+      "name": "extractZigArchive",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 390,
+      "description": "Extract Zig archive",
+      "signature": "fn(Allocator, archive_path: [, ) void",
+      "keywords": ["extractZigArchive", "function", "Extract", "Zig", "archive"]
+    },
+    {
+      "name": "setActiveZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 437,
+      "description": "Set active Zig version by creating symlink",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["setActiveZig", "function", "Set", "active", "Zig", "version", "creating", "symlink"]
+    },
+    {
+      "name": "getCurrentZig",
+      "type": "function",
+      "file": "src/commands/zig.zig",
+      "line": 459,
+      "description": "Get current active Zig version",
+      "signature": "fn(Allocator) ?",
+      "keywords": ["getCurrentZig", "function", "Get", "current", "active", "Zig", "version"]
+    }
+  ]
+}

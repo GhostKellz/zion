@@ -1,0 +1,82 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/keyring.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "gpg_keyring",
+      "type": "variable",
+      "file": "src/commands/keyring.zig",
+      "line": 2,
+      "keywords": ["gpg_keyring", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/keyring.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "keyring",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 5,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["keyring", "function"]
+    },
+    {
+      "name": "printUsage",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 33,
+      "signature": "fn() void",
+      "keywords": ["printUsage", "function"]
+    },
+    {
+      "name": "listKeys",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 49,
+      "signature": "fn(Allocator) void",
+      "keywords": ["listKeys", "function"]
+    },
+    {
+      "name": "trustFingerprint",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 78,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["trustFingerprint", "function"]
+    },
+    {
+      "name": "verifyArchKeyrings",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 132,
+      "signature": "fn(Allocator) void",
+      "keywords": ["verifyArchKeyrings", "function"]
+    },
+    {
+      "name": "showKeyringsStatus",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 203,
+      "signature": "fn(Allocator) void",
+      "keywords": ["showKeyringsStatus", "function"]
+    },
+    {
+      "name": "refreshKeyrings",
+      "type": "function",
+      "file": "src/commands/keyring.zig",
+      "line": 266,
+      "signature": "fn(Allocator) void",
+      "keywords": ["refreshKeyrings", "function"]
+    }
+  ]
+}

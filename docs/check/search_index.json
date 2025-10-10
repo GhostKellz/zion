@@ -1,0 +1,101 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "mem",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 3,
+      "keywords": ["mem", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 5,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 6,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "downloader",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 7,
+      "keywords": ["downloader", "variable"]
+    },
+    {
+      "name": "github",
+      "type": "variable",
+      "file": "src/commands/check.zig",
+      "line": 8,
+      "keywords": ["github", "variable"]
+    },
+    {
+      "name": "HealthStatus",
+      "type": "enum",
+      "file": "src/commands/check.zig",
+      "line": 10,
+      "keywords": ["HealthStatus", "enum"]
+    },
+    {
+      "name": "PackageHealth",
+      "type": "struct",
+      "file": "src/commands/check.zig",
+      "line": 16,
+      "keywords": ["PackageHealth", "struct"]
+    },
+    {
+      "name": "check",
+      "type": "function",
+      "file": "src/commands/check.zig",
+      "line": 45,
+      "signature": "fn(Allocator) void",
+      "keywords": ["check", "function"]
+    },
+    {
+      "name": "checkUrlAccessibility",
+      "type": "function",
+      "file": "src/commands/check.zig",
+      "line": 306,
+      "description": "Check if a URL is accessible",
+      "signature": "fn(Allocator, ) bool",
+      "keywords": ["checkUrlAccessibility", "function", "Check", "URL", "accessible"]
+    },
+    {
+      "name": "extractPackageRefFromUrl",
+      "type": "function",
+      "file": "src/commands/check.zig",
+      "line": 362,
+      "description": "Extract package reference (user/repo) from GitHub URL",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["extractPackageRefFromUrl", "function", "Extract", "package", "reference", "(user/repo)", "from", "GitHub", "URL"]
+    }
+  ]
+}

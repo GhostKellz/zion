@@ -1,0 +1,208 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/zls.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/zls.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/zls.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "zls",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 6,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["zls", "function"]
+    },
+    {
+      "name": "installZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 33,
+      "description": "Install ZLS",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["installZLS", "function", "Install", "ZLS"]
+    },
+    {
+      "name": "configZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 66,
+      "description": "Configure ZLS",
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["configZLS", "function", "Configure", "ZLS"]
+    },
+    {
+      "name": "doctorZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 78,
+      "description": "Doctor - check ZLS health",
+      "signature": "fn(Allocator) void",
+      "keywords": ["doctorZLS", "function", "Doctor", "check", "ZLS", "health"]
+    },
+    {
+      "name": "whichZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 193,
+      "description": "Show which ZLS is being used",
+      "signature": "fn(Allocator) void",
+      "keywords": ["whichZLS", "function", "Show", "which", "ZLS", "being", "used"]
+    },
+    {
+      "name": "versionZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 224,
+      "description": "Show ZLS version",
+      "signature": "fn(Allocator) void",
+      "keywords": ["versionZLS", "function", "Show", "ZLS", "version"]
+    },
+    {
+      "name": "restartZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 236,
+      "description": "Restart ZLS (for development)",
+      "signature": "fn(Allocator) void",
+      "keywords": ["restartZLS", "function", "Restart", "ZLS", "(for", "development)"]
+    },
+    {
+      "name": "checkCommand",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 249,
+      "signature": "fn() bool",
+      "keywords": ["checkCommand", "function"]
+    },
+    {
+      "name": "createZLSConfig",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 259,
+      "signature": "fn(Allocator) void",
+      "keywords": ["createZLSConfig", "function"]
+    },
+    {
+      "name": "showZLSVersion",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 298,
+      "signature": "fn() void",
+      "keywords": ["showZLSVersion", "function"]
+    },
+    {
+      "name": "showZigVersionForZLS",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 324,
+      "signature": "fn() void",
+      "keywords": ["showZigVersionForZLS", "function"]
+    },
+    {
+      "name": "checkZLSConfig",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 349,
+      "signature": "fn(Allocator) bool",
+      "keywords": ["checkZLSConfig", "function"]
+    },
+    {
+      "name": "checkProjectRoot",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 358,
+      "signature": "fn() bool",
+      "keywords": ["checkProjectRoot", "function"]
+    },
+    {
+      "name": "checkBuildZon",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 363,
+      "signature": "fn() bool",
+      "keywords": ["checkBuildZon", "function"]
+    },
+    {
+      "name": "getZLSPath",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 368,
+      "signature": "fn(Allocator) [",
+      "keywords": ["getZLSPath", "function"]
+    },
+    {
+      "name": "getZLSVersionString",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 414,
+      "signature": "fn(Allocator) [",
+      "keywords": ["getZLSVersionString", "function"]
+    },
+    {
+      "name": "getZigVersionString",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 460,
+      "signature": "fn(Allocator) [",
+      "keywords": ["getZigVersionString", "function"]
+    },
+    {
+      "name": "isZLSVersionCompatible",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 506,
+      "signature": "fn() bool",
+      "keywords": ["isZLSVersionCompatible", "function"]
+    },
+    {
+      "name": "isZigVersionSupported",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 511,
+      "signature": "fn() bool",
+      "keywords": ["isZigVersionSupported", "function"]
+    },
+    {
+      "name": "getZLSConfigPath",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 516,
+      "signature": "fn(Allocator) [",
+      "keywords": ["getZLSConfigPath", "function"]
+    },
+    {
+      "name": "validateZLSConfig",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 528,
+      "signature": "fn(Allocator, ) bool",
+      "keywords": ["validateZLSConfig", "function"]
+    },
+    {
+      "name": "printZLSHelp",
+      "type": "function",
+      "file": "src/commands/zls.zig",
+      "line": 536,
+      "signature": "fn() void",
+      "keywords": ["printZLSHelp", "function"]
+    }
+  ]
+}

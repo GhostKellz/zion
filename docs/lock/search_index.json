@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "mem",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 3,
+      "keywords": ["mem", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 4,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 5,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/lock.zig",
+      "line": 7,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "lock",
+      "type": "function",
+      "file": "src/commands/lock.zig",
+      "line": 10,
+      "signature": "fn(Allocator) void",
+      "keywords": ["lock", "function"]
+    }
+  ]
+}

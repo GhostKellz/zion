@@ -48,8 +48,8 @@ pub const ZionTUI = struct {
     
     pub fn deinit(self: *ZionTUI) void {
         self.allocator.free(self.search_results);
-        self.search_query.deinit(allocator);
-        self.app.deinit(allocator);
+        self.search_query.deinit(self.allocator);
+        self.app.deinit();
         self.allocator.destroy(self);
     }
     
@@ -434,7 +434,7 @@ const SearchWidget = struct {
     
     fn deinitWidget(widget: *phantom.widgets.Widget) void {
         const self = @fieldParentPtr("widget", widget);
-        self.query.deinit(allocator);
+        self.query.deinit(self.allocator);
         self.allocator.destroy(self);
     }
 };

@@ -1,0 +1,501 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "init_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 4,
+      "keywords": ["init_mod", "variable"]
+    },
+    {
+      "name": "add_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 5,
+      "keywords": ["add_mod", "variable"]
+    },
+    {
+      "name": "fetch_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 6,
+      "keywords": ["fetch_mod", "variable"]
+    },
+    {
+      "name": "build_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 7,
+      "keywords": ["build_mod", "variable"]
+    },
+    {
+      "name": "version_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 8,
+      "keywords": ["version_mod", "variable"]
+    },
+    {
+      "name": "help_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 9,
+      "keywords": ["help_mod", "variable"]
+    },
+    {
+      "name": "lock_mod",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 10,
+      "keywords": ["lock_mod", "variable"]
+    },
+    {
+      "name": "init",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 13,
+      "keywords": ["init", "variable"]
+    },
+    {
+      "name": "add",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 14,
+      "keywords": ["add", "variable"]
+    },
+    {
+      "name": "addMultiple",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 15,
+      "keywords": ["addMultiple", "variable"]
+    },
+    {
+      "name": "AddOptions",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 16,
+      "keywords": ["AddOptions", "variable"]
+    },
+    {
+      "name": "remove",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 17,
+      "keywords": ["remove", "variable"]
+    },
+    {
+      "name": "update",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 18,
+      "keywords": ["update", "variable"]
+    },
+    {
+      "name": "list",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 19,
+      "keywords": ["list", "variable"]
+    },
+    {
+      "name": "info",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 20,
+      "keywords": ["info", "variable"]
+    },
+    {
+      "name": "fetch",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 21,
+      "keywords": ["fetch", "variable"]
+    },
+    {
+      "name": "pin",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 22,
+      "keywords": ["pin", "variable"]
+    },
+    {
+      "name": "unpin",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 23,
+      "keywords": ["unpin", "variable"]
+    },
+    {
+      "name": "repair",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 24,
+      "keywords": ["repair", "variable"]
+    },
+    {
+      "name": "check",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 25,
+      "keywords": ["check", "variable"]
+    },
+    {
+      "name": "build",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 26,
+      "keywords": ["build", "variable"]
+    },
+    {
+      "name": "clean",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 27,
+      "keywords": ["clean", "variable"]
+    },
+    {
+      "name": "lock",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 28,
+      "keywords": ["lock", "variable"]
+    },
+    {
+      "name": "version",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 29,
+      "keywords": ["version", "variable"]
+    },
+    {
+      "name": "help",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 30,
+      "keywords": ["help", "variable"]
+    },
+    {
+      "name": "hash",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 31,
+      "keywords": ["hash", "variable"]
+    },
+    {
+      "name": "config",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 32,
+      "keywords": ["config", "variable"]
+    },
+    {
+      "name": "security",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 33,
+      "keywords": ["security", "variable"]
+    },
+    {
+      "name": "performance",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 34,
+      "keywords": ["performance", "variable"]
+    },
+    {
+      "name": "debug",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 35,
+      "keywords": ["debug", "variable"]
+    },
+    {
+      "name": "run",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 36,
+      "keywords": ["run", "variable"]
+    },
+    {
+      "name": "test_command",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 37,
+      "keywords": ["test_command", "variable"]
+    },
+    {
+      "name": "tree",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 38,
+      "keywords": ["tree", "variable"]
+    },
+    {
+      "name": "doc",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 39,
+      "keywords": ["doc", "variable"]
+    },
+    {
+      "name": "outdated",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 40,
+      "keywords": ["outdated", "variable"]
+    },
+    {
+      "name": "zig_manager",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 41,
+      "keywords": ["zig_manager", "variable"]
+    },
+    {
+      "name": "zig_command_override",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 43,
+      "keywords": ["zig_command_override", "variable"]
+    },
+    {
+      "name": "setZigCommandHandler",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 45,
+      "signature": "fn() void",
+      "keywords": ["setZigCommandHandler", "function"]
+    },
+    {
+      "name": "resetZigCommandHandler",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 49,
+      "signature": "fn() void",
+      "keywords": ["resetZigCommandHandler", "function"]
+    },
+    {
+      "name": "nvim",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 52,
+      "keywords": ["nvim", "variable"]
+    },
+    {
+      "name": "search",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 53,
+      "keywords": ["search", "variable"]
+    },
+    {
+      "name": "registry",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 54,
+      "keywords": ["registry", "variable"]
+    },
+    {
+      "name": "publish",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 55,
+      "keywords": ["publish", "variable"]
+    },
+    {
+      "name": "setup",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 56,
+      "keywords": ["setup", "variable"]
+    },
+    {
+      "name": "zls",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 57,
+      "keywords": ["zls", "variable"]
+    },
+    {
+      "name": "workspace",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 58,
+      "keywords": ["workspace", "variable"]
+    },
+    {
+      "name": "ghostspec",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 59,
+      "keywords": ["ghostspec", "variable"]
+    },
+    {
+      "name": "signature_verify",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 62,
+      "keywords": ["signature_verify", "variable"]
+    },
+    {
+      "name": "cache",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 63,
+      "keywords": ["cache", "variable"]
+    },
+    {
+      "name": "tui",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 64,
+      "keywords": ["tui", "variable"]
+    },
+    {
+      "name": "interface",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 67,
+      "keywords": ["interface", "variable"]
+    },
+    {
+      "name": "search_interactive",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 68,
+      "keywords": ["search_interactive", "variable"]
+    },
+    {
+      "name": "ziglibs",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 71,
+      "keywords": ["ziglibs", "variable"]
+    },
+    {
+      "name": "zigistry",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 72,
+      "keywords": ["zigistry", "variable"]
+    },
+    {
+      "name": "enhanced_add",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 73,
+      "keywords": ["enhanced_add", "variable"]
+    },
+    {
+      "name": "enhanced_zls",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 74,
+      "keywords": ["enhanced_zls", "variable"]
+    },
+    {
+      "name": "enhanced_zig_manager",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 75,
+      "keywords": ["enhanced_zig_manager", "variable"]
+    },
+    {
+      "name": "enhanced_add_zeke",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 78,
+      "keywords": ["enhanced_add_zeke", "variable"]
+    },
+    {
+      "name": "status",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 79,
+      "keywords": ["status", "variable"]
+    },
+    {
+      "name": "ai_search",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 80,
+      "keywords": ["ai_search", "variable"]
+    },
+    {
+      "name": "ai_chat",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 81,
+      "keywords": ["ai_chat", "variable"]
+    },
+    {
+      "name": "keyring",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 84,
+      "keywords": ["keyring", "variable"]
+    },
+    {
+      "name": "add_legacy",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 90,
+      "keywords": ["add_legacy", "variable"]
+    },
+    {
+      "name": "search_legacy",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 91,
+      "keywords": ["search_legacy", "variable"]
+    },
+    {
+      "name": "registry_legacy",
+      "type": "variable",
+      "file": "src/commands/mod.zig",
+      "line": 92,
+      "keywords": ["registry_legacy", "variable"]
+    },
+    {
+      "name": "zig",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 95,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["zig", "function"]
+    },
+    {
+      "name": "template",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 113,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["template", "function"]
+    },
+    {
+      "name": "fmt",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 123,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["fmt", "function"]
+    },
+    {
+      "name": "analyze",
+      "type": "function",
+      "file": "src/commands/mod.zig",
+      "line": 133,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["analyze", "function"]
+    }
+  ]
+}

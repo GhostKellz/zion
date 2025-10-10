@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "mem",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 3,
+      "keywords": ["mem", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 5,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 6,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "downloader",
+      "type": "variable",
+      "file": "src/commands/repair.zig",
+      "line": 7,
+      "keywords": ["downloader", "variable"]
+    },
+    {
+      "name": "repair",
+      "type": "function",
+      "file": "src/commands/repair.zig",
+      "line": 10,
+      "signature": "fn(Allocator) void",
+      "keywords": ["repair", "function"]
+    },
+    {
+      "name": "extractTarball",
+      "type": "function",
+      "file": "src/commands/repair.zig",
+      "line": 208,
+      "description": "Extract a tarball to a destination directory",
+      "signature": "fn(Allocator, dest_path: [, ) void",
+      "keywords": ["extractTarball", "function", "Extract", "tarball", "destination", "directory"]
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/search_v2.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/search_v2.zig",
+      "line": 2,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "enhanced_config",
+      "type": "variable",
+      "file": "src/commands/search_v2.zig",
+      "line": 3,
+      "keywords": ["enhanced_config", "variable"]
+    },
+    {
+      "name": "registry_manager",
+      "type": "variable",
+      "file": "src/commands/search_v2.zig",
+      "line": 4,
+      "keywords": ["registry_manager", "variable"]
+    },
+    {
+      "name": "registry_v2",
+      "type": "variable",
+      "file": "src/commands/search_v2.zig",
+      "line": 5,
+      "keywords": ["registry_v2", "variable"]
+    },
+    {
+      "name": "printSearchHelp",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 8,
+      "description": "Print help information for the search command",
+      "signature": "fn() void",
+      "keywords": ["printSearchHelp", "function", "Print", "help", "information", "for", "the", "search", "command"]
+    },
+    {
+      "name": "search",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 33,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["search", "function"]
+    },
+    {
+      "name": "SearchOptions",
+      "type": "struct",
+      "file": "src/commands/search_v2.zig",
+      "line": 222,
+      "description": "Search options structure",
+      "keywords": ["SearchOptions", "struct", "Search", "options", "structure"]
+    },
+    {
+      "name": "parseSearchOptions",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 262,
+      "description": "Parse command line options",
+      "signature": "fn(args: [, , Allocator) void",
+      "keywords": ["parseSearchOptions", "function", "Parse", "command", "line", "options"]
+    },
+    {
+      "name": "searchSpecificRegistry",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 294,
+      "description": "Search a specific registry",
+      "signature": "fn(Allocator, term: [, registry_name: [, filters: registry_v2, ) [",
+      "keywords": ["searchSpecificRegistry", "function", "Search", "specific", "registry"]
+    },
+    {
+      "name": "formatCount",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 313,
+      "description": "Format large numbers with K/M suffixes",
+      "signature": "fn(u64) [",
+      "keywords": ["formatCount", "function", "Format", "large", "numbers", "with", "K/M", "suffixes"]
+    },
+    {
+      "name": "formatDate",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 324,
+      "description": "Format ISO date to relative time",
+      "signature": "fn() [",
+      "keywords": ["formatDate", "function", "Format", "ISO", "date", "relative", "time"]
+    },
+    {
+      "name": "interactiveSearch",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 334,
+      "signature": "fn(Allocator) void",
+      "keywords": ["interactiveSearch", "function"]
+    },
+    {
+      "name": "printInteractiveHelp",
+      "type": "function",
+      "file": "src/commands/search_v2.zig",
+      "line": 377,
+      "signature": "fn() void",
+      "keywords": ["printInteractiveHelp", "function"]
+    }
+  ]
+}

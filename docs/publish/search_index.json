@@ -1,0 +1,254 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "json",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 3,
+      "keywords": ["json", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "enhanced_config",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 5,
+      "keywords": ["enhanced_config", "variable"]
+    },
+    {
+      "name": "registry_manager",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 6,
+      "keywords": ["registry_manager", "variable"]
+    },
+    {
+      "name": "registry_v2",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 7,
+      "keywords": ["registry_v2", "variable"]
+    },
+    {
+      "name": "security",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 8,
+      "keywords": ["security", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/publish.zig",
+      "line": 9,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "publish",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 12,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["publish", "function"]
+    },
+    {
+      "name": "PublishOptions",
+      "type": "struct",
+      "file": "src/commands/publish.zig",
+      "line": 146,
+      "description": "Publish options",
+      "keywords": ["PublishOptions", "struct", "Publish", "options"]
+    },
+    {
+      "name": "PackageMetadata",
+      "type": "struct",
+      "file": "src/commands/publish.zig",
+      "line": 164,
+      "description": "Package metadata for publishing",
+      "keywords": ["PackageMetadata", "struct", "Package", "metadata", "for", "publishing"]
+    },
+    {
+      "name": "UploadResult",
+      "type": "struct",
+      "file": "src/commands/publish.zig",
+      "line": 220,
+      "description": "Upload result information",
+      "keywords": ["UploadResult", "struct", "Upload", "result", "information"]
+    },
+    {
+      "name": "parsePublishOptions",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 235,
+      "description": "Parse command line options",
+      "signature": "fn(args: [, , Allocator) void",
+      "keywords": ["parsePublishOptions", "function", "Parse", "command", "line", "options"]
+    },
+    {
+      "name": "getDefaultPublishRegistry",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 271,
+      "description": "Get default registry for publishing",
+      "signature": "fn() [",
+      "keywords": ["getDefaultPublishRegistry", "function", "Get", "default", "registry", "for", "publishing"]
+    },
+    {
+      "name": "validateProjectForPublishing",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 280,
+      "description": "Validate project structure for publishing",
+      "signature": "fn() void",
+      "keywords": ["validateProjectForPublishing", "function", "Validate", "project", "structure", "for", "publishing"]
+    },
+    {
+      "name": "readPackageMetadata",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 318,
+      "description": "Read package metadata from build.zig.zon and other sources",
+      "signature": "fn(Allocator) PackageMetadata",
+      "keywords": ["readPackageMetadata", "function", "Read", "package", "metadata", "from", "build", "zig", "zon", "and", "other", "sources"]
+    },
+    {
+      "name": "validatePackageMetadata",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 379,
+      "description": "Validate package metadata for publishing",
+      "signature": "fn(PackageMetadata) void",
+      "keywords": ["validatePackageMetadata", "function", "Validate", "package", "metadata", "for", "publishing"]
+    },
+    {
+      "name": "checkExistingPackage",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 419,
+      "description": "Check if package already exists in registry",
+      "signature": "fn(metadata: PackageMetadata, PackageMetadata) ?",
+      "keywords": ["checkExistingPackage", "function", "Check", "package", "already", "exists", "registry"]
+    },
+    {
+      "name": "buildPackageForPublish",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 429,
+      "description": "Build package for publishing",
+      "signature": "fn(Allocator, PackageMetadata, PublishOptions) [",
+      "keywords": ["buildPackageForPublish", "function", "Build", "package", "for", "publishing"]
+    },
+    {
+      "name": "verifyPackageIntegrity",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 491,
+      "description": "Verify package integrity before publishing",
+      "signature": "fn(Allocator, metadata: PackageMetadata, PackageMetadata) void",
+      "keywords": ["verifyPackageIntegrity", "function", "Verify", "package", "integrity", "before", "publishing"]
+    },
+    {
+      "name": "signPackage",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 516,
+      "description": "Sign package with security module",
+      "signature": "fn(Allocator, metadata: PackageMetadata, PackageMetadata) .",
+      "keywords": ["signPackage", "function", "Sign", "package", "with", "security", "module"]
+    },
+    {
+      "name": "uploadPackage",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 528,
+      "description": "Upload package to registry",
+      "signature": "fn(Allocator, package_path: [, metadata: PackageMetadata, PackageMetadata, ) UploadResult",
+      "keywords": ["uploadPackage", "function", "Upload", "package", "registry"]
+    },
+    {
+      "name": "updateLocalCache",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 598,
+      "description": "Update local package cache",
+      "signature": "fn(Allocator, PackageMetadata, ) void",
+      "keywords": ["updateLocalCache", "function", "Update", "local", "package", "cache"]
+    },
+    {
+      "name": "extractDescriptionFromReadme",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 608,
+      "signature": "fn(Allocator, ) ?",
+      "keywords": ["extractDescriptionFromReadme", "function"]
+    },
+    {
+      "name": "detectLicenseType",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 630,
+      "signature": "fn() ?",
+      "keywords": ["detectLicenseType", "function"]
+    },
+    {
+      "name": "isValidVersion",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 648,
+      "signature": "fn() bool",
+      "keywords": ["isValidVersion", "function"]
+    },
+    {
+      "name": "isValidPackageName",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 663,
+      "signature": "fn() bool",
+      "keywords": ["isValidPackageName", "function"]
+    },
+    {
+      "name": "serializeMetadata",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 675,
+      "signature": "fn(Allocator, PackageMetadata) [",
+      "keywords": ["serializeMetadata", "function"]
+    },
+    {
+      "name": "UploadResponse",
+      "type": "struct",
+      "file": "src/commands/publish.zig",
+      "line": 692,
+      "keywords": ["UploadResponse", "struct"]
+    },
+    {
+      "name": "parseUploadResponse",
+      "type": "function",
+      "file": "src/commands/publish.zig",
+      "line": 697,
+      "signature": "fn(Allocator, ) UploadResponse",
+      "keywords": ["parseUploadResponse", "function"]
+    }
+  ]
+}

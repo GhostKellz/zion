@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/clean.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/clean.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/clean.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "clean",
+      "type": "function",
+      "file": "src/commands/clean.zig",
+      "line": 6,
+      "signature": "fn(Allocator, bool) void",
+      "keywords": ["clean", "function"]
+    },
+    {
+      "name": "cleanupBuildZig",
+      "type": "function",
+      "file": "src/commands/clean.zig",
+      "line": 106,
+      "description": "Clean up orphaned zion comments and dependency blocks in build.zig",
+      "signature": "fn(Allocator) bool",
+      "keywords": ["cleanupBuildZig", "function", "Clean", "orphaned", "zion", "comments", "and", "dependency", "blocks", "build", "zig"]
+    },
+    {
+      "name": "resetBuildZig",
+      "type": "function",
+      "file": "src/commands/clean.zig",
+      "line": 194,
+      "description": "Reset build.zig to completely clean state (removes all zion modifications)",
+      "signature": "fn(Allocator) bool",
+      "keywords": ["resetBuildZig", "function", "Reset", "build", "zig", "completely", "clean", "state", "(removes", "all", "zion", "modifications)"]
+    },
+    {
+      "name": "resetZonDependencies",
+      "type": "function",
+      "file": "src/commands/clean.zig",
+      "line": 260,
+      "description": "Reset build.zig.zon dependencies to empty state",
+      "signature": "fn(Allocator) bool",
+      "keywords": ["resetZonDependencies", "function", "Reset", "build", "zig", "zon", "dependencies", "empty", "state"]
+    }
+  ]
+}

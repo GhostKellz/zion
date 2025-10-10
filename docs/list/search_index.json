@@ -1,0 +1,100 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/list.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/list.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/list.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/list.zig",
+      "line": 4,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/list.zig",
+      "line": 5,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "list",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 8,
+      "signature": "fn(Allocator, bool) void",
+      "keywords": ["list", "function"]
+    },
+    {
+      "name": "listWithOptions",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 13,
+      "signature": "fn(Allocator, bool, bool, bool) void",
+      "keywords": ["listWithOptions", "function"]
+    },
+    {
+      "name": "printJsonList",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 41,
+      "description": "Print dependencies in JSON format",
+      "signature": "fn(Allocator, lock_file: *, ) void",
+      "keywords": ["printJsonList", "function", "Print", "dependencies", "JSON", "format"]
+    },
+    {
+      "name": "printTableList",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 97,
+      "description": "Print dependencies in table format",
+      "signature": "fn(Allocator, lock_file: *, ) void",
+      "keywords": ["printTableList", "function", "Print", "dependencies", "table", "format"]
+    },
+    {
+      "name": "RepoInfo",
+      "type": "struct",
+      "file": "src/commands/list.zig",
+      "line": 163,
+      "description": "Repository information extracted from URL",
+      "keywords": ["RepoInfo", "struct", "Repository", "information", "extracted", "from", "URL"]
+    },
+    {
+      "name": "extractRepoInfo",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 169,
+      "description": "Extract owner and repository name from GitHub URL",
+      "signature": "fn(Allocator, ) RepoInfo",
+      "keywords": ["extractRepoInfo", "function", "Extract", "owner", "and", "repository", "name", "from", "GitHub", "URL"]
+    },
+    {
+      "name": "printEnhancedTableList",
+      "type": "function",
+      "file": "src/commands/list.zig",
+      "line": 203,
+      "description": "Enhanced table format with additional options",
+      "signature": "fn(Allocator, lock_file: *, show_outdated: bool, bool, bool) void",
+      "keywords": ["printEnhancedTableList", "function", "Enhanced", "table", "format", "with", "additional", "options"]
+    }
+  ]
+}

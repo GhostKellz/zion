@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "zsync",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 2,
+      "keywords": ["zsync", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 3,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 5,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 6,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "zeke_client",
+      "type": "variable",
+      "file": "src/commands/status.zig",
+      "line": 7,
+      "keywords": ["zeke_client", "variable"]
+    },
+    {
+      "name": "status",
+      "type": "function",
+      "file": "src/commands/status.zig",
+      "line": 10,
+      "signature": "fn(Allocator, args: [, [: 0) void",
+      "keywords": ["status", "function"]
+    },
+    {
+      "name": "displayBasicStatus",
+      "type": "function",
+      "file": "src/commands/status.zig",
+      "line": 40,
+      "description": "Display basic project status without AI",
+      "signature": "fn(Allocator) void",
+      "keywords": ["displayBasicStatus", "function", "Display", "basic", "project", "status", "without"]
+    },
+    {
+      "name": "performZekeAnalysis",
+      "type": "function",
+      "file": "src/commands/status.zig",
+      "line": 94,
+      "description": "Perform comprehensive Zeke AI analysis",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["performZekeAnalysis", "function", "Perform", "comprehensive", "Zeke", "analysis"]
+    },
+    {
+      "name": "statusMinimal",
+      "type": "function",
+      "file": "src/commands/status.zig",
+      "line": 185,
+      "signature": "fn(Allocator) void",
+      "keywords": ["statusMinimal", "function"]
+    }
+  ]
+}

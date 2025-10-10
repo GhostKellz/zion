@@ -1,0 +1,86 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "print",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 2,
+      "keywords": ["print", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "RegistryManager",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 4,
+      "keywords": ["RegistryManager", "variable"]
+    },
+    {
+      "name": "ZionConfig",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 5,
+      "keywords": ["ZionConfig", "variable"]
+    },
+    {
+      "name": "Package",
+      "type": "variable",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 6,
+      "keywords": ["Package", "variable"]
+    },
+    {
+      "name": "enhanced_add",
+      "type": "function",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 9,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["enhanced_add", "function"]
+    },
+    {
+      "name": "AddOptions",
+      "type": "struct",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 94,
+      "keywords": ["AddOptions", "struct"]
+    },
+    {
+      "name": "addSinglePackage",
+      "type": "function",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 100,
+      "signature": "fn(Allocator, package_name: [, options: AddOptions, AddOptions) bool",
+      "keywords": ["addSinglePackage", "function"]
+    },
+    {
+      "name": "addToBuildZon",
+      "type": "function",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 206,
+      "signature": "fn(Allocator, Package, ) void",
+      "keywords": ["addToBuildZon", "function"]
+    },
+    {
+      "name": "showAddHelp",
+      "type": "function",
+      "file": "src/commands/enhanced_add.zig",
+      "line": 236,
+      "signature": "fn() void",
+      "keywords": ["showAddHelp", "function"]
+    }
+  ]
+}

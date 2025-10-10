@@ -1,0 +1,202 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/registry_v2.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "enhanced_config",
+      "type": "variable",
+      "file": "src/commands/registry_v2.zig",
+      "line": 2,
+      "keywords": ["enhanced_config", "variable"]
+    },
+    {
+      "name": "registry_manager",
+      "type": "variable",
+      "file": "src/commands/registry_v2.zig",
+      "line": 3,
+      "keywords": ["registry_manager", "variable"]
+    },
+    {
+      "name": "registry_v2",
+      "type": "variable",
+      "file": "src/commands/registry_v2.zig",
+      "line": 4,
+      "keywords": ["registry_v2", "variable"]
+    },
+    {
+      "name": "registryCommand",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 7,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["registryCommand", "function"]
+    },
+    {
+      "name": "showRegistryHelp",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 65,
+      "signature": "fn() void",
+      "keywords": ["showRegistryHelp", "function"]
+    },
+    {
+      "name": "listRegistries",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 110,
+      "description": "List all configured registries with detailed information",
+      "signature": "fn() void",
+      "keywords": ["listRegistries", "function", "List", "all", "configured", "registries", "with", "detailed", "information"]
+    },
+    {
+      "name": "addRegistry",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 174,
+      "description": "Add a new registry",
+      "signature": "fn(url: [, name: ?, ) void",
+      "keywords": ["addRegistry", "function", "Add", "new", "registry"]
+    },
+    {
+      "name": "removeRegistry",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 210,
+      "description": "Remove a registry",
+      "signature": "fn(name_or_url: [, ) void",
+      "keywords": ["removeRegistry", "function", "Remove", "registry"]
+    },
+    {
+      "name": "testRegistry",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 248,
+      "description": "Test a specific registry",
+      "signature": "fn(name: [, ) void",
+      "keywords": ["testRegistry", "function", "Test", "specific", "registry"]
+    },
+    {
+      "name": "testAllRegistries",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 267,
+      "description": "Test all configured registries",
+      "signature": "fn() void",
+      "keywords": ["testAllRegistries", "function", "Test", "all", "configured", "registries"]
+    },
+    {
+      "name": "showRegistryHealth",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 312,
+      "description": "Show comprehensive registry health information",
+      "signature": "fn() void",
+      "keywords": ["showRegistryHealth", "function", "Show", "comprehensive", "registry", "health", "information"]
+    },
+    {
+      "name": "showRegistryInfo",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 368,
+      "description": "Show detailed information about a specific registry",
+      "signature": "fn(name: [, ) void",
+      "keywords": ["showRegistryInfo", "function", "Show", "detailed", "information", "about", "specific", "registry"]
+    },
+    {
+      "name": "handleAuthCommand",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 422,
+      "description": "Handle authentication commands",
+      "signature": "fn(args: [, ) void",
+      "keywords": ["handleAuthCommand", "function", "Handle", "authentication", "commands"]
+    },
+    {
+      "name": "showAuthHelp",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 456,
+      "signature": "fn() void",
+      "keywords": ["showAuthHelp", "function"]
+    },
+    {
+      "name": "generateRegistryName",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 476,
+      "description": "Helper functions (simplified implementations)",
+      "signature": "fn() [",
+      "keywords": ["generateRegistryName", "function", "Helper", "functions", "(simplified", "implementations)"]
+    },
+    {
+      "name": "testRegistryUrl",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 494,
+      "signature": "fn(url: [, ) void",
+      "keywords": ["testRegistryUrl", "function"]
+    },
+    {
+      "name": "testRegistryConfig",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 516,
+      "signature": "fn(registry: enhanced_config, ) bool",
+      "keywords": ["testRegistryConfig", "function"]
+    },
+    {
+      "name": "listAuthTokens",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 554,
+      "signature": "fn() void",
+      "keywords": ["listAuthTokens", "function"]
+    },
+    {
+      "name": "setAuthToken",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 588,
+      "signature": "fn(registry_name: [, token: [, ) void",
+      "keywords": ["setAuthToken", "function"]
+    },
+    {
+      "name": "removeAuthToken",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 608,
+      "signature": "fn(registry_name: [, ) void",
+      "keywords": ["removeAuthToken", "function"]
+    },
+    {
+      "name": "testAuthToken",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 625,
+      "signature": "fn(registry_name: [, ) void",
+      "keywords": ["testAuthToken", "function"]
+    },
+    {
+      "name": "setRegistryPriority",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 657,
+      "signature": "fn(registry_name: [, priority: u32, u32) void",
+      "keywords": ["setRegistryPriority", "function"]
+    },
+    {
+      "name": "handleMirrorCommand",
+      "type": "function",
+      "file": "src/commands/registry_v2.zig",
+      "line": 669,
+      "signature": "fn(args: [, ) void",
+      "keywords": ["handleMirrorCommand", "function"]
+    }
+  ]
+}

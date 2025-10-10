@@ -1,0 +1,97 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/tui.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/tui.zig",
+      "line": 2,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "commands",
+      "type": "variable",
+      "file": "src/commands/tui.zig",
+      "line": 3,
+      "keywords": ["commands", "variable"]
+    },
+    {
+      "name": "tui",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 6,
+      "signature": "fn(Allocator, [: 0) void",
+      "keywords": ["tui", "function"]
+    },
+    {
+      "name": "Screen",
+      "type": "enum",
+      "file": "src/commands/tui.zig",
+      "line": 81,
+      "keywords": ["Screen", "enum"]
+    },
+    {
+      "name": "drawMainMenu",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 88,
+      "signature": "fn() void",
+      "keywords": ["drawMainMenu", "function"]
+    },
+    {
+      "name": "drawSearchMenu",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 104,
+      "signature": "fn() void",
+      "keywords": ["drawSearchMenu", "function"]
+    },
+    {
+      "name": "drawSettingsMenu",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 117,
+      "signature": "fn() void",
+      "keywords": ["drawSettingsMenu", "function"]
+    },
+    {
+      "name": "getUserChoice",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 131,
+      "signature": "fn(buffer: *, ) u8",
+      "keywords": ["getUserChoice", "function"]
+    },
+    {
+      "name": "getSearchInput",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 139,
+      "signature": "fn(Allocator, buffer: *, search_input: *, ) [",
+      "keywords": ["getSearchInput", "function"]
+    },
+    {
+      "name": "performSearchCommand",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 152,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["performSearchCommand", "function"]
+    },
+    {
+      "name": "waitForKeypress",
+      "type": "function",
+      "file": "src/commands/tui.zig",
+      "line": 168,
+      "signature": "fn(buffer: *, ) void",
+      "keywords": ["waitForKeypress", "function"]
+    }
+  ]
+}

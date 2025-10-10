@@ -1,0 +1,165 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "mem",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 3,
+      "keywords": ["mem", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 4,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "ZonFile",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 5,
+      "keywords": ["ZonFile", "variable"]
+    },
+    {
+      "name": "LockFile",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 6,
+      "keywords": ["LockFile", "variable"]
+    },
+    {
+      "name": "downloader",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 7,
+      "keywords": ["downloader", "variable"]
+    },
+    {
+      "name": "enhanced_config",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 8,
+      "keywords": ["enhanced_config", "variable"]
+    },
+    {
+      "name": "registry",
+      "type": "variable",
+      "file": "src/commands/add.zig",
+      "line": 9,
+      "keywords": ["registry", "variable"]
+    },
+    {
+      "name": "add",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 12,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["add", "function"]
+    },
+    {
+      "name": "tryRegistryAliasResolution",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 67,
+      "description": "Try registry alias resolution",
+      "signature": "fn(Allocator, config: *, ) ?",
+      "keywords": ["tryRegistryAliasResolution", "function", "Try", "registry", "alias", "resolution"]
+    },
+    {
+      "name": "addSingleDependency",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 124,
+      "description": "Add a single dependency (internal function)",
+      "signature": "fn(Allocator, config: *, ) void",
+      "keywords": ["addSingleDependency", "function", "Add", "single", "dependency", "(internal", "function)"]
+    },
+    {
+      "name": "addMultiple",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 225,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["addMultiple", "function"]
+    },
+    {
+      "name": "ensureDepsDir",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 251,
+      "description": "Ensure the .zion/deps directory exists",
+      "signature": "fn() void",
+      "keywords": ["ensureDepsDir", "function", "Ensure", "the", "zion/deps", "directory", "exists"]
+    },
+    {
+      "name": "extractTarball",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 270,
+      "description": "Extract a tarball to a destination directory",
+      "signature": "fn(Allocator, dest_path: [, ) void",
+      "keywords": ["extractTarball", "function", "Extract", "tarball", "destination", "directory"]
+    },
+    {
+      "name": "validateExtractedPackage",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 339,
+      "description": "Validate that the extracted package has the expected structure",
+      "signature": "fn() void",
+      "keywords": ["validateExtractedPackage", "function", "Validate", "that", "the", "extracted", "package", "has", "the", "expected", "structure"]
+    },
+    {
+      "name": "printBuildInstructions",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 370,
+      "description": "Print instructions for integrating the dependency into build.zig",
+      "signature": "fn(deps_path: [, ) void",
+      "keywords": ["printBuildInstructions", "function", "Print", "instructions", "for", "integrating", "the", "dependency", "into", "build", "zig"]
+    },
+    {
+      "name": "modifyBuildZig",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 395,
+      "description": "Automatically modify build.zig to include the new dependency",
+      "signature": "fn(Allocator, deps_path: [, ) void",
+      "keywords": ["modifyBuildZig", "function", "Automatically", "modify", "build", "zig", "include", "the", "new", "dependency"]
+    },
+    {
+      "name": "injectAfterMarker",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 437,
+      "description": "Inject dependency after the zion:deps marker",
+      "signature": "fn(Allocator, marker_pos: usize, usize, deps_path: [, ) void",
+      "keywords": ["injectAfterMarker", "function", "Inject", "dependency", "after", "the", "zion", "deps", "marker"]
+    },
+    {
+      "name": "injectAtBestLocation",
+      "type": "function",
+      "file": "src/commands/add.zig",
+      "line": 478,
+      "description": "Try to inject at a reasonable location in build.zig",
+      "signature": "fn(Allocator, package_name: [, deps_path: [, ) void",
+      "keywords": ["injectAtBestLocation", "function", "Try", "inject", "reasonable", "location", "build", "zig"]
+    }
+  ]
+}

@@ -71,6 +71,12 @@ pub fn build(b: *std.Build) void {
         mod.addImport("phantom", phantom.module("phantom"));
     }
 
+    // Import zdoc dependency for documentation generation
+    const zdoc_dep = b.lazyDependency("zdoc", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
@@ -188,6 +194,23 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    // Documentation generation step using zdoc
+    if (zdoc_dep) |zdoc| {
+        const zdoc_exe = zdoc.artifact("zdoc");
+
+        // Create docs generation step
+        const docs_step = b.step("docs", "Generate API documentation");
+
+        const run_zdoc = b.addRunArtifact(zdoc_exe);
+        run_zdoc.addArgs(&.{
+            "--format=html",
+            "src/root.zig", // Root module with all imports
+            "docs/",
+        });
+
+        docs_step.dependOn(&run_zdoc.step);
+    }
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

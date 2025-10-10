@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zdoc Documentation</title>
+<style>
+body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; }}
+h1 {{ color: #333; margin: 0 0 20px 0; }}
+h2 {{ color: #666; border-bottom: 1px solid #ddd; margin: 30px 0 15px 0; }}
+.container {{ display: flex; min-height: 100vh; }}
+.sidebar {{ width: 250px; background: #f8f9fa; border-right: 1px solid #ddd; padding: 20px; overflow-y: auto; }}
+.content {{ flex: 1; padding: 40px; }}
+.nav-section {{ margin-bottom: 20px; }}
+.nav-title {{ font-weight: bold; color: #666; margin-bottom: 8px; text-transform: uppercase; font-size: 0.9em; }}
+.nav-item {{ display: block; color: #007acc; text-decoration: none; padding: 4px 8px; border-radius: 3px; margin-bottom: 2px; }}
+.nav-item:hover {{ background: #e9ecef; }}
+.nav-function {{ border-left: 3px solid #28a745; }}
+.nav-struct {{ border-left: 3px solid #dc3545; }}
+.nav-enum {{ border-left: 3px solid #ffc107; }}
+.nav-union {{ border-left: 3px solid #17a2b8; }}
+.nav-variable {{ border-left: 3px solid #6c757d; }}
+.declaration {{ margin: 10px 0; padding: 10px; background: #f8f9fa; border-left: 3px solid #007acc; }}
+.function {{ border-left-color: #28a745; }}
+.struct {{ border-left-color: #dc3545; }}
+.enum {{ border-left-color: #ffc107; }}
+.union {{ border-left-color: #17a2b8; }}
+.variable {{ border-left-color: #6c757d; }}
+.name {{ font-weight: bold; }}
+.kind {{ color: #666; font-size: 0.8em; text-transform: uppercase; }}
+.signature {{ font-family: monospace; color: #333; }}
+.doc-comment {{ color: #555; font-style: italic; margin-top: 5px; padding: 5px; background: #f0f0f0; border-radius: 3px; }}
+.code-block {{ background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin: 10px 0; overflow-x: auto; }}
+.code-block code {{ background: none; padding: 0; }}
+.zig-keyword {{ color: #0066cc; font-weight: bold; }}
+.zig-string {{ color: #008800; }}
+.zig-number {{ color: #aa6600; }}
+.zig-comment {{ color: #888888; font-style: italic; }}
+.zig-type {{ color: #0088aa; font-weight: bold; }}
+.zig-function {{ color: #7700aa; }}
+.generic-indicator {{ color: #cc6600; font-weight: bold; font-style: italic; }}
+.badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-left: 5px; }}
+.badge-pub {{ background: #28a745; color: white; }}
+.badge-export {{ background: #007acc; color: white; }}
+.badge-extern {{ background: #6c757d; color: white; }}
+.badge-generic {{ background: #cc6600; color: white; }}
+.params-section {{ margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; }}
+.params-title {{ font-weight: bold; color: #555; margin-bottom: 5px; }}
+.param-item {{ margin: 5px 0 5px 15px; font-family: monospace; }}
+.param-name {{ color: #0066cc; font-weight: bold; }}
+.param-type {{ color: #0088aa; }}
+.return-section {{ margin: 10px 0; padding: 8px; background: #e9f7ef; border-left: 3px solid #28a745; }}
+.error-section {{ margin: 10px 0; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; }}
+.fields-table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
+.fields-table th {{ background: #e9ecef; padding: 8px; text-align: left; border: 1px solid #ddd; }}
+.fields-table td {{ padding: 8px; border: 1px solid #ddd; font-family: monospace; }}
+.source-link {{ display: inline-block; margin-top: 5px; font-size: 0.85em; color: #007acc; text-decoration: none; }}
+.source-link:hover {{ text-decoration: underline; }}
+.doc-tags {{ margin: 10px 0; }}
+.doc-tag {{ margin: 5px 0; padding: 5px; background: #f0f4f8; border-left: 2px solid #007acc; }}
+.doc-tag-label {{ font-weight: bold; color: #007acc; }}
+
+/* Mobile responsive design */
+@media (max-width: 768px) {{
+  .container {{ flex-direction: column; }}
+  .sidebar {{ width: 100%; border-right: none; border-bottom: 1px solid #ddd; padding: 15px; }}
+  .content {{ padding: 20px; }}
+  .nav-section {{ display: inline-block; margin-right: 20px; vertical-align: top; }}
+  .nav-title {{ margin-bottom: 5px; }}
+  .nav-item {{ display: inline-block; margin-right: 10px; margin-bottom: 5px; }}
+  h1 {{ font-size: 1.8em; }}
+  h2 {{ font-size: 1.4em; }}
+  .declaration {{ margin: 8px 0; padding: 8px; }}
+}}
+
+@media (max-width: 480px) {{
+  .content {{ padding: 15px; }}
+  .sidebar {{ padding: 10px; }}
+  h1 {{ font-size: 1.6em; }}
+  h2 {{ font-size: 1.2em; }}
+  .nav-section {{ display: block; margin-bottom: 15px; }}
+  .declaration {{ margin: 6px 0; padding: 6px; }}
+}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="sidebar">
+<h3>Navigation</h3>
+<div style="margin-bottom: 15px;">
+<input type="text" id="search" placeholder="Search declarations..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+</div>
+<div class="nav-section">
+<div class="nav-title">Functions</div><a href="#zig_manager" class="nav-item nav-function">zig_manager</a><a href="#listVersions" class="nav-item nav-function">listVersions</a><a href="#installVersion" class="nav-item nav-function">installVersion</a><a href="#useVersion" class="nav-item nav-function">useVersion</a><a href="#showCurrent" class="nav-item nav-function">showCurrent</a><a href="#removeVersion" class="nav-item nav-function">removeVersion</a><a href="#cleanVersions" class="nav-item nav-function">cleanVersions</a><a href="#setDefault" class="nav-item nav-function">setDefault</a><a href="#ensureZigDir" class="nav-item nav-function">ensureZigDir</a><a href="#getZigDir" class="nav-item nav-function">getZigDir</a><a href="#getVersionDir" class="nav-item nav-function">getVersionDir</a><a href="#getZigPath" class="nav-item nav-function">getZigPath</a><a href="#getCurrentVersion" class="nav-item nav-function">getCurrentVersion</a><a href="#setActiveVersion" class="nav-item nav-function">setActiveVersion</a><a href="#clearActiveVersion" class="nav-item nav-function">clearActiveVersion</a><a href="#getActiveZigPath" class="nav-item nav-function">getActiveZigPath</a><a href="#listInstalledVersions" class="nav-item nav-function">listInstalledVersions</a><a href="#listRemoteVersions" class="nav-item nav-function">listRemoteVersions</a><a href="#downloadAndInstallZig" class="nav-item nav-function">downloadAndInstallZig</a><a href="#verifyZigVersion" class="nav-item nav-function">verifyZigVersion</a><a href="#showZigVersionDetails" class="nav-item nav-function">showZigVersionDetails</a><a href="#updateShellProfile" class="nav-item nav-function">updateShellProfile</a><a href="#detectSystemZig" class="nav-item nav-function">detectSystemZig</a><a href="#getZigVersionFromPath" class="nav-item nav-function">getZigVersionFromPath</a><a href="#getZigDownloadUrl" class="nav-item nav-function">getZigDownloadUrl</a><a href="#getFilenameFromUrl" class="nav-item nav-function">getFilenameFromUrl</a><a href="#downloadFile" class="nav-item nav-function">downloadFile</a><a href="#extractZigArchive" class="nav-item nav-function">extractZigArchive</a><a href="#printZigHelp" class="nav-item nav-function">printZigHelp</a></div>
+<div class="nav-section">
+<div class="nav-title">Variables</div><a href="#std" class="nav-item nav-variable">std</a><a href="#fs" class="nav-item nav-variable">fs</a><a href="#http" class="nav-item nav-variable">http</a><a href="#json" class="nav-item nav-variable">json</a><a href="#Allocator" class="nav-item nav-variable">Allocator</a></div>
+</div>
+<div class="content">
+<h1>API Documentation for src/commands/zig_manager.zig</h1><h2>Functions</h2>
+<div class="declaration function" id="zig_manager">
+<span class="name">zig_manager</span> <span class="kind">Functions</span><span class="badge badge-pub">pub</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L8" class="source-link" target="_blank">🔗 zig_manager.zig:8</a></div>
+<div class="declaration function" id="listVersions">
+<span class="name">listVersions</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>List available Zig versions</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L37" class="source-link" target="_blank">🔗 zig_manager.zig:37</a></div>
+<div class="declaration function" id="installVersion">
+<span class="name">installVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Install a specific Zig version</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L62" class="source-link" target="_blank">🔗 zig_manager.zig:62</a></div>
+<div class="declaration function" id="useVersion">
+<span class="name">useVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Switch to a specific Zig version</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L86" class="source-link" target="_blank">🔗 zig_manager.zig:86</a></div>
+<div class="declaration function" id="showCurrent">
+<span class="name">showCurrent</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Show current Zig version</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L141" class="source-link" target="_blank">🔗 zig_manager.zig:141</a></div>
+<div class="declaration function" id="removeVersion">
+<span class="name">removeVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Remove a Zig version</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L185" class="source-link" target="_blank">🔗 zig_manager.zig:185</a></div>
+<div class="declaration function" id="cleanVersions">
+<span class="name">cleanVersions</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Clean up old/unused Zig versions</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L207" class="source-link" target="_blank">🔗 zig_manager.zig:207</a></div>
+<div class="declaration function" id="setDefault">
+<span class="name">setDefault</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><br><div class="doc-comment"><p>Set default Zig version</p>
+</div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L251" class="source-link" target="_blank">🔗 zig_manager.zig:251</a></div>
+<div class="declaration function" id="ensureZigDir">
+<span class="name">ensureZigDir</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L269" class="source-link" target="_blank">🔗 zig_manager.zig:269</a></div>
+<div class="declaration function" id="getZigDir">
+<span class="name">getZigDir</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L280" class="source-link" target="_blank">🔗 zig_manager.zig:280</a></div>
+<div class="declaration function" id="getVersionDir">
+<span class="name">getVersionDir</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L285" class="source-link" target="_blank">🔗 zig_manager.zig:285</a></div>
+<div class="declaration function" id="getZigPath">
+<span class="name">getZigPath</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L291" class="source-link" target="_blank">🔗 zig_manager.zig:291</a></div>
+<div class="declaration function" id="getCurrentVersion">
+<span class="name">getCurrentVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L297" class="source-link" target="_blank">🔗 zig_manager.zig:297</a></div>
+<div class="declaration function" id="setActiveVersion">
+<span class="name">setActiveVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L306" class="source-link" target="_blank">🔗 zig_manager.zig:306</a></div>
+<div class="declaration function" id="clearActiveVersion">
+<span class="name">clearActiveVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L314" class="source-link" target="_blank">🔗 zig_manager.zig:314</a></div>
+<div class="declaration function" id="getActiveZigPath">
+<span class="name">getActiveZigPath</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L326" class="source-link" target="_blank">🔗 zig_manager.zig:326</a></div>
+<div class="declaration function" id="listInstalledVersions">
+<span class="name">listInstalledVersions</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L337" class="source-link" target="_blank">🔗 zig_manager.zig:337</a></div>
+<div class="declaration function" id="listRemoteVersions">
+<span class="name">listRemoteVersions</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, bool) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">bool</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L383" class="source-link" target="_blank">🔗 zig_manager.zig:383</a></div>
+<div class="declaration function" id="downloadAndInstallZig">
+<span class="name">downloadAndInstallZig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L417" class="source-link" target="_blank">🔗 zig_manager.zig:417</a></div>
+<div class="declaration function" id="verifyZigVersion">
+<span class="name">verifyZigVersion</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L454" class="source-link" target="_blank">🔗 zig_manager.zig:454</a></div>
+<div class="declaration function" id="showZigVersionDetails">
+<span class="name">showZigVersionDetails</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L484" class="source-link" target="_blank">🔗 zig_manager.zig:484</a></div>
+<div class="declaration function" id="updateShellProfile">
+<span class="name">updateShellProfile</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L496" class="source-link" target="_blank">🔗 zig_manager.zig:496</a></div>
+<div class="declaration function" id="detectSystemZig">
+<span class="name">detectSystemZig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L524" class="source-link" target="_blank">🔗 zig_manager.zig:524</a></div>
+<div class="declaration function" id="getZigVersionFromPath">
+<span class="name">getZigVersionFromPath</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L585" class="source-link" target="_blank">🔗 zig_manager.zig:585</a></div>
+<div class="declaration function" id="getZigDownloadUrl">
+<span class="name">getZigDownloadUrl</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L633" class="source-link" target="_blank">🔗 zig_manager.zig:633</a></div>
+<div class="declaration function" id="getFilenameFromUrl">
+<span class="name">getFilenameFromUrl</span> <span class="kind">Functions</span><br><span class="signature">fn() [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L653" class="source-link" target="_blank">🔗 zig_manager.zig:653</a></div>
+<div class="declaration function" id="downloadFile">
+<span class="name">downloadFile</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, output_path: [, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">output_path</span>: <span class="param-type">[</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L665" class="source-link" target="_blank">🔗 zig_manager.zig:665</a></div>
+<div class="declaration function" id="extractZigArchive">
+<span class="name">extractZigArchive</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, extract_dir: [, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">extract_dir</span>: <span class="param-type">[</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L679" class="source-link" target="_blank">🔗 zig_manager.zig:679</a></div>
+<div class="declaration function" id="printZigHelp">
+<span class="name">printZigHelp</span> <span class="kind">Functions</span><br><span class="signature">fn() void</span><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L693" class="source-link" target="_blank">🔗 zig_manager.zig:693</a></div>
+<h2>Variables</h2>
+<div class="declaration variable" id="std">
+<span class="name">std</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L1" class="source-link" target="_blank">🔗 zig_manager.zig:1</a></div>
+<div class="declaration variable" id="fs">
+<span class="name">fs</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L2" class="source-link" target="_blank">🔗 zig_manager.zig:2</a></div>
+<div class="declaration variable" id="http">
+<span class="name">http</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L3" class="source-link" target="_blank">🔗 zig_manager.zig:3</a></div>
+<div class="declaration variable" id="json">
+<span class="name">json</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L4" class="source-link" target="_blank">🔗 zig_manager.zig:4</a></div>
+<div class="declaration variable" id="Allocator">
+<span class="name">Allocator</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/zig_manager.zig#L5" class="source-link" target="_blank">🔗 zig_manager.zig:5</a></div>
+</div>
+</div>
+<script>
+document.getElementById('search').addEventListener('input', function(e) {
+  const query = e.target.value.toLowerCase();
+  const navItems = document.querySelectorAll('.nav-item');
+  const declarations = document.querySelectorAll('.declaration');
+  const sections = document.querySelectorAll('.nav-section');
+
+  navItems.forEach(function(item) {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(query) ? 'block' : 'none';
+  });
+
+  declarations.forEach(function(decl) {
+    const name = decl.querySelector('.name').textContent.toLowerCase();
+    decl.style.display = name.includes(query) ? 'block' : 'none';
+  });
+
+  sections.forEach(function(section) {
+    const visibleItems = section.querySelectorAll('.nav-item[style*="block"], .nav-item:not([style])');
+    section.style.display = (query === '' || visibleItems.length > 0) ? 'block' : 'none';
+  });
+});
+
+// Syntax highlighting for Zig code
+function highlightZig(code) {
+  const keywords = ['const', 'var', 'pub', 'fn', 'struct', 'enum', 'union', 'if', 'else', 'while', 'for', 'return', 'try', 'catch', 'defer', 'errdefer', 'switch', 'and', 'or', 'null', 'undefined', 'true', 'false', 'test', 'comptime', 'inline', 'export', 'extern', 'packed', 'align', 'volatile', 'allowzero', 'async', 'await', 'suspend', 'resume', 'cancel'];
+  const types = ['u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64', 'f32', 'f64', 'bool', 'usize', 'isize', 'c_short', 'c_ushort', 'c_int', 'c_uint', 'c_long', 'c_ulong', 'c_longlong', 'c_ulonglong', 'c_longdouble', 'c_void', 'void', 'noreturn', 'type', 'anyerror', 'anyframe', 'anytype'];
+
+  let result = code;
+
+  // Highlight strings
+  result = result.replace(/"([^"\\\\]|\\\\.)*"/g, '<span class="zig-string">$&</span>');
+  result = result.replace(/'([^'\\\\]|\\\\.)'/g, '<span class="zig-string">$&</span>');
+
+  // Highlight numbers
+  result = result.replace(/\\b\\d+(\\.\\d+)?\\b/g, '<span class="zig-number">$&</span>');
+
+  // Highlight comments
+  result = result.replace(/\\/\\/.*$/gm, '<span class="zig-comment">$&</span>');
+
+  // Highlight keywords
+  keywords.forEach(function(keyword) {
+    const regex = new RegExp('\\\\b' + keyword + '\\\\b', 'g');
+    result = result.replace(regex, '<span class="zig-keyword">' + keyword + '</span>');
+  });
+
+  // Highlight types
+  types.forEach(function(type) {
+    const regex = new RegExp('\\\\b' + type + '\\\\b', 'g');
+    result = result.replace(regex, '<span class="zig-type">' + type + '</span>');
+  });
+
+  return result;
+}
+
+// Apply syntax highlighting on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const codeBlocks = document.querySelectorAll('code');
+  codeBlocks.forEach(function(block) {
+    if (block.textContent.includes('const') || block.textContent.includes('fn') || block.textContent.includes('pub')) {
+      block.innerHTML = highlightZig(block.textContent);
+    }
+  });
+});
+</script>
+</body>
+</html>

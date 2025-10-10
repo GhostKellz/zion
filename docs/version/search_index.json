@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/version.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "version",
+      "type": "function",
+      "file": "src/commands/version.zig",
+      "line": 4,
+      "signature": "fn() void",
+      "keywords": ["version", "function"]
+    }
+  ]
+}

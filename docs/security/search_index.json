@@ -1,0 +1,165 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/security.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/security.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/security.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "sec",
+      "type": "variable",
+      "file": "src/commands/security.zig",
+      "line": 4,
+      "keywords": ["sec", "variable"]
+    },
+    {
+      "name": "security",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 7,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["security", "function"]
+    },
+    {
+      "name": "printSecurityHelp",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 32,
+      "description": "Print security help",
+      "signature": "fn() void",
+      "keywords": ["printSecurityHelp", "function", "Print", "security", "help"]
+    },
+    {
+      "name": "handleKeyGen",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 59,
+      "description": "Generate a new Ed25519 key pair",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["handleKeyGen", "function", "Generate", "new", "Ed25519", "key", "pair"]
+    },
+    {
+      "name": "handleSign",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 89,
+      "description": "Sign a package file",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["handleSign", "function", "Sign", "package", "file"]
+    },
+    {
+      "name": "handleVerify",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 168,
+      "description": "Verify a package signature and integrity",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["handleVerify", "function", "Verify", "package", "signature", "and", "integrity"]
+    },
+    {
+      "name": "handleTrust",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 242,
+      "description": "Trust a signer",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["handleTrust", "function", "Trust", "signer"]
+    },
+    {
+      "name": "handleStatus",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 274,
+      "description": "Show security status",
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["handleStatus", "function", "Show", "security", "status"]
+    },
+    {
+      "name": "SignatureData",
+      "type": "struct",
+      "file": "src/commands/security.zig",
+      "line": 322,
+      "description": "Signature data structure",
+      "keywords": ["SignatureData", "struct", "Signature", "data", "structure"]
+    },
+    {
+      "name": "VerificationResult",
+      "type": "struct",
+      "file": "src/commands/security.zig",
+      "line": 339,
+      "description": "Verification result structure",
+      "keywords": ["VerificationResult", "struct", "Verification", "result", "structure"]
+    },
+    {
+      "name": "parseSignatureFile",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 350,
+      "description": "Parse signature file and extract data",
+      "signature": "fn(Allocator, ) SignatureData",
+      "keywords": ["parseSignatureFile", "function", "Parse", "signature", "file", "and", "extract", "data"]
+    },
+    {
+      "name": "verifyPackageSignature",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 400,
+      "description": "Verify package signature using Ed25519",
+      "signature": "fn(Allocator, sig_data: SignatureData, SignatureData) VerificationResult",
+      "keywords": ["verifyPackageSignature", "function", "Verify", "package", "signature", "using", "Ed25519"]
+    },
+    {
+      "name": "decodeSignature",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 456,
+      "description": "Decode signature from base64 format",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["decodeSignature", "function", "Decode", "signature", "from", "base64", "format"]
+    },
+    {
+      "name": "decodePublicKey",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 469,
+      "description": "Decode public key from base64 format",
+      "signature": "fn(Allocator, ) [",
+      "keywords": ["decodePublicKey", "function", "Decode", "public", "key", "from", "base64", "format"]
+    },
+    {
+      "name": "verifyEd25519Signature",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 482,
+      "description": "Verify Ed25519 signature (simplified implementation)",
+      "signature": "fn(signature: [, public_key: [, ) bool",
+      "keywords": ["verifyEd25519Signature", "function", "Verify", "Ed25519", "signature", "(simplified", "implementation)"]
+    },
+    {
+      "name": "checkSignerTrust",
+      "type": "function",
+      "file": "src/commands/security.zig",
+      "line": 514,
+      "description": "Check if a signer is in the trusted list",
+      "signature": "fn(Allocator, ) bool",
+      "keywords": ["checkSignerTrust", "function", "Check", "signer", "the", "trusted", "list"]
+    }
+  ]
+}

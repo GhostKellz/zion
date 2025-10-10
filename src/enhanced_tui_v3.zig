@@ -117,10 +117,10 @@ pub const ZionTUIv3 = struct {
     }
     
     pub fn deinit(self: *ZionTUIv3) void {
-        self.ghostkellz.deinit(allocator);
-        self.ziglibs.deinit(allocator);
-        self.search_query.deinit(allocator);
-        
+        self.ghostkellz.deinit(self.allocator);
+        self.ziglibs.deinit(self.allocator);
+        self.search_query.deinit(self.allocator);
+
         for (self.installation_queue.items) |*install| {
             self.allocator.free(install.name);
             self.allocator.free(install.fetch_command);
@@ -129,9 +129,9 @@ pub const ZionTUIv3 = struct {
             }
             self.allocator.free(install.dependencies);
         }
-        self.installation_queue.deinit(allocator);
-        
-        self.app.deinit(allocator);
+        self.installation_queue.deinit(self.allocator);
+
+        self.app.deinit();
         self.allocator.destroy(self);
     }
     
@@ -206,10 +206,10 @@ pub const ZionTUIv3 = struct {
                 .dependencies = deps,
             };
             
-            try browser.packages.append(allocator, phantom_pkg);
+            try browser.packages.append(self.allocator, phantom_pkg);
         }
     }
-    
+
     fn populateZigLibsPackages(self: *ZionTUIv3, browser: *phantom.widgets.UniversalPackageBrowser) !void {
         // Add ZigLibs repository
         try browser.addRepository(phantom.widgets.universal_package_browser.Repository{
@@ -239,10 +239,10 @@ pub const ZionTUIv3 = struct {
                 .dependencies = deps,
             };
             
-            try browser.packages.append(allocator, phantom_pkg);
+            try browser.packages.append(self.allocator, phantom_pkg);
         }
     }
-    
+
     pub fn switchEcosystem(self: *ZionTUIv3, ecosystem: EcosystemType) void {
         self.current_ecosystem = ecosystem;
         self.app.invalidate();
@@ -286,8 +286,8 @@ pub const ZionTUIv3 = struct {
             },
             else => return error.InvalidEcosystem,
         };
-        
-        try self.installation_queue.append(allocator, installation);
+
+        try self.installation_queue.append(self.allocator, installation);
     }
     
     pub fn processInstallationQueue(self: *ZionTUIv3) !void {
@@ -316,17 +316,17 @@ pub const ZionTUIv3 = struct {
     }
     
     pub fn generateInstallScript(self: *ZionTUIv3) ![]const u8 {
-        var script: std.ArrayList(u8) = .{};
-        
-        try script.appendSlice(allocator, "#!/bin/bash\n");
-        try script.appendSlice(allocator, "# Zion Package Manager - Combined Installation Script\n");
-        try script.appendSlice(allocator, "# GhostLibs + ZigLibs Ecosystem Integration\n\n");
-        
+        var script = std.ArrayList(u8).init(self.allocator);
+
+        try script.appendSlice("#!/bin/bash\n");
+        try script.appendSlice("# Zion Package Manager - Combined Installation Script\n");
+        try script.appendSlice("# GhostLibs + ZigLibs Ecosystem Integration\n\n");
+
         // Group by ecosystem
-        var ghostkellz_packages: std.ArrayList([]const u8) = .{};
-        var ziglibs_packages: std.ArrayList([]const u8) = .{};
-        defer ghostkellz_packages.deinit(allocator);
-        defer ziglibs_packages.deinit(allocator);
+        var ghostkellz_packages = std.ArrayList([]const u8).init(self.allocator);
+        var ziglibs_packages = std.ArrayList([]const u8).init(self.allocator);
+        defer ghostkellz_packages.deinit(self.allocator);
+        defer ziglibs_packages.deinit(self.allocator);
         
         for (self.installation_queue.items) |install| {
             switch (install.ecosystem) {
@@ -338,23 +338,23 @@ pub const ZionTUIv3 = struct {
         
         // Generate GhostLibs section
         if (ghostkellz_packages.items.len > 0) {
-            try script.appendSlice(allocator, "echo \"👻 Installing GhostLibs packages...\"\n");
+            try script.appendSlice("echo \"👻 Installing GhostLibs packages...\"\n");
             const gk_script = try self.ghostkellz.generateInstallScript(ghostkellz_packages.items, self.allocator);
             defer self.allocator.free(gk_script);
-            try script.appendSlice(allocator, gk_script);
-            try script.appendSlice(allocator, "\n");
+            try script.appendSlice(gk_script);
+            try script.appendSlice("\n");
         }
-        
+
         // Generate ZigLibs section
         if (ziglibs_packages.items.len > 0) {
-            try script.appendSlice(allocator, "echo \"🦎 Installing ZigLibs packages...\"\n");
+            try script.appendSlice("echo \"🦎 Installing ZigLibs packages...\"\n");
             const zl_script = try self.ziglibs.generateBulkFetchScript(ziglibs_packages.items, self.allocator);
             defer self.allocator.free(zl_script);
-            try script.appendSlice(allocator, zl_script);
+            try script.appendSlice(zl_script);
         }
-        
-        try script.appendSlice(allocator, "\necho \"🎉 All ecosystem packages installed!\"\n");
-        try script.appendSlice(allocator, "echo \"Run 'zig build' to verify your project builds with new dependencies\"\n");
+
+        try script.appendSlice("\necho \"🎉 All ecosystem packages installed!\"\n");
+        try script.appendSlice("echo \"Run 'zig build' to verify your project builds with new dependencies\"\n");
         
         return script.toOwnedSlice();
     }

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zdoc Documentation</title>
+<style>
+body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; }}
+h1 {{ color: #333; margin: 0 0 20px 0; }}
+h2 {{ color: #666; border-bottom: 1px solid #ddd; margin: 30px 0 15px 0; }}
+.container {{ display: flex; min-height: 100vh; }}
+.sidebar {{ width: 250px; background: #f8f9fa; border-right: 1px solid #ddd; padding: 20px; overflow-y: auto; }}
+.content {{ flex: 1; padding: 40px; }}
+.nav-section {{ margin-bottom: 20px; }}
+.nav-title {{ font-weight: bold; color: #666; margin-bottom: 8px; text-transform: uppercase; font-size: 0.9em; }}
+.nav-item {{ display: block; color: #007acc; text-decoration: none; padding: 4px 8px; border-radius: 3px; margin-bottom: 2px; }}
+.nav-item:hover {{ background: #e9ecef; }}
+.nav-function {{ border-left: 3px solid #28a745; }}
+.nav-struct {{ border-left: 3px solid #dc3545; }}
+.nav-enum {{ border-left: 3px solid #ffc107; }}
+.nav-union {{ border-left: 3px solid #17a2b8; }}
+.nav-variable {{ border-left: 3px solid #6c757d; }}
+.declaration {{ margin: 10px 0; padding: 10px; background: #f8f9fa; border-left: 3px solid #007acc; }}
+.function {{ border-left-color: #28a745; }}
+.struct {{ border-left-color: #dc3545; }}
+.enum {{ border-left-color: #ffc107; }}
+.union {{ border-left-color: #17a2b8; }}
+.variable {{ border-left-color: #6c757d; }}
+.name {{ font-weight: bold; }}
+.kind {{ color: #666; font-size: 0.8em; text-transform: uppercase; }}
+.signature {{ font-family: monospace; color: #333; }}
+.doc-comment {{ color: #555; font-style: italic; margin-top: 5px; padding: 5px; background: #f0f0f0; border-radius: 3px; }}
+.code-block {{ background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin: 10px 0; overflow-x: auto; }}
+.code-block code {{ background: none; padding: 0; }}
+.zig-keyword {{ color: #0066cc; font-weight: bold; }}
+.zig-string {{ color: #008800; }}
+.zig-number {{ color: #aa6600; }}
+.zig-comment {{ color: #888888; font-style: italic; }}
+.zig-type {{ color: #0088aa; font-weight: bold; }}
+.zig-function {{ color: #7700aa; }}
+.generic-indicator {{ color: #cc6600; font-weight: bold; font-style: italic; }}
+.badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-left: 5px; }}
+.badge-pub {{ background: #28a745; color: white; }}
+.badge-export {{ background: #007acc; color: white; }}
+.badge-extern {{ background: #6c757d; color: white; }}
+.badge-generic {{ background: #cc6600; color: white; }}
+.params-section {{ margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; }}
+.params-title {{ font-weight: bold; color: #555; margin-bottom: 5px; }}
+.param-item {{ margin: 5px 0 5px 15px; font-family: monospace; }}
+.param-name {{ color: #0066cc; font-weight: bold; }}
+.param-type {{ color: #0088aa; }}
+.return-section {{ margin: 10px 0; padding: 8px; background: #e9f7ef; border-left: 3px solid #28a745; }}
+.error-section {{ margin: 10px 0; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; }}
+.fields-table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
+.fields-table th {{ background: #e9ecef; padding: 8px; text-align: left; border: 1px solid #ddd; }}
+.fields-table td {{ padding: 8px; border: 1px solid #ddd; font-family: monospace; }}
+.source-link {{ display: inline-block; margin-top: 5px; font-size: 0.85em; color: #007acc; text-decoration: none; }}
+.source-link:hover {{ text-decoration: underline; }}
+.doc-tags {{ margin: 10px 0; }}
+.doc-tag {{ margin: 5px 0; padding: 5px; background: #f0f4f8; border-left: 2px solid #007acc; }}
+.doc-tag-label {{ font-weight: bold; color: #007acc; }}
+
+/* Mobile responsive design */
+@media (max-width: 768px) {{
+  .container {{ flex-direction: column; }}
+  .sidebar {{ width: 100%; border-right: none; border-bottom: 1px solid #ddd; padding: 15px; }}
+  .content {{ padding: 20px; }}
+  .nav-section {{ display: inline-block; margin-right: 20px; vertical-align: top; }}
+  .nav-title {{ margin-bottom: 5px; }}
+  .nav-item {{ display: inline-block; margin-right: 10px; margin-bottom: 5px; }}
+  h1 {{ font-size: 1.8em; }}
+  h2 {{ font-size: 1.4em; }}
+  .declaration {{ margin: 8px 0; padding: 8px; }}
+}}
+
+@media (max-width: 480px) {{
+  .content {{ padding: 15px; }}
+  .sidebar {{ padding: 10px; }}
+  h1 {{ font-size: 1.6em; }}
+  h2 {{ font-size: 1.2em; }}
+  .nav-section {{ display: block; margin-bottom: 15px; }}
+  .declaration {{ margin: 6px 0; padding: 6px; }}
+}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="sidebar">
+<h3>Navigation</h3>
+<div style="margin-bottom: 15px;">
+<input type="text" id="search" placeholder="Search declarations..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+</div>
+<div class="nav-section">
+<div class="nav-title">Functions</div><a href="#enhanced_zls" class="nav-item nav-function">enhanced_zls</a><a href="#showEnhancedZlsHelp" class="nav-item nav-function">showEnhancedZlsHelp</a><a href="#zlsDoctor" class="nav-item nav-function">zlsDoctor</a><a href="#zlsConfig" class="nav-item nav-function">zlsConfig</a><a href="#zlsDeps" class="nav-item nav-function">zlsDeps</a><a href="#zlsCompletions" class="nav-item nav-function">zlsCompletions</a><a href="#zlsAnalyze" class="nav-item nav-function">zlsAnalyze</a><a href="#zlsImports" class="nav-item nav-function">zlsImports</a><a href="#zlsSetup" class="nav-item nav-function">zlsSetup</a><a href="#checkGlobalZlsConfig" class="nav-item nav-function">checkGlobalZlsConfig</a><a href="#validateZlsConfig" class="nav-item nav-function">validateZlsConfig</a><a href="#checkDependencyHealth" class="nav-item nav-function">checkDependencyHealth</a><a href="#generateOptimalZlsConfig" class="nav-item nav-function">generateOptimalZlsConfig</a><a href="#showCurrentZlsConfig" class="nav-item nav-function">showCurrentZlsConfig</a><a href="#startDependencyWatcher" class="nav-item nav-function">startDependencyWatcher</a><a href="#showDependencyStatus" class="nav-item nav-function">showDependencyStatus</a><a href="#getZlsDataDir" class="nav-item nav-function">getZlsDataDir</a><a href="#generateCompletionData" class="nav-item nav-function">generateCompletionData</a><a href="#analyzeImports" class="nav-item nav-function">analyzeImports</a><a href="#analyzeDependencies" class="nav-item nav-function">analyzeDependencies</a><a href="#generatePerformanceRecommendations" class="nav-item nav-function">generatePerformanceRecommendations</a><a href="#optimizeImports" class="nav-item nav-function">optimizeImports</a><a href="#analyzeImportUsage" class="nav-item nav-function">analyzeImportUsage</a><a href="#setupNeovim" class="nav-item nav-function">setupNeovim</a><a href="#setupVSCode" class="nav-item nav-function">setupVSCode</a><a href="#setupEmacs" class="nav-item nav-function">setupEmacs</a><a href="#setupHelix" class="nav-item nav-function">setupHelix</a></div>
+<div class="nav-section">
+<div class="nav-title">Structs</div><a href="#ImportAnalysis" class="nav-item nav-struct">ImportAnalysis</a><a href="#DependencyAnalysis" class="nav-item nav-struct">DependencyAnalysis</a></div>
+<div class="nav-section">
+<div class="nav-title">Variables</div><a href="#std" class="nav-item nav-variable">std</a><a href="#print" class="nav-item nav-variable">print</a><a href="#Allocator" class="nav-item nav-variable">Allocator</a><a href="#Package" class="nav-item nav-variable">Package</a><a href="#zsync" class="nav-item nav-variable">zsync</a><a href="#json" class="nav-item nav-variable">json</a><a href="#RegistryManager" class="nav-item nav-variable">RegistryManager</a><a href="#ZionConfig" class="nav-item nav-variable">ZionConfig</a></div>
+</div>
+<div class="content">
+<h1>API Documentation for src/commands/enhanced_zls.zig</h1><h2>Functions</h2>
+<div class="declaration function" id="enhanced_zls">
+<span class="name">enhanced_zls</span> <span class="kind">Functions</span><span class="badge badge-pub">pub</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L11" class="source-link" target="_blank">🔗 enhanced_zls.zig:11</a></div>
+<div class="declaration function" id="showEnhancedZlsHelp">
+<span class="name">showEnhancedZlsHelp</span> <span class="kind">Functions</span><br><span class="signature">fn() void</span><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L39" class="source-link" target="_blank">🔗 enhanced_zls.zig:39</a></div>
+<div class="declaration function" id="zlsDoctor">
+<span class="name">zlsDoctor</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L72" class="source-link" target="_blank">🔗 enhanced_zls.zig:72</a></div>
+<div class="declaration function" id="zlsConfig">
+<span class="name">zlsConfig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L193" class="source-link" target="_blank">🔗 enhanced_zls.zig:193</a></div>
+<div class="declaration function" id="zlsDeps">
+<span class="name">zlsDeps</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L209" class="source-link" target="_blank">🔗 enhanced_zls.zig:209</a></div>
+<div class="declaration function" id="zlsCompletions">
+<span class="name">zlsCompletions</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L225" class="source-link" target="_blank">🔗 enhanced_zls.zig:225</a></div>
+<div class="declaration function" id="zlsAnalyze">
+<span class="name">zlsAnalyze</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L271" class="source-link" target="_blank">🔗 enhanced_zls.zig:271</a></div>
+<div class="declaration function" id="zlsImports">
+<span class="name">zlsImports</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L309" class="source-link" target="_blank">🔗 enhanced_zls.zig:309</a></div>
+<div class="declaration function" id="zlsSetup">
+<span class="name">zlsSetup</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, [: 0) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">[</span>: <span class="param-type">0</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L325" class="source-link" target="_blank">🔗 enhanced_zls.zig:325</a></div>
+<div class="declaration function" id="checkGlobalZlsConfig">
+<span class="name">checkGlobalZlsConfig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) bool</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">bool</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L371" class="source-link" target="_blank">🔗 enhanced_zls.zig:371</a></div>
+<div class="declaration function" id="validateZlsConfig">
+<span class="name">validateZlsConfig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L377" class="source-link" target="_blank">🔗 enhanced_zls.zig:377</a></div>
+<div class="declaration function" id="checkDependencyHealth">
+<span class="name">checkDependencyHealth</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L383" class="source-link" target="_blank">🔗 enhanced_zls.zig:383</a></div>
+<div class="declaration function" id="generateOptimalZlsConfig">
+<span class="name">generateOptimalZlsConfig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L403" class="source-link" target="_blank">🔗 enhanced_zls.zig:403</a></div>
+<div class="declaration function" id="showCurrentZlsConfig">
+<span class="name">showCurrentZlsConfig</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L451" class="source-link" target="_blank">🔗 enhanced_zls.zig:451</a></div>
+<div class="declaration function" id="startDependencyWatcher">
+<span class="name">startDependencyWatcher</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L468" class="source-link" target="_blank">🔗 enhanced_zls.zig:468</a></div>
+<div class="declaration function" id="showDependencyStatus">
+<span class="name">showDependencyStatus</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L491" class="source-link" target="_blank">🔗 enhanced_zls.zig:491</a></div>
+<div class="declaration function" id="getZlsDataDir">
+<span class="name">getZlsDataDir</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L532" class="source-link" target="_blank">🔗 enhanced_zls.zig:532</a></div>
+<div class="declaration function" id="generateCompletionData">
+<span class="name">generateCompletionData</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name"></span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L537" class="source-link" target="_blank">🔗 enhanced_zls.zig:537</a></div>
+<div class="declaration function" id="analyzeImports">
+<span class="name">analyzeImports</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) ImportAnalysis</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">ImportAnalysis</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L569" class="source-link" target="_blank">🔗 enhanced_zls.zig:569</a></div>
+<div class="declaration function" id="analyzeDependencies">
+<span class="name">analyzeDependencies</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) DependencyAnalysis</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">DependencyAnalysis</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L579" class="source-link" target="_blank">🔗 enhanced_zls.zig:579</a></div>
+<div class="declaration function" id="generatePerformanceRecommendations">
+<span class="name">generatePerformanceRecommendations</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator, ImportAnalysis, DependencyAnalysis) [</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div><div class="param-item"><span class="param-name">ImportAnalysis</span></div><div class="param-item"><span class="param-name">DependencyAnalysis</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">[</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L589" class="source-link" target="_blank">🔗 enhanced_zls.zig:589</a></div>
+<div class="declaration function" id="optimizeImports">
+<span class="name">optimizeImports</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L613" class="source-link" target="_blank">🔗 enhanced_zls.zig:613</a></div>
+<div class="declaration function" id="analyzeImportUsage">
+<span class="name">analyzeImportUsage</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L626" class="source-link" target="_blank">🔗 enhanced_zls.zig:626</a></div>
+<div class="declaration function" id="setupNeovim">
+<span class="name">setupNeovim</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L645" class="source-link" target="_blank">🔗 enhanced_zls.zig:645</a></div>
+<div class="declaration function" id="setupVSCode">
+<span class="name">setupVSCode</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L676" class="source-link" target="_blank">🔗 enhanced_zls.zig:676</a></div>
+<div class="declaration function" id="setupEmacs">
+<span class="name">setupEmacs</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L703" class="source-link" target="_blank">🔗 enhanced_zls.zig:703</a></div>
+<div class="declaration function" id="setupHelix">
+<span class="name">setupHelix</span> <span class="kind">Functions</span><br><span class="signature">fn(Allocator) void</span><div class="params-section"><div class="params-title">Parameters:</div><div class="param-item"><span class="param-name">Allocator</span></div></div><div class="return-section"><strong>Returns:</strong> <span class="param-type">void</span></div><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L734" class="source-link" target="_blank">🔗 enhanced_zls.zig:734</a></div>
+<h2>Structs</h2>
+<div class="declaration struct" id="ImportAnalysis">
+<span class="name">ImportAnalysis</span> <span class="kind">Structs</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L349" class="source-link" target="_blank">🔗 enhanced_zls.zig:349</a></div>
+<div class="declaration struct" id="DependencyAnalysis">
+<span class="name">DependencyAnalysis</span> <span class="kind">Structs</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L360" class="source-link" target="_blank">🔗 enhanced_zls.zig:360</a></div>
+<h2>Variables</h2>
+<div class="declaration variable" id="std">
+<span class="name">std</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L1" class="source-link" target="_blank">🔗 enhanced_zls.zig:1</a></div>
+<div class="declaration variable" id="print">
+<span class="name">print</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L2" class="source-link" target="_blank">🔗 enhanced_zls.zig:2</a></div>
+<div class="declaration variable" id="Allocator">
+<span class="name">Allocator</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L3" class="source-link" target="_blank">🔗 enhanced_zls.zig:3</a></div>
+<div class="declaration variable" id="Package">
+<span class="name">Package</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L4" class="source-link" target="_blank">🔗 enhanced_zls.zig:4</a></div>
+<div class="declaration variable" id="zsync">
+<span class="name">zsync</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L5" class="source-link" target="_blank">🔗 enhanced_zls.zig:5</a></div>
+<div class="declaration variable" id="json">
+<span class="name">json</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L6" class="source-link" target="_blank">🔗 enhanced_zls.zig:6</a></div>
+<div class="declaration variable" id="RegistryManager">
+<span class="name">RegistryManager</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L7" class="source-link" target="_blank">🔗 enhanced_zls.zig:7</a></div>
+<div class="declaration variable" id="ZionConfig">
+<span class="name">ZionConfig</span> <span class="kind">Variables</span><a href="https://github.com/ghostkellz/zion/blob/main/src/commands/enhanced_zls.zig#L8" class="source-link" target="_blank">🔗 enhanced_zls.zig:8</a></div>
+</div>
+</div>
+<script>
+document.getElementById('search').addEventListener('input', function(e) {
+  const query = e.target.value.toLowerCase();
+  const navItems = document.querySelectorAll('.nav-item');
+  const declarations = document.querySelectorAll('.declaration');
+  const sections = document.querySelectorAll('.nav-section');
+
+  navItems.forEach(function(item) {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(query) ? 'block' : 'none';
+  });
+
+  declarations.forEach(function(decl) {
+    const name = decl.querySelector('.name').textContent.toLowerCase();
+    decl.style.display = name.includes(query) ? 'block' : 'none';
+  });
+
+  sections.forEach(function(section) {
+    const visibleItems = section.querySelectorAll('.nav-item[style*="block"], .nav-item:not([style])');
+    section.style.display = (query === '' || visibleItems.length > 0) ? 'block' : 'none';
+  });
+});
+
+// Syntax highlighting for Zig code
+function highlightZig(code) {
+  const keywords = ['const', 'var', 'pub', 'fn', 'struct', 'enum', 'union', 'if', 'else', 'while', 'for', 'return', 'try', 'catch', 'defer', 'errdefer', 'switch', 'and', 'or', 'null', 'undefined', 'true', 'false', 'test', 'comptime', 'inline', 'export', 'extern', 'packed', 'align', 'volatile', 'allowzero', 'async', 'await', 'suspend', 'resume', 'cancel'];
+  const types = ['u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64', 'f32', 'f64', 'bool', 'usize', 'isize', 'c_short', 'c_ushort', 'c_int', 'c_uint', 'c_long', 'c_ulong', 'c_longlong', 'c_ulonglong', 'c_longdouble', 'c_void', 'void', 'noreturn', 'type', 'anyerror', 'anyframe', 'anytype'];
+
+  let result = code;
+
+  // Highlight strings
+  result = result.replace(/"([^"\\\\]|\\\\.)*"/g, '<span class="zig-string">$&</span>');
+  result = result.replace(/'([^'\\\\]|\\\\.)'/g, '<span class="zig-string">$&</span>');
+
+  // Highlight numbers
+  result = result.replace(/\\b\\d+(\\.\\d+)?\\b/g, '<span class="zig-number">$&</span>');
+
+  // Highlight comments
+  result = result.replace(/\\/\\/.*$/gm, '<span class="zig-comment">$&</span>');
+
+  // Highlight keywords
+  keywords.forEach(function(keyword) {
+    const regex = new RegExp('\\\\b' + keyword + '\\\\b', 'g');
+    result = result.replace(regex, '<span class="zig-keyword">' + keyword + '</span>');
+  });
+
+  // Highlight types
+  types.forEach(function(type) {
+    const regex = new RegExp('\\\\b' + type + '\\\\b', 'g');
+    result = result.replace(regex, '<span class="zig-type">' + type + '</span>');
+  });
+
+  return result;
+}
+
+// Apply syntax highlighting on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const codeBlocks = document.querySelectorAll('code');
+  codeBlocks.forEach(function(block) {
+    if (block.textContent.includes('const') || block.textContent.includes('fn') || block.textContent.includes('pub')) {
+      block.innerHTML = highlightZig(block.textContent);
+    }
+  });
+});
+</script>
+</body>
+</html>

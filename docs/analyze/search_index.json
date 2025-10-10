@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/analyze.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "fs",
+      "type": "variable",
+      "file": "src/commands/analyze.zig",
+      "line": 2,
+      "keywords": ["fs", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/analyze.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "analyze",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 7,
+      "signature": "fn(Allocator, ) void",
+      "keywords": ["analyze", "function"]
+    },
+    {
+      "name": "printAnalyzeHelp",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 32,
+      "description": "Print analyze help",
+      "signature": "fn() void",
+      "keywords": ["printAnalyzeHelp", "function", "Print", "analyze", "help"]
+    },
+    {
+      "name": "analyzeDependencies",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 59,
+      "description": "Analyze project dependencies and show tree",
+      "signature": "fn(Allocator) void",
+      "keywords": ["analyzeDependencies", "function", "Analyze", "project", "dependencies", "and", "show", "tree"]
+    },
+    {
+      "name": "findUnusedDependencies",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 150,
+      "description": "Find potentially unused dependencies",
+      "signature": "fn(Allocator) void",
+      "keywords": ["findUnusedDependencies", "function", "Find", "potentially", "unused", "dependencies"]
+    },
+    {
+      "name": "findVersionConflicts",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 169,
+      "description": "Find version conflicts (simplified)",
+      "signature": "fn(Allocator) void",
+      "keywords": ["findVersionConflicts", "function", "Find", "version", "conflicts", "(simplified)"]
+    },
+    {
+      "name": "securityAudit",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 196,
+      "description": "Basic security audit",
+      "signature": "fn(Allocator) void",
+      "keywords": ["securityAudit", "function", "Basic", "security", "audit"]
+    },
+    {
+      "name": "analyzeBinarySize",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 214,
+      "description": "Analyze binary size impact",
+      "signature": "fn(Allocator) void",
+      "keywords": ["analyzeBinarySize", "function", "Analyze", "binary", "size", "impact"]
+    },
+    {
+      "name": "extractDepName",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 255,
+      "description": "Extract dependency name from a zon line",
+      "signature": "fn() ?",
+      "keywords": ["extractDepName", "function", "Extract", "dependency", "name", "from", "zon", "line"]
+    },
+    {
+      "name": "scanForImports",
+      "type": "function",
+      "file": "src/commands/analyze.zig",
+      "line": 269,
+      "description": "Basic import scanning",
+      "signature": "fn(Allocator) void",
+      "keywords": ["scanForImports", "function", "Basic", "import", "scanning"]
+    }
+  ]
+}

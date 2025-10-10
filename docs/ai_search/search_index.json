@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/commands/ai_search.zig",
+      "line": 1,
+      "keywords": ["std", "variable"]
+    },
+    {
+      "name": "zsync",
+      "type": "variable",
+      "file": "src/commands/ai_search.zig",
+      "line": 2,
+      "keywords": ["zsync", "variable"]
+    },
+    {
+      "name": "Allocator",
+      "type": "variable",
+      "file": "src/commands/ai_search.zig",
+      "line": 3,
+      "keywords": ["Allocator", "variable"]
+    },
+    {
+      "name": "zeke_client",
+      "type": "variable",
+      "file": "src/commands/ai_search.zig",
+      "line": 4,
+      "keywords": ["zeke_client", "variable"]
+    },
+    {
+      "name": "aiSearch",
+      "type": "function",
+      "file": "src/commands/ai_search.zig",
+      "line": 7,
+      "signature": "fn(Allocator, args: [, [: 0) void",
+      "keywords": ["aiSearch", "function"]
+    },
+    {
+      "name": "displayPackageRecommendation",
+      "type": "function",
+      "file": "src/commands/ai_search.zig",
+      "line": 80,
+      "description": "Display a single package recommendation with rich formatting",
+      "signature": "fn(index: usize, usize) void",
+      "keywords": ["displayPackageRecommendation", "function", "Display", "single", "package", "recommendation", "with", "rich", "formatting"]
+    },
+    {
+      "name": "generateRelatedSearches",
+      "type": "function",
+      "file": "src/commands/ai_search.zig",
+      "line": 115,
+      "description": "Generate related search suggestions based on the query",
+      "signature": "fn() void",
+      "keywords": ["generateRelatedSearches", "function", "Generate", "related", "search", "suggestions", "based", "the", "query"]
+    },
+    {
+      "name": "queryRelatedTo",
+      "type": "function",
+      "file": "src/commands/ai_search.zig",
+      "line": 154,
+      "description": "Check if a query is related to a suggestion",
+      "signature": "fn(suggestion: [, ) bool",
+      "keywords": ["queryRelatedTo", "function", "Check", "query", "related", "suggestion"]
+    },
+    {
+      "name": "aiChat",
+      "type": "function",
+      "file": "src/commands/ai_search.zig",
+      "line": 177,
+      "signature": "fn(Allocator, args: [, [: 0) void",
+      "keywords": ["aiChat", "function"]
+    }
+  ]
+}
