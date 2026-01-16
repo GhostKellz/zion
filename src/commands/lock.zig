@@ -1,8 +1,11 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
+const zion_root = @import("../root.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -11,10 +14,11 @@ pub fn lock(allocator: Allocator) !void {
     std.debug.print("Updating lock file...\n", .{});
 
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Check if file exists
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;

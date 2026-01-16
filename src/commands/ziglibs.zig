@@ -4,6 +4,9 @@ const Allocator = std.mem.Allocator;
 const RegistryManager = @import("../enhanced_registry_manager.zig").RegistryManager;
 const ZionConfig = @import("../registry_config.zig").ZionConfig;
 const Package = @import("../registry_client.zig").Package;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// Ziglibs integration commands for enhanced package discovery
 pub fn ziglibs(allocator: Allocator, args: []const []const u8) !void {
@@ -204,9 +207,12 @@ fn searchZiglibsPackages(allocator: Allocator, query: []const u8) !void {
 
 fn showZiglibsStatus(allocator: Allocator) !void {
     print("📈 Ziglibs Status for Current Project\n\n", .{});
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Read build.zig.zon to check current dependencies
-    const zon_content = std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
+    const zon_content = cwd.readFileAlloc(io, "build.zig.zon", allocator, Io.Limit.limited(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No build.zig.zon found. Run 'zion init' first.\n", .{});
             return;
@@ -214,9 +220,9 @@ fn showZiglibsStatus(allocator: Allocator) !void {
         else => return err,
     };
     defer allocator.free(zon_content);
-    
+
     // Simple parsing to find ziglibs dependencies
-    var ziglibs_deps: std.ArrayList([]const u8) = .{};
+    var ziglibs_deps: std.ArrayListUnmanaged([]const u8) = .empty;
     defer {
         for (ziglibs_deps.items) |dep| allocator.free(dep);
         ziglibs_deps.deinit(allocator);

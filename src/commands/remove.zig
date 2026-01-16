@@ -1,9 +1,12 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
+const zion_root = @import("../root.zig");
 
 /// Remove a dependency from the project
 pub fn remove(allocator: Allocator, package_name: []const u8) !void {
@@ -11,9 +14,10 @@ pub fn remove(allocator: Allocator, package_name: []const u8) !void {
 
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: build.zig.zon not found. No project to remove dependencies from.\n", .{});
             return error.FileNotFound;
@@ -93,7 +97,7 @@ pub fn remove(allocator: Allocator, package_name: []const u8) !void {
     defer allocator.free(deps_path);
 
     std.debug.print("Removing package directory {s}...\n", .{deps_path});
-    cwd.deleteTree(deps_path) catch |err| {
+    cwd.deleteTree(io, deps_path) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("  (directory not found, skipping)\n", .{});
         } else {
@@ -135,10 +139,11 @@ fn removeFromLockFile(lock_file: *LockFile, package_name: []const u8) !void {
 
 /// Remove the dependency from build.zig
 fn removeFromBuildZig(allocator: Allocator, package_name: []const u8) !void {
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Check if build.zig exists
-    cwd.access("build.zig", .{}) catch |err| {
+    cwd.access(io, "build.zig", .{}) catch |err| {
         if (err == error.FileNotFound) {
             return; // No build.zig to modify
         }
@@ -146,7 +151,7 @@ fn removeFromBuildZig(allocator: Allocator, package_name: []const u8) !void {
     };
 
     // Read build.zig content
-    const build_content = try cwd.readFileAlloc("build.zig", allocator, @enumFromInt(10 * 1024 * 1024));
+    const build_content = try cwd.readFileAlloc(io, "build.zig", allocator, Io.Limit.limited(10 * 1024 * 1024));
     defer allocator.free(build_content);
 
     // Look for the dependency block to remove
@@ -199,7 +204,7 @@ fn removeFromBuildZig(allocator: Allocator, package_name: []const u8) !void {
             defer allocator.free(new_content);
 
             // Write back to file
-            try cwd.writeFile(.{ .sub_path = "build.zig", .data = new_content });
+            try cwd.writeFile(io, .{ .sub_path = "build.zig", .data = new_content });
             std.debug.print("  ✓ Removed {s} module definition from build.zig\n", .{package_name});
         } else {
             std.debug.print("  ⚠️  Found dependency comment but could not locate full block to remove\n", .{});

@@ -5,26 +5,29 @@ const commands = zion.commands;
 const qol = zion.qol_enhancements;
 const AsyncCommandHandler = @import("async_command_handler.zig").AsyncCommandHandler;
 
+// Re-export AppContext from zion module for convenience
+const AppContext = zion.AppContext;
+
 /// Async wrapper for add command to leverage zsync performance
 fn addAsync(allocator: std.mem.Allocator, io: zsync.Io, package_ref: []const u8, options: commands.AddOptions) !void {
     _ = io; // For future async operations
     try commands.add(allocator, package_ref, options);
 }
 
-/// Async wrapper for multiple package add to leverage zsync performance  
+/// Async wrapper for multiple package add to leverage zsync performance
 fn addMultipleAsync(allocator: std.mem.Allocator, io: zsync.Io, packages: []const []const u8, options: commands.AddOptions) !void {
     _ = io; // For future async operations
     try commands.addMultiple(allocator, packages, options);
 }
 
 /// Async wrapper for search command to leverage zsync performance
-fn searchAsync(allocator: std.mem.Allocator, io: zsync.Io, args: [][:0]u8) !void {
-    _ = io; // For future async operations  
+fn searchAsync(allocator: std.mem.Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
+    _ = io; // For future async operations
     try commands.search(allocator, args);
 }
 
 /// Async wrapper for registry operations to leverage zsync performance
-fn registryAsync(allocator: std.mem.Allocator, io: zsync.Io, args: [][:0]u8) !void {
+fn registryAsync(allocator: std.mem.Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
     _ = io; // For future async operations
     try commands.registry(allocator, args);
 }
@@ -66,28 +69,87 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     return command;
 }
 
-pub fn main() !void {
-    // Use high-performance runtime for optimal performance (zsync v0.5.4)
-    // Leverages platform-specific optimizations and advanced I/O
-    try zsync.runHighPerf(zionMain, .{});
+/// Main entry point - accepts std.process.Init for Zig 0.16.0 compatibility
+/// This provides access to:
+///   - init.gpa: General purpose allocator
+///   - init.io: std.Io for standard library operations
+///   - init.minimal.args: Command line arguments
+///   - init.environ_map: Environment variables
+pub fn main(init: std.process.Init) !void {
+    // Convert args to slice using the provided arena allocator
+    const args = init.minimal.args.toSlice(init.arena.allocator()) catch |err| {
+        std.debug.print("Failed to get command line arguments: {}\n", .{err});
+        return;
+    };
+
+    // Set up application context for passing through to zionMain
+    // This is stored in the zion module so all commands can access it
+    const context = AppContext{
+        .allocator = init.gpa,
+        .std_io = init.io,
+        .args = args,
+        .environ = init.environ_map,
+    };
+    zion.app_context = &context;
+    defer zion.app_context = null;
+
+    // Create zsync runtime using the allocator from Init
+    // This properly integrates zsync with Zig 0.16's allocation model
+    const runtime = zsync.createOptimalRuntime(init.gpa) catch |err| {
+        std.debug.print("Failed to create async runtime: {}, falling back to sync\n", .{err});
+        // Fallback to synchronous execution
+        try zionMainSync(&context);
+        return;
+    };
+    defer runtime.deinit();
+
+    // Run the main application logic with async support
+    // zsync's runtime provides the Io interface to the callback
+    runtime.run(zionMain, .{}) catch |err| {
+        std.debug.print("Runtime error: {}, falling back to sync\n", .{err});
+        try zionMainSync(&context);
+    };
+}
+
+/// Synchronous fallback when async runtime is unavailable
+fn zionMainSync(ctx: *const AppContext) !void {
+    zion.logger.init();
+
+    if (ctx.args.len < 2) {
+        try commands.help(ctx.allocator);
+        return;
+    }
+
+    const raw_command = ctx.args[1];
+    const command = resolveCommandAlias(raw_command);
+
+    // Handle basic commands synchronously
+    if (std.mem.eql(u8, command, "version") or std.mem.eql(u8, raw_command, "--version") or std.mem.eql(u8, raw_command, "-V")) {
+        try commands.version(ctx.allocator);
+    } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, raw_command, "--help") or std.mem.eql(u8, raw_command, "-h")) {
+        try commands.help(ctx.allocator);
+    } else {
+        try commands.help(ctx.allocator);
+    }
 }
 
 fn zionMain(io: zsync.Io) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .retain_metadata = false }){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    // Get the application context from thread-local storage in zion module
+    const ctx = zion.app_context orelse {
+        std.debug.print("Error: Application context not available\n", .{});
+        return;
+    };
+
+    const allocator = ctx.allocator;
+    const args = ctx.args;
 
     // Initialize logging system
     zion.logger.init();
 
-    // Initialize async command handler for v1.0.7 features  
+    // Initialize async command handler for v1.0.7 features
     var async_handler = AsyncCommandHandler.init(allocator, io) catch |err| {
         std.debug.print("⚠️  Async features unavailable: {}\n", .{err});
         std.debug.print("   Falling back to synchronous operations\n", .{});
-        
-        // Handle fallback synchronously
-        const args = try std.process.argsAlloc(allocator);
-        defer std.process.argsFree(allocator, args);
 
         if (args.len < 2) {
             try commands.help(allocator);
@@ -96,7 +158,7 @@ fn zionMain(io: zsync.Io) !void {
 
         const raw_command = args[1];
         const command = resolveCommandAlias(raw_command);
-        
+
         // Handle basic commands synchronously
         if (std.mem.eql(u8, command, "version")) {
             try commands.version(allocator);
@@ -108,9 +170,6 @@ fn zionMain(io: zsync.Io) !void {
         return;
     };
     defer async_handler.deinit();
-
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
 
     if (args.len < 2) {
         try commands.help(allocator);
@@ -314,7 +373,7 @@ fn zionMain(io: zsync.Io) !void {
         // Standalone Arch verification command - same as keyring archver
         const archver_str = try allocator.dupeZ(u8, "archver");
         defer allocator.free(archver_str);
-        var archver_args = [_][:0]u8{ args[0], args[1], archver_str };
+        var archver_args = [_][:0]const u8{ args[0], args[1], archver_str };
         try commands.keyring(allocator, &archver_args);
     } else {
         std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});

@@ -3,6 +3,9 @@ const json = std.json;
 const http = std.http;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("root.zig");
 const registry = @import("registry.zig");
 const enhanced_config = @import("enhanced_config.zig");
 
@@ -409,6 +412,8 @@ fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHu
 
 /// Fetch JSON data using curl (fallback for HTTP client issues)
 fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
+    const io = try zion_root.getIo();
+
     const argv = [_][]const u8{
         "curl",
         "-s",
@@ -416,43 +421,47 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
         "-H", "User-Agent: Zion-Package-Manager/0.5.0",
         url,
     };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    
-    // Use direct file readAll with pre-allocated buffers
-    var stdout_buf: std.ArrayList(u8) = .{};
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
+
+    // Use direct file readStreaming with pre-allocated buffers
+    var stdout_buf: std.ArrayList(u8) = .empty;
     defer stdout_buf.deinit(allocator);
-    var stderr_buf: std.ArrayList(u8) = .{};
+    var stderr_buf: std.ArrayList(u8) = .empty;
     defer stderr_buf.deinit(allocator);
-    
-    // Read data in chunks
+
+    // Read data in chunks using scatter/gather API
     var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try stdout_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+    if (child.stdout) |stdout_pipe| {
+        while (true) {
+            const bytes_read = stdout_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stdout_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+        }
     }
-    
-    while (true) {
-        const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+
+    if (child.stderr) |stderr_pipe| {
+        while (true) {
+            const bytes_read = stderr_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+        }
     }
-    
+
     const stdout = try allocator.dupe(u8, stdout_buf.items);
     const stderr = try allocator.dupe(u8, stderr_buf.items);
     defer allocator.free(stderr);
     errdefer allocator.free(stdout); // Free stdout on error, caller frees on success
-    
-    const term = try child.wait();
-    
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
                 std.debug.print("curl failed (exit code {d}): {s}\n", .{ code, stderr });
                 return error.CurlFailed;
@@ -463,6 +472,6 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
             return error.CurlFailed;
         },
     }
-    
+
     return stdout;
 }

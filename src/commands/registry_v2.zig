@@ -2,9 +2,10 @@ const std = @import("std");
 const enhanced_config = @import("../enhanced_config.zig");
 const registry_manager = @import("../registry_manager.zig");
 const registry_v2 = @import("../registry_v2.zig");
+const zion_root = @import("../root.zig");
 
 /// Enhanced registry command for v0.7.0 with comprehensive registry management
-pub fn registryCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
+pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         try showRegistryHelp();
         return;
@@ -156,10 +157,10 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
     
     // Show configuration source
     std.debug.print("📋 Configuration Sources:\n", .{});
-    if (std.posix.getenv("ZION_REGISTRY_URL")) |_| {
+    if (zion_root.getEnv("ZION_REGISTRY_URL")) |_| {
         std.debug.print("   ✅ ZION_REGISTRY_URL environment variable\n", .{});
     }
-    if (std.posix.getenv("ZION_REGISTRIES")) |_| {
+    if (zion_root.getEnv("ZION_REGISTRIES")) |_| {
         std.debug.print("   ✅ ZION_REGISTRIES environment variable\n", .{});
     }
     std.debug.print("   ℹ️  Default GitHub fallback\n", .{});
@@ -191,7 +192,7 @@ fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[]const u8)
         std.debug.print("   export ZION_REGISTRY_TOKEN=\"your-auth-token\"  # if needed\n", .{});
     } else {
         std.debug.print("   # Add to registry list:\n", .{});
-        if (std.posix.getenv("ZION_REGISTRIES")) |existing| {
+        if (zion_root.getEnv("ZION_REGISTRIES")) |existing| {
             std.debug.print("   export ZION_REGISTRIES=\"{s},{s}\"\n", .{ existing, url });
         } else {
             std.debug.print("   export ZION_REGISTRIES=\"{s}\"\n", .{url});
@@ -281,9 +282,9 @@ fn testAllRegistries(allocator: std.mem.Allocator) !void {
     for (config.registries.items, 0..) |registry, i| {
         std.debug.print("[{d}/{d}] Testing {s}...\n", .{ i + 1, config.registries.items.len, registry.name });
         
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
         const is_healthy = testRegistryConfig(allocator, registry) catch false;
-        const response_time = @as(u64, @intCast(std.time.milliTimestamp() - start_time));
+        const response_time = @as(u64, @intCast(zion_root.milliTimestamp() - start_time));
         
         if (is_healthy) {
             healthy_count += 1;
@@ -340,7 +341,7 @@ fn showRegistryHealth(allocator: std.mem.Allocator) !void {
         
         if (status.last_checked > 0) {
             std.debug.print("   Last Checked: {d}s ago\n", .{
-                @divTrunc(std.time.timestamp() - status.last_checked, 1000)
+                @divTrunc(zion_root.timestamp() - status.last_checked, 1000)
             });
         }
         
@@ -514,7 +515,8 @@ fn testRegistryUrl(allocator: std.mem.Allocator, url: []const u8) !void {
 }
 
 fn testRegistryConfig(allocator: std.mem.Allocator, registry: enhanced_config.RegistryConfig) !bool {
-    var client = registry_v2.RegistryClient.init(allocator, registry);
+    const io = try zion_root.getIo();
+    var client = registry_v2.RegistryClient.init(allocator, registry, io);
     defer client.deinit();
     
     // Test health endpoint
@@ -637,7 +639,11 @@ fn testAuthToken(allocator: std.mem.Allocator, registry_name: []const u8) !void 
             }
             
             // Test authenticated request
-            var client = registry_v2.RegistryClient.init(allocator, registry);
+            const io = zion_root.getIo() catch {
+                std.debug.print("❌ Failed to get I/O context\n", .{});
+                return;
+            };
+            var client = registry_v2.RegistryClient.init(allocator, registry, io);
             defer client.deinit();
             
             // Make an authenticated request (this would be registry-specific)

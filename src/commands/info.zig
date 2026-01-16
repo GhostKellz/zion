@@ -1,17 +1,21 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const github = @import("../github.zig");
+const zion_root = @import("../root.zig");
 
 /// Show detailed information about a package dependency
 pub fn info(allocator: Allocator, package_name: []const u8) !void {
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Check if build.zig.zon exists
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -40,7 +44,7 @@ pub fn info(allocator: Allocator, package_name: []const u8) !void {
         defer allocator.free(deps_path);
 
         const installed = blk: {
-            fs.cwd().access(deps_path, .{}) catch {
+            cwd.access(io, deps_path, .{}) catch {
                 break :blk false;
             };
             break :blk true;

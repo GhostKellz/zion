@@ -1,9 +1,10 @@
 const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
 
 /// Simple setup command for testing
-pub fn setup(allocator: Allocator, args: [][:0]u8) !void {
+pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printSetupHelp();
         return;
@@ -48,13 +49,20 @@ fn verifySetup(allocator: Allocator) !void {
 }
 
 fn checkCommand(command: []const u8) bool {
-    const which_args = [_][]const u8{ "which", command };
-    var child = std.process.Child.init(&which_args, std.heap.page_allocator);
-    child.stdout_behavior = .Ignore;
-    child.stderr_behavior = .Ignore;
-    
-    const result = child.spawnAndWait() catch return false;
-    return result.Exited == 0;
+    const io = zion_root.getIo() catch return false;
+    const argv = [_][]const u8{ "which", command };
+    var child = std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .ignore,
+    }) catch return false;
+
+    const term = child.wait(io) catch return false;
+    return switch (term) {
+        .exited => |code| code == 0,
+        else => false,
+    };
 }
 
 fn printSetupHelp() void {

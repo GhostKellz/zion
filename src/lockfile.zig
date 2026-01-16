@@ -1,7 +1,10 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const json = std.json;
+const zion_root = @import("root.zig");
 
 /// Represents a package entry in the lock file
 pub const LockedPackage = struct {
@@ -103,7 +106,7 @@ pub const LockFile = struct {
                         break :blk deps_copy;
                     } else null,
                     .dev_only = metadata.dev_only,
-                    .timestamp = std.time.timestamp(),
+                    .timestamp = zion_root.timestamp(),
                 };
                 return;
             }
@@ -126,7 +129,7 @@ pub const LockFile = struct {
                 break :blk deps_copy;
             } else null,
             .dev_only = metadata.dev_only,
-            .timestamp = std.time.timestamp(),
+            .timestamp = zion_root.timestamp(),
         };
 
         try self.packages.append(self.allocator, new_pkg);
@@ -134,11 +137,12 @@ pub const LockFile = struct {
 
     /// Load lock file from disk
     pub fn loadFromFile(allocator: Allocator) !LockFile {
-        const cwd = fs.cwd();
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
         const lock_path = "zion.lock";
 
         // Check if file exists
-        cwd.access(lock_path, .{}) catch |err| {
+        cwd.access(io, lock_path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 // If file doesn't exist, return an empty lock file
                 return LockFile.init(allocator);
@@ -147,7 +151,7 @@ pub const LockFile = struct {
         };
 
         // Read file
-        const file_content = try cwd.readFileAlloc(lock_path, allocator, @enumFromInt(10 * 1024 * 1024));
+        const file_content = try cwd.readFileAlloc(io, lock_path, allocator, Io.Limit.limited(10 * 1024 * 1024));
         defer allocator.free(file_content);
 
         // Parse JSON using new API
@@ -194,9 +198,9 @@ pub const LockFile = struct {
                                 null;
 
                             const timestamp = if (pkg_obj.get("timestamp")) |t|
-                                if (t == .integer) t.integer else std.time.timestamp()
+                                if (t == .integer) t.integer else zion_root.timestamp()
                             else
-                                std.time.timestamp();
+                                zion_root.timestamp();
 
                             // v0.7.0 enhanced fields
                             const registry = if (pkg_obj.get("registry")) |r|
@@ -258,86 +262,87 @@ pub const LockFile = struct {
 
     /// Save lock file to disk
     pub fn saveToFile(self: *const LockFile) !void {
-        const cwd = fs.cwd();
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
         const lock_path = "zion.lock";
 
-        var file = try cwd.createFile(lock_path, .{ .truncate = true });
-        defer file.close();
+        var file = try cwd.createFile(io, lock_path, .{ .truncate = true });
+        defer file.close(io);
 
         // Create a simple JSON structure manually for better control
-        try file.writeAll("{\n  \"packages\": [\n");
+        try file.writeStreamingAll(io, "{\n  \"packages\": [\n");
 
         for (self.packages.items, 0..) |pkg, i| {
-            try file.writeAll("    {\n");
+            try file.writeStreamingAll(io, "    {\n");
             const name_line = try std.fmt.allocPrint(self.allocator, "      \"name\": \"{s}\",\n", .{pkg.name});
             defer self.allocator.free(name_line);
-            try file.writeAll(name_line);
-            
+            try file.writeStreamingAll(io, name_line);
+
             const url_line = try std.fmt.allocPrint(self.allocator, "      \"url\": \"{s}\",\n", .{pkg.url});
             defer self.allocator.free(url_line);
-            try file.writeAll(url_line);
-            
+            try file.writeStreamingAll(io, url_line);
+
             const hash_line = try std.fmt.allocPrint(self.allocator, "      \"hash\": \"{s}\",\n", .{pkg.hash});
             defer self.allocator.free(hash_line);
-            try file.writeAll(hash_line);
-            
+            try file.writeStreamingAll(io, hash_line);
+
             const timestamp_line = try std.fmt.allocPrint(self.allocator, "      \"timestamp\": {d}", .{pkg.timestamp});
             defer self.allocator.free(timestamp_line);
-            try file.writeAll(timestamp_line);
+            try file.writeStreamingAll(io, timestamp_line);
 
             if (pkg.version) |version| {
                 const version_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version\": \"{s}\"", .{version});
                 defer self.allocator.free(version_line);
-                try file.writeAll(version_line);
+                try file.writeStreamingAll(io, version_line);
             }
 
             // v0.7.0 enhanced fields
             if (pkg.registry) |registry| {
                 const registry_line = try std.fmt.allocPrint(self.allocator, ",\n      \"registry\": \"{s}\"", .{registry});
                 defer self.allocator.free(registry_line);
-                try file.writeAll(registry_line);
+                try file.writeStreamingAll(io, registry_line);
             }
 
             if (pkg.resolved_from) |resolved_from| {
                 const resolved_from_line = try std.fmt.allocPrint(self.allocator, ",\n      \"resolved_from\": \"{s}\"", .{resolved_from});
                 defer self.allocator.free(resolved_from_line);
-                try file.writeAll(resolved_from_line);
+                try file.writeStreamingAll(io, resolved_from_line);
             }
 
             if (pkg.integrity) |integrity| {
                 const integrity_line = try std.fmt.allocPrint(self.allocator, ",\n      \"integrity\": \"{s}\"", .{integrity});
                 defer self.allocator.free(integrity_line);
-                try file.writeAll(integrity_line);
+                try file.writeStreamingAll(io, integrity_line);
             }
 
             if (pkg.dependencies) |dependencies| {
-                try file.writeAll(",\n      \"dependencies\": [");
+                try file.writeStreamingAll(io, ",\n      \"dependencies\": [");
                 for (dependencies, 0..) |dep, dep_i| {
                     const dep_line = try std.fmt.allocPrint(self.allocator, "\"{s}\"", .{dep});
                     defer self.allocator.free(dep_line);
-                    try file.writeAll(dep_line);
+                    try file.writeStreamingAll(io, dep_line);
                     if (dep_i < dependencies.len - 1) {
-                        try file.writeAll(", ");
+                        try file.writeStreamingAll(io, ", ");
                     }
                 }
-                try file.writeAll("]");
+                try file.writeStreamingAll(io, "]");
             }
 
             if (pkg.dev_only) {
                 const dev_only_line = try std.fmt.allocPrint(self.allocator, ",\n      \"dev_only\": {}", .{pkg.dev_only});
                 defer self.allocator.free(dev_only_line);
-                try file.writeAll(dev_only_line);
+                try file.writeStreamingAll(io, dev_only_line);
             }
 
-            try file.writeAll("\n    }");
+            try file.writeStreamingAll(io, "\n    }");
 
             if (i < self.packages.items.len - 1) {
-                try file.writeAll(",");
+                try file.writeStreamingAll(io, ",");
             }
-            try file.writeAll("\n");
+            try file.writeStreamingAll(io, "\n");
         }
 
-        try file.writeAll("  ]\n}\n");
+        try file.writeStreamingAll(io, "  ]\n}\n");
     }
 
     /// Get a package by name

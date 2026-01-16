@@ -1,8 +1,9 @@
 const std = @import("std");
 const build_cache = @import("../build_cache.zig");
+const zion_root = @import("../root.zig");
 const Allocator = std.mem.Allocator;
 
-pub fn cache(allocator: Allocator, args: [][:0]u8) !void {
+pub fn cache(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         std.debug.print("Usage: zion cache <command> [options]\n", .{});
         std.debug.print("\nCommands:\n", .{});
@@ -12,9 +13,12 @@ pub fn cache(allocator: Allocator, args: [][:0]u8) !void {
         std.debug.print("  restore <project>  Restore build from cache\n", .{});
         return;
     }
-    
-    const cache_dir = std.process.getEnvVarOwned(allocator, "ZION_CACHE_DIR") catch try std.fmt.allocPrint(allocator, "{s}/.zion/cache", .{std.process.getEnvVarOwned(allocator, "HOME") catch "/tmp"});
-    defer allocator.free(cache_dir);
+
+    const home_dir = zion_root.getEnv("HOME") orelse "/tmp";
+    const cache_dir = zion_root.getEnv("ZION_CACHE_DIR") orelse
+        try std.fmt.allocPrint(allocator, "{s}/.zion/cache", .{home_dir});
+    const should_free = zion_root.getEnv("ZION_CACHE_DIR") == null;
+    defer if (should_free) allocator.free(cache_dir);
     
     var cache_system = build_cache.BuildCache.init(allocator, cache_dir) catch |err| {
         std.debug.print("❌ Failed to initialize build cache: {}\n", .{err});

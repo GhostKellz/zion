@@ -6,6 +6,9 @@ const zsync = @import("zsync");
 const json = std.json;
 const RegistryManager = @import("../enhanced_registry_manager.zig").RegistryManager;
 const ZionConfig = @import("../registry_config.zig").ZionConfig;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// Enhanced ZLS integration with real-time dependency management
 pub fn enhanced_zls(allocator: Allocator, args: [][:0]u8) !void {
@@ -71,67 +74,45 @@ fn showEnhancedZlsHelp() !void {
 
 fn zlsDoctor(allocator: Allocator) !void {
     print("🧞 ZLS Comprehensive Health Check\n\n", .{});
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     var issues = std.ArrayList([]const u8).init(allocator);
     defer {
         for (issues.items) |issue| allocator.free(issue);
         issues.deinit(allocator);
     }
-    
+
     // Check ZLS installation
     print("🔍 ZLS Installation:\n", .{});
-    const zls_result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "zls", "--version" },
-        .max_output_bytes = 1024,
-    }) catch null;
-    
-    if (zls_result) |result| {
-        defer allocator.free(result.stdout);
-        defer allocator.free(result.stderr);
-        
-        if (result.term == .Exited and result.term.Exited == 0) {
-            const version = std.mem.trim(u8, result.stdout, " \t\n\r");
-            print("  ✅ ZLS Version: {s}\n", .{version});
-        } else {
-            print("  ❌ ZLS not working properly\n", .{});
-            try issues.append(try allocator.dupe(u8, "ZLS installation issue"));
-        }
-    } else {
-        print("  ❌ ZLS not found in PATH\n", .{});
-        try issues.append(try allocator.dupe(u8, "ZLS not installed"));
+    const zls_ok = checkCommand(allocator, io, &.{ "zls", "--version" }, "ZLS") catch false;
+    if (!zls_ok) {
+        try issues.append(try allocator.dupe(u8, "ZLS not installed or not working"));
     }
-    
+
     // Check Zig installation
     print("\n🔧 Zig Installation:\n", .{});
-    const zig_result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "zig", "version" },
-        .max_output_bytes = 1024,
-    }) catch null;
-    
-    if (zig_result) |result| {
-        defer allocator.free(result.stdout);
-        defer allocator.free(result.stderr);
-        
-        if (result.term == .Exited and result.term.Exited == 0) {
-            const version = std.mem.trim(u8, result.stdout, " \t\n\r");
-            print("  ✅ Zig Version: {s}\n", .{version});
-        } else {
-            print("  ❌ Zig not working properly\n", .{});
-            try issues.append(try allocator.dupe(u8, "Zig installation issue"));
-        }
-    } else {
-        print("  ❌ Zig not found in PATH\n", .{});
-        try issues.append(try allocator.dupe(u8, "Zig not installed"));
+    const zig_ok = checkCommand(allocator, io, &.{ "zig", "version" }, "Zig") catch false;
+    if (!zig_ok) {
+        try issues.append(try allocator.dupe(u8, "Zig not installed or not working"));
     }
-    
+
     // Check project structure
     print("\n📁 Project Structure:\n", .{});
-    
-    const has_build_zig = std.fs.cwd().access("build.zig", .{}) catch false;
-    const has_build_zon = std.fs.cwd().access("build.zig.zon", .{}) catch false;
-    const has_src_dir = std.fs.cwd().access("src", .{}) catch false;
+
+    const has_build_zig = blk: {
+        cwd.access(io, "build.zig", .{}) catch break :blk false;
+        break :blk true;
+    };
+    const has_build_zon = blk: {
+        cwd.access(io, "build.zig.zon", .{}) catch break :blk false;
+        break :blk true;
+    };
+    const has_src_dir = blk: {
+        cwd.access(io, "src", .{}) catch break :blk false;
+        break :blk true;
+    };
     
     if (has_build_zig) {
         print("  ✅ build.zig found\n", .{});
@@ -154,8 +135,11 @@ fn zlsDoctor(allocator: Allocator) !void {
     
     // Check ZLS configuration
     print("\n⚙️ ZLS Configuration:\n", .{});
-    
-    const has_zls_json = std.fs.cwd().access("zls.json", .{}) catch false;
+
+    const has_zls_json = blk: {
+        cwd.access(io, "zls.json", .{}) catch break :blk false;
+        break :blk true;
+    };
     const has_global_config = checkGlobalZlsConfig(allocator);
     
     if (has_zls_json) {
@@ -224,46 +208,46 @@ fn zlsDeps(allocator: Allocator, args: [][:0]u8) !void {
 
 fn zlsCompletions(allocator: Allocator) !void {
     print("📝 Generating ZLS completion data...\n\n", .{});
-    
+
+    const io = try zion_root.getIo();
+
     // Load configuration
     var config = ZionConfig.init(allocator);
     defer config.deinit();
     try config.loadFromEnvironment();
-    
+
     // Initialize registry manager
     var manager = try RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Generate package name completions
     print("🔍 Fetching popular packages for completion...\n", .{});
-    
+
     const popular_packages = try manager.searchPackages("zig", 100);
     defer {
         for (popular_packages) |pkg| pkg.deinit(allocator);
         allocator.free(popular_packages);
     }
-    
+
     // Create completion data file
     const completion_data = try generateCompletionData(allocator, popular_packages);
     defer allocator.free(completion_data);
-    
+
     const zls_dir = try getZlsDataDir(allocator);
     defer allocator.free(zls_dir);
-    
-    std.fs.makeDirAbsolute(zls_dir) catch |err| switch (err) {
+
+    Dir.createDirAbsolute(io, zls_dir, .default_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
-    
+
     const completion_file = try std.fmt.allocPrint(allocator, "{s}/zion_completions.json", .{zls_dir});
     defer allocator.free(completion_file);
-    
-    const file = try std.fs.createFileAbsolute(completion_file, .{});
-    defer file.close();
-    
-    try file.writeAll(completion_data);
-    
+
+    // Write completion file
+    try Dir.writeFile(Dir.cwd(), io, .{ .sub_path = completion_file, .data = completion_data });
+
     print("✅ Completion data generated: {s}\n", .{completion_file});
     print("💡 ZLS will now provide package name completions\n", .{});
 }
@@ -382,16 +366,22 @@ fn validateZlsConfig(allocator: Allocator, config_path: []const u8) !void {
 
 fn checkDependencyHealth(allocator: Allocator, issues: *std.ArrayList([]const u8)) !void {
     _ = issues;
-    
-    const has_zon = std.fs.cwd().access("build.zig.zon", .{}) catch false;
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const has_zon = blk: {
+        cwd.access(io, "build.zig.zon", .{}) catch break :blk false;
+        break :blk true;
+    };
+
     if (has_zon) {
-        const zon_content = try std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024));
+        const zon_content = try cwd.readFileAlloc(io, "build.zig.zon", allocator, Io.Limit.limited(1024 * 1024));
         defer allocator.free(zon_content);
-        
+
         const dep_count = std.mem.count(u8, zon_content, ".url");
         print("  ✅ Found {} dependencies\n", .{dep_count});
-        
+
         if (dep_count > 0) {
             print("  📊 Dependency health: Good\n", .{});
         }
@@ -403,7 +393,10 @@ fn checkDependencyHealth(allocator: Allocator, issues: *std.ArrayList([]const u8
 fn generateOptimalZlsConfig(allocator: Allocator) !void {
     _ = allocator;
     print("⚙️ Generating optimal ZLS configuration...\n\n", .{});
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const optimal_config =
         \\{
         \\  "enable_snippets": true,
@@ -434,12 +427,9 @@ fn generateOptimalZlsConfig(allocator: Allocator) !void {
         \\}
         \\
     ;
-    
-    const file = try std.fs.cwd().createFile("zls.json", .{});
-    defer file.close();
-    
-    try file.writeAll(optimal_config);
-    
+
+    try cwd.writeFile(io, .{ .sub_path = "zls.json", .data = optimal_config });
+
     print("✅ Created optimal zls.json configuration\n", .{});
     print("💡 Features enabled:\n", .{});
     print("  • Snippets and autofix\n", .{});
@@ -450,8 +440,11 @@ fn generateOptimalZlsConfig(allocator: Allocator) !void {
 
 fn showCurrentZlsConfig(allocator: Allocator) !void {
     print("⚙️ Current ZLS Configuration\n\n", .{});
-    
-    const config_content = std.fs.cwd().readFileAlloc("zls.json", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const config_content = cwd.readFileAlloc(io, "zls.json", allocator, Io.Limit.limited(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No zls.json found in current directory\n", .{});
             print("💡 Run 'zion zls config --generate' to create one\n", .{});
@@ -460,7 +453,7 @@ fn showCurrentZlsConfig(allocator: Allocator) !void {
         else => return err,
     };
     defer allocator.free(config_content);
-    
+
     print("📝 Current zls.json:\n", .{});
     print("{s}\n", .{config_content});
 }
@@ -490,27 +483,33 @@ fn startDependencyWatcher(allocator: Allocator) !void {
 
 fn showDependencyStatus(allocator: Allocator) !void {
     print("📦 Dependency Status\n\n", .{});
-    
-    const has_zon = std.fs.cwd().access("build.zig.zon", .{}) catch false;
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const has_zon = blk: {
+        cwd.access(io, "build.zig.zon", .{}) catch break :blk false;
+        break :blk true;
+    };
+
     if (!has_zon) {
         print("❌ No build.zig.zon found\n", .{});
         return;
     }
-    
-    const zon_content = try std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024));
+
+    const zon_content = try cwd.readFileAlloc(io, "build.zig.zon", allocator, Io.Limit.limited(1024 * 1024));
     defer allocator.free(zon_content);
-    
+
     // Simple dependency parsing
     var lines = std.mem.splitScalar(u8, zon_content, '\n');
     var dep_count: u32 = 0;
-    
+
     print("📈 Dependencies found:\n", .{});
-    
+
     while (lines.next()) |line| {
         if (std.mem.indexOf(u8, line, ".url") != null) {
             dep_count += 1;
-            
+
             // Extract URL
             if (std.mem.indexOf(u8, line, "https://")) |start| {
                 if (std.mem.indexOf(u8, line[start..], "\"")) |end| {
@@ -520,7 +519,7 @@ fn showDependencyStatus(allocator: Allocator) !void {
             }
         }
     }
-    
+
     if (dep_count == 0) {
         print("  📅 No dependencies found\n", .{});
     } else {
@@ -530,7 +529,7 @@ fn showDependencyStatus(allocator: Allocator) !void {
 }
 
 fn getZlsDataDir(allocator: Allocator) ![]const u8 {
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     return try std.fmt.allocPrint(allocator, "{s}/.local/share/zls", .{home_dir});
 }
 
@@ -763,4 +762,51 @@ fn setupHelix(allocator: Allocator) !void {
     
     print("\n✅ Helix setup instructions complete!\n", .{});
     print("💡 Restart Helix and open a .zig file to test ZLS\n", .{});
+}
+
+/// Helper function to check if a command runs successfully
+fn checkCommand(allocator: Allocator, io: Io, argv: []const []const u8, name: []const u8) !bool {
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    }) catch {
+        print("  ❌ {s} not found in PATH\n", .{name});
+        return false;
+    };
+
+    var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+    defer stdout_list.deinit(allocator);
+
+    if (child.stdout) |stdout_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            stdout_list.appendSlice(allocator, buffer[0..n]) catch break;
+        }
+    }
+
+    const term = child.wait(io) catch {
+        print("  ❌ {s} failed to run\n", .{name});
+        return false;
+    };
+
+    switch (term) {
+        .exited => |code| {
+            if (code == 0) {
+                const version = std.mem.trim(u8, stdout_list.items, " \t\n\r");
+                print("  ✅ {s} Version: {s}\n", .{ name, version });
+                return true;
+            } else {
+                print("  ❌ {s} not working properly\n", .{name});
+                return false;
+            }
+        },
+        else => {
+            print("  ❌ {s} terminated abnormally\n", .{name});
+            return false;
+        },
+    }
 }

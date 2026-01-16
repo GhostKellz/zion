@@ -3,6 +3,9 @@ const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 const Mutex = std.Thread.Mutex;
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("root.zig");
 
 /// Performance optimization system for Zion
 /// Implements caching, compression, connection pooling, and smart batching
@@ -110,14 +113,18 @@ pub const SmartCache = struct {
 
     /// Check if cached file exists and is not expired
     pub fn isCached(self: *SmartCache, url: []const u8) bool {
+        const io = zion_root.getIo() catch return false;
+        const cwd = Dir.cwd();
         const cache_path = self.getCachePath(url) catch return false;
         defer self.allocator.free(cache_path);
 
-        const file = fs.cwd().openFile(cache_path, .{}) catch return false;
-        defer file.close();
+        const file = cwd.openFile(io, cache_path, .{}) catch return false;
+        defer file.close(io);
 
-        const stat = file.stat() catch return false;
-        const age_seconds = std.time.timestamp() - stat.mtime;
+        const stat = file.stat(io) catch return false;
+        const current_time = zion_root.timestamp();
+        const mtime_seconds: i64 = @intCast(@divFloor(stat.mtime.nanoseconds, std.time.ns_per_s));
+        const age_seconds = current_time - mtime_seconds;
         const max_age_seconds = @as(i64, self.config.max_age_hours) * 3600;
 
         return age_seconds < max_age_seconds;
@@ -133,13 +140,25 @@ pub const SmartCache = struct {
             return null;
         }
 
+        const io = zion_root.getIo() catch return null;
+        const cwd = Dir.cwd();
         const cache_path = self.getCachePath(url) catch return null;
         defer self.allocator.free(cache_path);
 
-        const content = fs.cwd().readFileAlloc(self.allocator, cache_path, @enumFromInt(100 * 1024 * 1024)) catch return null;
+        // Read file content using scatter/gather API
+        const file = cwd.openFile(io, cache_path, .{}) catch return null;
+        defer file.close(io);
+
+        var content_list: std.ArrayList(u8) = .empty;
+        var buffer: [8192]u8 = undefined;
+        while (true) {
+            const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (bytes_read == 0) break;
+            content_list.appendSlice(self.allocator, buffer[0..bytes_read]) catch return null;
+        }
 
         self.metrics.cache_hits += 1;
-        return content;
+        return content_list.toOwnedSlice(self.allocator) catch return null;
     }
 
     /// Store content in cache with optional compression
@@ -147,53 +166,60 @@ pub const SmartCache = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
         const cache_path = self.getCachePath(url) catch return;
         defer self.allocator.free(cache_path);
 
         // Ensure cache directory exists
         if (fs.path.dirname(cache_path)) |dir| {
-            fs.cwd().makePath(dir) catch {};
+            cwd.createDirPath(io, dir) catch {};
         }
 
-        const file = try fs.cwd().createFile(cache_path, .{});
-        defer file.close();
+        const file = try cwd.createFile(io, cache_path, .{});
+        defer file.close(io);
 
         if (self.config.compression_enabled and content.len > 1024) {
             // Simple compression simulation (in real implementation, use gzip/zstd)
-            try file.writeAll(content);
+            try file.writeStreamingAll(io, content);
             self.metrics.bytes_saved_compression += content.len / 10; // Assume 10% compression
         } else {
-            try file.writeAll(content);
+            try file.writeStreamingAll(io, content);
         }
     }
 
     /// Clean expired cache entries
     pub fn cleanup(self: *SmartCache) !void {
-        var cache_dir = fs.cwd().openDir(self.cache_dir, .{ .iterate = true }) catch |err| {
+        const io = zion_root.getIo() catch return;
+        const cwd = Dir.cwd();
+
+        var cache_dir = cwd.openDir(io, self.cache_dir, .{ .iterate = true }) catch |err| {
             if (err == error.FileNotFound) return; // Cache dir doesn't exist yet
             return err;
         };
-        defer cache_dir.close();
+        defer cache_dir.close(io);
 
         var iterator = cache_dir.iterate();
         const max_age_seconds = @as(i64, self.config.max_age_hours) * 3600;
-        const current_time = std.time.timestamp();
+        const current_time = zion_root.timestamp();
 
-        while (try iterator.next()) |entry| {
+        while (try iterator.next(io)) |entry| {
             if (entry.kind != .file) continue;
             if (!std.mem.startsWith(u8, entry.name, "cache_")) continue;
 
             const file_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ self.cache_dir, entry.name });
             defer self.allocator.free(file_path);
 
-            const file = fs.cwd().openFile(file_path, .{}) catch continue;
-            defer file.close();
+            const file = cwd.openFile(io, file_path, .{}) catch continue;
+            defer file.close(io);
 
-            const stat = file.stat() catch continue;
-            const age_seconds = current_time - stat.mtime;
+            const stat = file.stat(io) catch continue;
+            // Convert mtime nanoseconds to seconds for comparison
+            const mtime_seconds: i64 = @intCast(@divFloor(stat.mtime.nanoseconds, std.time.ns_per_s));
+            const age_seconds = current_time - mtime_seconds;
 
             if (age_seconds > max_age_seconds) {
-                fs.cwd().deleteFile(file_path) catch {};
+                cwd.deleteFile(io, file_path) catch {};
             }
         }
     }
@@ -271,31 +297,34 @@ pub const ParallelDownloader = struct {
                     std.debug.print("Download job failed: {}\n", .{err});
                 };
             } else {
-                std.time.sleep(100 * std.time.ns_per_ms); // Sleep 100ms
+                zion_root.sleep(100 * std.time.ns_per_ms); // Sleep 100ms
             }
         }
     }
 
     /// Process a single download job
     fn processJob(self: *ParallelDownloader, job: DownloadJob) !void {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+
         // Check cache first
         if (self.cache.getCached(job.url)) |cached_content| {
             defer self.allocator.free(cached_content);
 
-            const file = try fs.cwd().createFile(job.output_path, .{});
-            defer file.close();
-            try file.writeAll(cached_content);
+            const file = try cwd.createFile(io, job.output_path, .{});
+            defer file.close(io);
+            try file.writeStreamingAll(io, cached_content);
             return;
         }
 
         // Wait for connection pool
         while (!self.connection_pool.acquire()) {
-            std.time.sleep(50 * std.time.ns_per_ms);
+            zion_root.sleep(50 * std.time.ns_per_ms);
         }
         defer self.connection_pool.release();
 
         // Download with curl (simplified)
-        self.downloadWithCurl(job.url, job.output_path) catch |err| {
+        self.downloadWithCurl(io, job.url, job.output_path) catch |err| {
             if (job.retry_count < job.max_retries) {
                 var retry_job = job;
                 retry_job.retry_count += 1;
@@ -304,8 +333,18 @@ pub const ParallelDownloader = struct {
             return err;
         };
 
-        // Cache the downloaded content
-        const content = fs.cwd().readFileAlloc(self.allocator, job.output_path, @enumFromInt(100 * 1024 * 1024)) catch return;
+        // Cache the downloaded content - read using scatter/gather API
+        const file = cwd.openFile(io, job.output_path, .{}) catch return;
+        defer file.close(io);
+
+        var content_list: std.ArrayList(u8) = .empty;
+        var buffer: [8192]u8 = undefined;
+        while (true) {
+            const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (bytes_read == 0) break;
+            content_list.appendSlice(self.allocator, buffer[0..bytes_read]) catch return;
+        }
+        const content = content_list.toOwnedSlice(self.allocator) catch return;
         defer self.allocator.free(content);
 
         self.cache.store(job.url, content) catch {};
@@ -317,7 +356,7 @@ pub const ParallelDownloader = struct {
     }
 
     /// Download using curl (simplified implementation)
-    fn downloadWithCurl(self: *ParallelDownloader, url: []const u8, output_path: []const u8) !void {
+    fn downloadWithCurl(_: *ParallelDownloader, io: Io, url: []const u8, output_path: []const u8) !void {
         const argv = [_][]const u8{
             "curl",
             "-L", // Follow redirects
@@ -330,16 +369,17 @@ pub const ParallelDownloader = struct {
             url,
         };
 
-        var child = std.process.Child.init(&argv, self.allocator);
-        child.stdin_behavior = .Ignore;
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
+        var child = try std.process.spawn(io, .{
+            .argv = &argv,
+            .stdin = .ignore,
+            .stdout = .ignore,
+            .stderr = .ignore,
+        });
 
-        try child.spawn();
-        const term = try child.wait();
+        const term = try child.wait(io);
 
         switch (term) {
-            .Exited => |code| {
+            .exited => |code| {
                 if (code != 0) return error.DownloadFailed;
             },
             else => return error.DownloadFailed,
@@ -356,7 +396,9 @@ pub const PerformanceManager = struct {
 
     pub fn init(allocator: Allocator, config: CacheConfig) !PerformanceManager {
         // Ensure cache directory exists
-        try fs.cwd().makePath(".zion/cache");
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        try cwd.createDirPath(io, ".zion/cache");
 
         var cache = SmartCache.init(allocator, config, ".zion/cache");
         const downloader = try ParallelDownloader.init(allocator, &cache, config.parallel_downloads);

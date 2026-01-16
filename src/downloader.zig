@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const fs = std.fs;
 const crypto = std.crypto;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("root.zig");
 const github = @import("github.zig");
 
 /// Maximum size of downloaded content (100MB)
@@ -57,7 +59,9 @@ pub fn resolveGitHubUrl(allocator: Allocator, package_ref: []const u8) ![]const 
 }
 
 /// Test if a URL exists using a HEAD request
-fn testUrlExists(allocator: Allocator, url: []const u8) bool {
+fn testUrlExists(_: Allocator, url: []const u8) bool {
+    const io = zion_root.getIo() catch return false;
+
     const argv = [_][]const u8{
         "curl",
         "-I", // HEAD request only
@@ -68,19 +72,18 @@ fn testUrlExists(allocator: Allocator, url: []const u8) bool {
         url,
     };
 
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Ignore;
-    child.stderr_behavior = .Ignore;
+    const child = std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .ignore,
+    }) catch return false;
 
-    if (child.spawn()) {
-        const term = child.wait() catch return false;
-        switch (term) {
-            .Exited => |code| return code == 0,
-            else => return false,
-        }
-    } else |_| {
-        return false;
+    var child_mut = child;
+    const term = child_mut.wait(io) catch return false;
+    switch (term) {
+        .exited => |code| return code == 0,
+        else => return false,
     }
 }
 
@@ -100,8 +103,10 @@ pub fn downloadAndHashPackageVersion(allocator: Allocator, package_ref: []const 
     errdefer allocator.free(cache_path);
 
     // Check if we already have this cached
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     const cached_file_exists = blk: {
-        fs.cwd().access(cache_path, .{}) catch |err| {
+        cwd.access(io, cache_path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 break :blk false;
             }
@@ -112,17 +117,17 @@ pub fn downloadAndHashPackageVersion(allocator: Allocator, package_ref: []const 
 
     if (!cached_file_exists) {
         // Download the tarball with performance monitoring
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
 
         try downloadWithCurlImproved(allocator, version_info.url, cache_path);
 
-        const end_time = std.time.milliTimestamp();
+        const end_time = zion_root.milliTimestamp();
         const download_time = end_time - start_time;
 
         // Get file size for speed calculation
-        const file = try fs.cwd().openFile(cache_path, .{});
-        defer file.close();
-        const file_size = try file.getEndPos();
+        const file = try cwd.openFile(io, cache_path, .{});
+        defer file.close(io);
+        const file_size = try file.length(io);
 
         if (download_time > 0) {
             const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
@@ -163,8 +168,10 @@ pub fn downloadAndHashPackage(allocator: Allocator, package_ref: []const u8) !Do
     errdefer allocator.free(cache_path);
 
     // Check if we already have this cached
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     const cached_file_exists = blk: {
-        fs.cwd().access(cache_path, .{}) catch |err| {
+        cwd.access(io, cache_path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 break :blk false;
             }
@@ -175,17 +182,17 @@ pub fn downloadAndHashPackage(allocator: Allocator, package_ref: []const u8) !Do
 
     if (!cached_file_exists) {
         // Download the tarball with performance monitoring
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
 
         try downloadWithCurlImproved(allocator, url, cache_path);
 
-        const end_time = std.time.milliTimestamp();
+        const end_time = zion_root.milliTimestamp();
         const download_time = end_time - start_time;
 
         // Get file size for speed calculation
-        const file = try fs.cwd().openFile(cache_path, .{});
-        defer file.close();
-        const file_size = try file.getEndPos();
+        const file = try cwd.openFile(io, cache_path, .{});
+        defer file.close(io);
+        const file_size = try file.length(io);
 
         if (download_time > 0) {
             const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
@@ -208,17 +215,18 @@ pub fn downloadAndHashPackage(allocator: Allocator, package_ref: []const u8) !Do
 
 /// Ensures the .zion/cache directory exists
 pub fn ensureCacheDir(_: Allocator) !void {
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Create .zion directory if it doesn't exist
-    cwd.makeDir(".zion") catch |err| {
+    cwd.createDir(io, ".zion", .default_dir) catch |err| {
         if (err != error.PathAlreadyExists) {
             return err;
         }
     };
 
     // Create .zion/cache directory if it doesn't exist
-    cwd.makeDir(".zion/cache") catch |err| {
+    cwd.createDir(io, ".zion/cache", .default_dir) catch |err| {
         if (err != error.PathAlreadyExists) {
             return err;
         }
@@ -235,9 +243,10 @@ pub fn downloadFile(allocator: Allocator, url: []const u8, output_path: []const 
 
 /// Calculates SHA256 hash of a file
 pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u8 {
-    const cwd = fs.cwd();
-    const file = try cwd.openFile(file_path, .{});
-    defer file.close();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const file = try cwd.openFile(io, file_path, .{});
+    defer file.close(io);
 
     std.debug.print("Calculating SHA256 hash for {s}...\n", .{file_path});
 
@@ -246,7 +255,7 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
     var buffer: [65536]u8 = undefined; // Increased from 8KB to 64KB
 
     while (true) {
-        const bytes_read = try file.readAll(buffer[0..]);
+        const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
         if (bytes_read == 0) break;
         hash.update(buffer[0..bytes_read]);
     }
@@ -265,6 +274,7 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
 /// Option to use curl instead of std.http, using a subprocess
 /// This implementation is a fallback in case std.http has issues
 pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
+    const io = try zion_root.getIo();
     std.debug.print("Downloading with curl: {s}...\n", .{url});
 
     const argv = [_][]const u8{
@@ -276,43 +286,39 @@ pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []co
     };
 
     // Create the child process
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
 
-    try child.spawn();
+    // Read output using scatter/gather API
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
 
-    // Wait for the process to complete
-    const term = try child.wait();
-
-    // Read output
-    const stderr = if (child.stderr) |stderr_pipe| blk: {
-        var output_buf: std.ArrayList(u8) = .{};
-        defer output_buf.deinit(allocator);
-        
+    if (child.stderr) |stderr_pipe| {
         var read_buf: [4096]u8 = undefined;
         while (true) {
-            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            const bytes_read = stderr_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
             if (bytes_read == 0) break;
-            try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
-        
-        break :blk try allocator.dupe(u8, output_buf.items);
-    } else
-        try allocator.dupe(u8, "No error output available");
-    defer allocator.free(stderr);
+    }
+
+    // Wait for the process to complete
+    const term = try child.wait(io);
 
     // Check exit code - success is 0
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("curl failed with exit code {d}: {s}\n", .{ code, stderr });
+                std.debug.print("curl failed with exit code {d}: {s}\n", .{ code, stderr_buf.items });
                 return error.DownloadFailed;
             }
         },
         else => {
-            std.debug.print("curl terminated abnormally: {s}\n", .{stderr});
+            std.debug.print("curl terminated abnormally: {s}\n", .{stderr_buf.items});
             return error.DownloadFailed;
         },
     }
@@ -322,11 +328,13 @@ pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []co
 
 /// Improved curl-based downloader with better error handling and validation
 pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     std.debug.print("Downloading {s}...\n", .{url});
 
     // Ensure output directory exists
-    if (fs.path.dirname(output_path)) |dir| {
-        try fs.cwd().makePath(dir);
+    if (Dir.path.dirname(output_path)) |dir| {
+        try cwd.createDirPath(io, dir);
     }
 
     const argv = [_][]const u8{
@@ -341,56 +349,52 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
     };
 
     // Create the child process
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
 
-    try child.spawn();
+    // Read stderr for error messages using scatter/gather API
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
 
-    // Wait for the process to complete
-    const term = try child.wait();
-
-    // Read stderr for error messages
-    const stderr = if (child.stderr) |stderr_pipe| blk: {
-        var output_buf: std.ArrayList(u8) = .{};
-        defer output_buf.deinit(allocator);
-        
+    if (child.stderr) |stderr_pipe| {
         var read_buf: [4096]u8 = undefined;
         while (true) {
-            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            const bytes_read = stderr_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
             if (bytes_read == 0) break;
-            try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
-        
-        break :blk try allocator.dupe(u8, output_buf.items);
-    } else
-        try allocator.dupe(u8, "No error output available");
-    defer allocator.free(stderr);
+    }
+
+    // Wait for the process to complete
+    const term = try child.wait(io);
 
     // Check exit code - success is 0
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("curl failed with exit code {d}: {s}\n", .{ code, stderr });
+                std.debug.print("curl failed with exit code {d}: {s}\n", .{ code, stderr_buf.items });
                 // Try wget as fallback
                 return downloadWithWget(allocator, url, output_path);
             }
         },
         else => {
-            std.debug.print("curl terminated abnormally: {s}\n", .{stderr});
+            std.debug.print("curl terminated abnormally: {s}\n", .{stderr_buf.items});
             return error.DownloadFailed;
         },
     }
 
     // Verify the file was actually created and has content
-    const file = fs.cwd().openFile(output_path, .{}) catch {
+    const file = cwd.openFile(io, output_path, .{}) catch {
         std.debug.print("Downloaded file not found: {s}\n", .{output_path});
         return error.DownloadFailed;
     };
-    defer file.close();
+    defer file.close(io);
 
-    const file_size = try file.getEndPos();
+    const file_size = try file.length(io);
     if (file_size == 0) {
         std.debug.print("Downloaded file is empty: {s}\n", .{output_path});
         return error.DownloadFailed;
@@ -400,7 +404,8 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
 }
 
 /// Fallback downloader using wget (if curl fails)
-pub fn downloadWithWget(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
+pub fn downloadWithWget(_: Allocator, url: []const u8, output_path: []const u8) !void {
+    const io = try zion_root.getIo();
     std.debug.print("Trying wget for {s}...\n", .{url});
 
     const argv = [_][]const u8{
@@ -412,16 +417,17 @@ pub fn downloadWithWget(allocator: Allocator, url: []const u8, output_path: []co
         url,
     };
 
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
 
-    try child.spawn();
-    const term = try child.wait();
+    const term = try child.wait(io);
 
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
                 std.debug.print("wget also failed with exit code {d}\n", .{code});
                 return error.DownloadFailed;

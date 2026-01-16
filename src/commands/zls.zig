@@ -1,16 +1,19 @@
 const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// ZLS (Zig Language Server) integration commands
-pub fn zls(allocator: Allocator, args: [][:0]u8) !void {
+pub fn zls(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printZLSHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "install")) {
         return installZLS(allocator, args[3..]);
     } else if (std.mem.eql(u8, subcommand, "config")) {
@@ -30,17 +33,17 @@ pub fn zls(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Install ZLS
-fn installZLS(allocator: Allocator, args: [][:0]u8) !void {
+fn installZLS(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+
     std.debug.print("Installing ZLS (Zig Language Server)...\n", .{});
-    
+
     // Check if ZLS is already installed
-    if (checkCommand("zls")) {
+    if (checkCommand()) {
         std.debug.print("ZLS is already installed\n", .{});
         return;
     }
-    
+
     std.debug.print("\nZLS Installation Options:\n", .{});
     std.debug.print("1. Package Manager (Recommended):\n", .{});
     std.debug.print("   macOS:   brew install zls\n", .{});
@@ -55,187 +58,169 @@ fn installZLS(allocator: Allocator, args: [][:0]u8) !void {
     std.debug.print("   cd zls\n", .{});
     std.debug.print("   zig build -Doptimize=ReleaseSafe\n", .{});
     std.debug.print("\n", .{});
-    
+
     // Create ZLS config after installation
     try createZLSConfig(allocator);
-    
+
     std.debug.print("After installing ZLS, run 'zion zls doctor' to verify.\n", .{});
 }
 
 /// Configure ZLS
-fn configZLS(allocator: Allocator, args: [][:0]u8) !void {
+fn configZLS(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+
     std.debug.print("Configuring ZLS...\n", .{});
-    
+
     try createZLSConfig(allocator);
-    
+
     std.debug.print("ZLS configuration complete!\n", .{});
     std.debug.print("Config file: ~/.config/zls/zls.json\n", .{});
 }
 
 /// Doctor - check ZLS health
 fn doctorZLS(allocator: Allocator) !void {
-    std.debug.print("🩺 ZLS Doctor - Health Check\n", .{});
+    std.debug.print("ZLS Doctor - Health Check\n", .{});
     std.debug.print("==============================\n", .{});
-    
+
     var all_good = true;
     var warnings: u32 = 0;
-    
+
     // Check if ZLS is installed
-    std.debug.print("🔍 ZLS Binary: ", .{});
+    std.debug.print("ZLS Binary: ", .{});
     const zls_path = getZLSPath(allocator) catch null;
     if (zls_path) |path| {
         defer allocator.free(path);
-        std.debug.print("✅ Found at {s}\n", .{path});
+        std.debug.print("Found at {s}\n", .{path});
     } else {
-        std.debug.print("❌ Not Found\n", .{});
+        std.debug.print("Not Found\n", .{});
         all_good = false;
     }
-    
+
     // Check ZLS version compatibility
-    std.debug.print("📊 ZLS Version: ", .{});
+    std.debug.print("ZLS Version: ", .{});
     if (zls_path != null) {
         const version = getZLSVersionString(allocator) catch "unknown";
         defer allocator.free(version);
         std.debug.print("{s}\n", .{version});
-        
+
         if (isZLSVersionCompatible(version)) {
-            std.debug.print("    ✅ Compatible with current Zig\n", .{});
+            std.debug.print("    Compatible with current Zig\n", .{});
         } else {
-            std.debug.print("    ⚠️  May have compatibility issues\n", .{});
+            std.debug.print("    May have compatibility issues\n", .{});
             warnings += 1;
         }
     } else {
         std.debug.print("N/A\n", .{});
     }
-    
+
     // Check Zig compatibility
-    std.debug.print("🦎 Zig Version: ", .{});
+    std.debug.print("Zig Version: ", .{});
     const zig_version = getZigVersionString(allocator) catch null;
     if (zig_version) |version| {
         defer allocator.free(version);
         std.debug.print("{s}\n", .{version});
-        
+
         if (isZigVersionSupported(version)) {
-            std.debug.print("    ✅ Supported version\n", .{});
+            std.debug.print("    Supported version\n", .{});
         } else {
-            std.debug.print("    ⚠️  Version compatibility unknown\n", .{});
+            std.debug.print("    Version compatibility unknown\n", .{});
             warnings += 1;
         }
     } else {
-        std.debug.print("❌ Not Found\n", .{});
+        std.debug.print("Not Found\n", .{});
         all_good = false;
     }
-    
+
     // Check ZLS config
-    std.debug.print("⚙️  ZLS Config: ", .{});
+    std.debug.print("ZLS Config: ", .{});
     const config_path = getZLSConfigPath(allocator) catch null;
     if (config_path) |path| {
         defer allocator.free(path);
-        std.debug.print("✅ Found at {s}\n", .{path});
-        
+        std.debug.print("Found at {s}\n", .{path});
+
         if (try validateZLSConfig(allocator, path)) {
-            std.debug.print("    ✅ Configuration looks good\n", .{});
+            std.debug.print("    Configuration looks good\n", .{});
         } else {
-            std.debug.print("    ⚠️  Configuration may have issues\n", .{});
+            std.debug.print("    Configuration may have issues\n", .{});
             warnings += 1;
         }
     } else {
-        std.debug.print("⚠️  Not Found (using defaults)\n", .{});
+        std.debug.print("Not Found (using defaults)\n", .{});
         warnings += 1;
     }
-    
+
     // Check project setup
-    std.debug.print("📁 Project Root: ", .{});
+    std.debug.print("Project Root: ", .{});
     if (checkProjectRoot()) {
-        std.debug.print("✅ Zig project detected (build.zig found)\n", .{});
-        
+        std.debug.print("Zig project detected (build.zig found)\n", .{});
+
         // Check for build.zig.zon
         if (checkBuildZon()) {
-            std.debug.print("    ✅ build.zig.zon found\n", .{});
+            std.debug.print("    build.zig.zon found\n", .{});
         } else {
-            std.debug.print("    ℹ️  build.zig.zon not found (optional)\n", .{});
+            std.debug.print("    build.zig.zon not found (optional)\n", .{});
         }
     } else {
-        std.debug.print("ℹ️  Not in a Zig project directory\n", .{});
+        std.debug.print("Not in a Zig project directory\n", .{});
     }
-    
+
     // Check PATH and environment
-    std.debug.print("🌍 Environment: ", .{});
-    if (checkCommand("zls")) {
-        std.debug.print("✅ ZLS in PATH\n", .{});
+    std.debug.print("Environment: ", .{});
+    if (checkCommand()) {
+        std.debug.print("ZLS in PATH\n", .{});
     } else {
-        std.debug.print("⚠️  ZLS not in PATH\n", .{});
+        std.debug.print("ZLS not in PATH\n", .{});
         warnings += 1;
     }
-    
+
     // Final summary
-    std.debug.print("\n📋 Summary:\n", .{});
+    std.debug.print("\nSummary:\n", .{});
     if (all_good and warnings == 0) {
-        std.debug.print("🎉 Perfect! ZLS health check passed with no issues.\n", .{});
-        std.debug.print("💡 Your Zig LSP setup should work flawlessly.\n", .{});
+        std.debug.print("Perfect! ZLS health check passed with no issues.\n", .{});
+        std.debug.print("Your Zig LSP setup should work flawlessly.\n", .{});
     } else if (all_good) {
-        std.debug.print("⚠️  ZLS is functional but has {d} warning(s).\n", .{warnings});
-        std.debug.print("💡 Consider running 'zion zls config' to optimize.\n", .{});
+        std.debug.print("ZLS is functional but has {d} warning(s).\n", .{warnings});
+        std.debug.print("Consider running 'zion zls config' to optimize.\n", .{});
     } else {
-        std.debug.print("❌ Critical issues found. ZLS may not work properly.\n", .{});
-        std.debug.print("💡 Run 'zion zls install' for installation help.\n", .{});
+        std.debug.print("Critical issues found. ZLS may not work properly.\n", .{});
+        std.debug.print("Run 'zion zls install' for installation help.\n", .{});
     }
-    
-    std.debug.print("\n🔗 Editor Integration:\n", .{});
+
+    std.debug.print("\nEditor Integration:\n", .{});
     std.debug.print("  Neovim:  :LspInfo to check ZLS status\n", .{});
     std.debug.print("  VSCode:  Install 'ziglang.vscode-zig' extension\n", .{});
     std.debug.print("  Emacs:   Use zig-mode with lsp-mode\n", .{});
 }
 
 /// Show which ZLS is being used
-fn whichZLS(_: Allocator) !void {
-    if (!checkCommand("zls")) {
+fn whichZLS(allocator: Allocator) !void {
+    const path = getZLSPath(allocator) catch {
         std.debug.print("ZLS not found in PATH\n", .{});
         return;
-    }
-    
-    // Get ZLS path
-    const which_args = [_][]const u8{ "which", "zls" };
-    var child = std.process.Child.init(&which_args, std.heap.page_allocator);
-    child.stdout_behavior = .Pipe;
-    
-    try child.spawn();
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(std.heap.page_allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
-    }
-    
-    const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
-    defer std.heap.page_allocator.free(stdout);
-    _ = try child.wait();
-    
-    std.debug.print("ZLS Path: {s}", .{stdout});
+    };
+    defer allocator.free(path);
+    std.debug.print("ZLS Path: {s}\n", .{path});
 }
 
 /// Show ZLS version
 fn versionZLS(allocator: Allocator) !void {
-    _ = allocator;
-    
-    if (!checkCommand("zls")) {
+    if (!checkCommand()) {
         std.debug.print("ZLS not found in PATH\n", .{});
         return;
     }
-    
-    try showZLSVersion();
+
+    const version = getZLSVersionString(allocator) catch {
+        std.debug.print("Failed to get ZLS version\n", .{});
+        return;
+    };
+    defer allocator.free(version);
+    std.debug.print("{s}\n", .{version});
 }
 
 /// Restart ZLS (for development)
 fn restartZLS(allocator: Allocator) !void {
     _ = allocator;
-    
+
     std.debug.print("Restarting ZLS...\n", .{});
     std.debug.print("This command would typically restart ZLS in your editor.\n", .{});
     std.debug.print("Manual restart instructions:\n", .{});
@@ -246,28 +231,40 @@ fn restartZLS(allocator: Allocator) !void {
 
 // Helper functions
 
-fn checkCommand(command: []const u8) bool {
-    const which_args = [_][]const u8{ "which", command };
-    var child = std.process.Child.init(&which_args, std.heap.page_allocator);
-    child.stdout_behavior = .Ignore;
-    child.stderr_behavior = .Ignore;
-    
-    const result = child.spawnAndWait() catch return false;
-    return result.Exited == 0;
+fn checkCommand() bool {
+    const io = zion_root.getIo() catch return false;
+    const argv = [_][]const u8{ "which", "zls" };
+    var child = std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .ignore,
+    }) catch return false;
+
+    const term = child.wait(io) catch return false;
+    return switch (term) {
+        .exited => |code| code == 0,
+        else => false,
+    };
 }
 
 fn createZLSConfig(allocator: Allocator) !void {
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const config_dir = try std.fmt.allocPrint(allocator, "{s}/.config/zls", .{home_dir});
     defer allocator.free(config_dir);
-    
-    try fs.cwd().makePath(config_dir);
-    
+
+    cwd.createDirPath(io, config_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     const config_file = try std.fmt.allocPrint(allocator, "{s}/zls.json", .{config_dir});
     defer allocator.free(config_file);
-    
+
     // Check if config already exists
-    fs.cwd().access(config_file, .{}) catch |err| {
+    cwd.access(io, config_file, .{}) catch |err| {
         if (err == error.FileNotFound) {
             const config_content =
                 \\{
@@ -284,223 +281,80 @@ fn createZLSConfig(allocator: Allocator) !void {
                 \\}
                 \\
             ;
-            
-            try fs.cwd().writeFile(.{ .sub_path = config_file, .data = config_content });
+
+            const file = try cwd.createFile(io, config_file, .{});
+            defer file.close(io);
+            try file.writeStreamingAll(io, config_content);
             std.debug.print("Created ZLS config: {s}\n", .{config_file});
             return;
         }
         return err;
     };
-    
+
     std.debug.print("ZLS config already exists: {s}\n", .{config_file});
 }
 
-fn showZLSVersion() !void {
-    const version_args = [_][]const u8{ "zls", "--version" };
-    var child = std.process.Child.init(&version_args, std.heap.page_allocator);
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(std.heap.page_allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
-    }
-    
-    const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
-    defer std.heap.page_allocator.free(stdout);
-    _ = try child.wait();
-    
-    const version = std.mem.trim(u8, stdout, " \t\n\r");
-    std.debug.print("{s}\n", .{version});
-}
+fn runCommandAndGetOutput(allocator: Allocator, argv: []const []const u8) ![]const u8 {
+    const io = try zion_root.getIo();
 
-fn showZigVersionForZLS() !void {
-    const version_args = [_][]const u8{ "zig", "version" };
-    var child = std.process.Child.init(&version_args, std.heap.page_allocator);
-    child.stdout_behavior = .Pipe;
-    
-    try child.spawn();
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(std.heap.page_allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stdout.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]);
-    }
-    
-    const stdout = try std.heap.page_allocator.dupe(u8, output_buf.items);
-    defer std.heap.page_allocator.free(stdout);
-    _ = try child.wait();
-    
-    const version = std.mem.trim(u8, stdout, " \t\n\r");
-    std.debug.print("{s}\n", .{version});
-}
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .ignore,
+    }) catch return error.CommandFailed;
 
-fn checkZLSConfig(allocator: Allocator) !bool {
-    const home_dir = std.posix.getenv("HOME") orelse return false;
-    const config_file = try std.fmt.allocPrint(allocator, "{s}/.config/zls/zls.json", .{home_dir});
-    defer allocator.free(config_file);
-    
-    fs.cwd().access(config_file, .{}) catch return false;
-    return true;
+    var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+    defer stdout_list.deinit(allocator);
+
+    if (child.stdout) |stdout_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            try stdout_list.appendSlice(allocator, buffer[0..n]);
+        }
+    }
+
+    const term = child.wait(io) catch return error.CommandFailed;
+    switch (term) {
+        .exited => |code| {
+            if (code != 0) return error.CommandFailed;
+        },
+        else => return error.CommandFailed,
+    }
+
+    const trimmed = std.mem.trim(u8, stdout_list.items, " \t\n\r");
+    return try allocator.dupe(u8, trimmed);
 }
 
 fn checkProjectRoot() bool {
-    fs.cwd().access("build.zig", .{}) catch return false;
+    const io = zion_root.getIo() catch return false;
+    const cwd = Dir.cwd();
+    cwd.access(io, "build.zig", .{}) catch return false;
     return true;
 }
 
 fn checkBuildZon() bool {
-    fs.cwd().access("build.zig.zon", .{}) catch return false;
+    const io = zion_root.getIo() catch return false;
+    const cwd = Dir.cwd();
+    cwd.access(io, "build.zig.zon", .{}) catch return false;
     return true;
 }
 
 fn getZLSPath(allocator: Allocator) ![]const u8 {
-    const which_args = [_][]const u8{ "which", "zls" };
-    var child = std.process.Child.init(&which_args, allocator);
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Ignore;
-    
-    child.spawn() catch return error.ZLSNotFound;
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    const stdout = blk: {
-        while (true) {
-            const bytes_read = child.stdout.?.readAll(read_buf[0..]) catch {
-                _ = child.wait() catch {};
-                return error.ZLSNotFound;
-            };
-            if (bytes_read == 0) break;
-            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
-                _ = child.wait() catch {};
-                return error.ZLSNotFound;
-            };
-        }
-        break :blk allocator.dupe(u8, output_buf.items) catch {
-            _ = child.wait() catch {};
-            return error.ZLSNotFound;
-        };
-    };
-    
-    const result = child.wait() catch {
-        allocator.free(stdout);
-        return error.ZLSNotFound;
-    };
-    
-    if (result.Exited != 0) {
-        allocator.free(stdout);
-        return error.ZLSNotFound;
-    }
-    
-    const trimmed = std.mem.trim(u8, stdout, " \t\n\r");
-    const path_copy = try allocator.dupe(u8, trimmed);
-    allocator.free(stdout);
-    return path_copy;
+    const argv = [_][]const u8{ "which", "zls" };
+    return runCommandAndGetOutput(allocator, &argv);
 }
 
 fn getZLSVersionString(allocator: Allocator) ![]const u8 {
-    const version_args = [_][]const u8{ "zls", "--version" };
-    var child = std.process.Child.init(&version_args, allocator);
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Ignore;
-    
-    child.spawn() catch return error.VersionDetectionFailed;
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    const stdout = blk: {
-        while (true) {
-            const bytes_read = child.stdout.?.readAll(read_buf[0..]) catch {
-                _ = child.wait() catch {};
-                return error.VersionDetectionFailed;
-            };
-            if (bytes_read == 0) break;
-            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
-                _ = child.wait() catch {};
-                return error.VersionDetectionFailed;
-            };
-        }
-        break :blk allocator.dupe(u8, output_buf.items) catch {
-            _ = child.wait() catch {};
-            return error.VersionDetectionFailed;
-        };
-    };
-    
-    const result = child.wait() catch {
-        allocator.free(stdout);
-        return error.VersionDetectionFailed;
-    };
-    
-    if (result.Exited != 0) {
-        allocator.free(stdout);
-        return error.VersionDetectionFailed;
-    }
-    
-    const trimmed = std.mem.trim(u8, stdout, " \t\n\r");
-    const version_copy = try allocator.dupe(u8, trimmed);
-    allocator.free(stdout);
-    return version_copy;
+    const argv = [_][]const u8{ "zls", "--version" };
+    return runCommandAndGetOutput(allocator, &argv);
 }
 
 fn getZigVersionString(allocator: Allocator) ![]const u8 {
-    const version_args = [_][]const u8{ "zig", "version" };
-    var child = std.process.Child.init(&version_args, allocator);
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Ignore;
-    
-    child.spawn() catch return error.VersionDetectionFailed;
-    
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    const stdout = blk: {
-        while (true) {
-            const bytes_read = child.stdout.?.readAll(read_buf[0..]) catch {
-                _ = child.wait() catch {};
-                return error.VersionDetectionFailed;
-            };
-            if (bytes_read == 0) break;
-            output_buf.appendSlice(std.heap.page_allocator, read_buf[0..bytes_read]) catch {
-                _ = child.wait() catch {};
-                return error.VersionDetectionFailed;
-            };
-        }
-        break :blk allocator.dupe(u8, output_buf.items) catch {
-            _ = child.wait() catch {};
-            return error.VersionDetectionFailed;
-        };
-    };
-    
-    const result = child.wait() catch {
-        allocator.free(stdout);
-        return error.VersionDetectionFailed;
-    };
-    
-    if (result.Exited != 0) {
-        allocator.free(stdout);
-        return error.VersionDetectionFailed;
-    }
-    
-    const trimmed = std.mem.trim(u8, stdout, " \t\n\r");
-    const version_copy = try allocator.dupe(u8, trimmed);
-    allocator.free(stdout);
-    return version_copy;
+    const argv = [_][]const u8{ "zig", "version" };
+    return runCommandAndGetOutput(allocator, &argv);
 }
 
 fn isZLSVersionCompatible(version: []const u8) bool {
@@ -514,14 +368,17 @@ fn isZigVersionSupported(version: []const u8) bool {
 }
 
 fn getZLSConfigPath(allocator: Allocator) ![]const u8 {
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const config_file = try std.fmt.allocPrint(allocator, "{s}/.config/zls/zls.json", .{home_dir});
-    
-    fs.cwd().access(config_file, .{}) catch {
+
+    cwd.access(io, config_file, .{}) catch {
         allocator.free(config_file);
         return error.ConfigNotFound;
     };
-    
+
     return config_file;
 }
 

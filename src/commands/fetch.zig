@@ -1,13 +1,16 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const github = @import("../github.zig");
+const zion_root = @import("../root.zig");
 
 /// Fetches dependencies specified in build.zig.zon or a specific package with version
-pub fn fetch(allocator: mem.Allocator, args: [][:0]u8) !void {
+pub fn fetch(allocator: mem.Allocator, args: []const [:0]const u8) !void {
     // Check if we're fetching a specific package with version
     if (args.len >= 3) {
         const package_spec = args[2];
@@ -94,13 +97,14 @@ fn fetchLatestVersion(allocator: mem.Allocator, package_ref: []const u8) !void {
 /// Fetch all dependencies from build.zig.zon
 fn fetchAll(allocator: mem.Allocator) !void {
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Ensure .zion/cache directory exists
     try downloader.ensureCacheDir(allocator);
 
     // Check if file exists
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -133,7 +137,7 @@ fn fetchAll(allocator: mem.Allocator) !void {
         defer allocator.free(cache_path);
 
         const cached_file_exists = blk: {
-            cwd.access(cache_path, .{}) catch |err| {
+            cwd.access(io, cache_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     break :blk false;
                 }

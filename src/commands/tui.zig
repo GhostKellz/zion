@@ -1,34 +1,38 @@
 const std = @import("std");
+const zion_root = @import("../root.zig");
 const Allocator = std.mem.Allocator;
 const commands = @import("mod.zig");
+const Io = std.Io;
+const File = Io.File;
 
 /// Simple but functional TUI for Zion v1.0.6
-pub fn tui(allocator: Allocator, args: [][:0]u8) !void {
+pub fn tui(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+
     std.debug.print("\x1b[2J\x1b[H", .{}); // Clear screen and move to top
-    
+
+    const io = try zion_root.getIo();
     var running = true;
     var current_screen = Screen.main_menu;
-    var search_input: std.ArrayList(u8) = .{};
+    var search_input: std.ArrayListUnmanaged(u8) = .empty;
     defer search_input.deinit(allocator);
-    
+
     // Get stdin for user input
-    const stdin_file = std.fs.File.stdin();
+    const stdin_file = File.stdin();
     var stdin_buffer: [256]u8 = undefined;
     
     while (running) {
         switch (current_screen) {
             .main_menu => {
                 try drawMainMenu();
-                const choice = try getUserChoice(stdin_file, &stdin_buffer);
+                const choice = try getUserChoice(io, stdin_file, &stdin_buffer);
                 switch (choice) {
                     '1' => current_screen = .search_packages,
                     '2' => current_screen = .list_dependencies,
                     '3' => current_screen = .settings,
                     '4' => {
                         try commands.help(allocator);
-                        try waitForKeypress(stdin_file, &stdin_buffer);
+                        try waitForKeypress(io, stdin_file, &stdin_buffer);
                         std.debug.print("\x1b[2J\x1b[H", .{});
                     },
                     'q', 'Q' => running = false,
@@ -37,10 +41,10 @@ pub fn tui(allocator: Allocator, args: [][:0]u8) !void {
             },
             .search_packages => {
                 try drawSearchMenu(&search_input);
-                const input = try getSearchInput(allocator, stdin_file, &stdin_buffer, &search_input);
+                const input = try getSearchInput(allocator, io, stdin_file, &stdin_buffer, &search_input);
                 if (input.len > 0) {
                     try performSearchCommand(allocator, input);
-                    try waitForKeypress(stdin_file, &stdin_buffer);
+                    try waitForKeypress(io, stdin_file, &stdin_buffer);
                 }
                 current_screen = .main_menu;
                 std.debug.print("\x1b[2J\x1b[H", .{});
@@ -50,22 +54,22 @@ pub fn tui(allocator: Allocator, args: [][:0]u8) !void {
                 std.debug.print("═══════════════════════\n\n", .{});
                 try commands.list(allocator, false);
                 std.debug.print("\n\nPress any key to return to main menu...", .{});
-                const bytes_read = try stdin_file.read(stdin_buffer[0..1]);
-                _ = bytes_read;
+                _ = stdin_file.readStreaming(io, &.{stdin_buffer[0..1]}) catch 0;
                 current_screen = .main_menu;
                 std.debug.print("\x1b[2J\x1b[H", .{});
             },
             .settings => {
                 try drawSettingsMenu();
-                const choice = try getUserChoice(stdin_file, &stdin_buffer);
+                const choice = try getUserChoice(io, stdin_file, &stdin_buffer);
                 switch (choice) {
                     '1' => {
                         try commands.performance(allocator, &[_][]const u8{ "zion", "performance", "status" });
-                        try waitForKeypress(stdin_file, &stdin_buffer);
+                        try waitForKeypress(io, stdin_file, &stdin_buffer);
                     },
                     '2' => {
-                        try commands.cache(allocator, &[_][:0]u8{});
-                        try waitForKeypress(stdin_file, &stdin_buffer);
+                        const empty_args: []const [:0]const u8 = &.{};
+                        try commands.cache(allocator, empty_args);
+                        try waitForKeypress(io, stdin_file, &stdin_buffer);
                     },
                     else => {},
                 }
@@ -101,11 +105,11 @@ fn drawMainMenu() !void {
     std.debug.print("Enter your choice: ", .{});
 }
 
-fn drawSearchMenu(search_input: *std.ArrayList(u8)) !void {
+fn drawSearchMenu(search_input: *std.ArrayListUnmanaged(u8)) !void {
     std.debug.print("┌─────────────────────────────────────────┐\n", .{});
     std.debug.print("│            🔍 Package Search           │\n", .{});
     std.debug.print("└─────────────────────────────────────────┘\n\n", .{});
-    
+
     std.debug.print("Current search: {s}\n\n", .{search_input.items});
     std.debug.print("💡 Examples:\n", .{});
     std.debug.print("  • libxev (for event loops)\n", .{});
@@ -128,18 +132,18 @@ fn drawSettingsMenu() !void {
     std.debug.print("Enter your choice: ", .{});
 }
 
-fn getUserChoice(stdin_file: std.fs.File, buffer: *[256]u8) !u8 {
-    const bytes_read = try stdin_file.read(buffer[0..1]);
+fn getUserChoice(io: Io, stdin_file: File, buffer: *[256]u8) !u8 {
+    const bytes_read = stdin_file.readStreaming(io, &.{buffer[0..1]}) catch return '\n';
     if (bytes_read > 0) {
         return buffer[0];
     }
     return '\n';
 }
 
-fn getSearchInput(allocator: Allocator, stdin_file: std.fs.File, buffer: *[256]u8, search_input: *std.ArrayList(u8)) ![]const u8 {
+fn getSearchInput(allocator: Allocator, io: Io, stdin_file: File, buffer: *[256]u8, search_input: *std.ArrayListUnmanaged(u8)) ![]const u8 {
     search_input.clearRetainingCapacity();
-    
-    const bytes_read = try stdin_file.read(buffer[0..]);
+
+    const bytes_read = stdin_file.readStreaming(io, &.{buffer[0..]}) catch return "";
     if (bytes_read > 0) {
         const input_str = buffer[0..bytes_read];
         const trimmed = std.mem.trim(u8, input_str, " \n\r\t");
@@ -165,8 +169,7 @@ fn performSearchCommand(allocator: Allocator, query: []const u8) !void {
     try commands.search(allocator, &search_args);
 }
 
-fn waitForKeypress(stdin_file: std.fs.File, buffer: *[256]u8) !void {
+fn waitForKeypress(io: Io, stdin_file: File, buffer: *[256]u8) !void {
     std.debug.print("\n\nPress any key to continue...", .{});
-    const bytes_read = try stdin_file.read(buffer[0..1]);
-    _ = bytes_read;
+    _ = stdin_file.readStreaming(io, &.{buffer[0..1]}) catch {};
 }

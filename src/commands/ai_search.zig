@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 const zeke_client = @import("../zeke_client_simple.zig");
 
 /// AI-powered package search and discovery
-pub fn aiSearch(allocator: Allocator, io: zsync.Io, args: [][:0]u8) !void {
+pub fn aiSearch(allocator: Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         std.debug.print("Usage: zion ai-search <query>\n", .{});
         std.debug.print("Examples:\n", .{});
@@ -13,9 +13,9 @@ pub fn aiSearch(allocator: Allocator, io: zsync.Io, args: [][:0]u8) !void {
         std.debug.print("  zion ai-search \"async networking\"\n", .{});
         return;
     }
-    
+
     // Combine all arguments into a search query
-    var query_buffer: std.ArrayList(u8) = .{};
+    var query_buffer: std.ArrayListUnmanaged(u8) = .empty;
     defer query_buffer.deinit(allocator);
     
     for (args[2..], 0..) |arg, i| {
@@ -174,7 +174,7 @@ fn queryRelatedTo(query: []const u8, suggestion: []const u8) bool {
 }
 
 /// Interactive AI chat for package discovery
-pub fn aiChat(allocator: Allocator, io: zsync.Io, args: [][:0]u8) !void {
+pub fn aiChat(allocator: Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
     _ = args;
     
     std.debug.print("🤖 **Zeke AI Assistant**\n", .{});

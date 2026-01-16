@@ -1,16 +1,19 @@
 const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// Workspace management - Cargo-style workspaces for Zig
-pub fn workspace(allocator: Allocator, args: [][:0]u8) !void {
+pub fn workspace(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printWorkspaceHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "init")) {
         return initWorkspace(allocator, args[3..]);
     } else if (std.mem.eql(u8, subcommand, "template")) {
@@ -36,23 +39,23 @@ pub fn workspace(allocator: Allocator, args: [][:0]u8) !void {
     }
 }
 
-fn initWorkspace(allocator: Allocator, args: [][:0]u8) !void {
+fn initWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+
     std.debug.print("Initializing Zig workspace...\n", .{});
-    
+
     // Check if already in a workspace
     if (checkWorkspaceConfig()) {
         std.debug.print("Already in a workspace directory\n", .{});
         return;
     }
-    
+
     // Create workspace configuration file
     try createWorkspaceConfig(allocator);
-    
+
     // Create basic workspace structure
     try createWorkspaceStructure();
-    
+
     std.debug.print("Zig workspace initialized!\n", .{});
     std.debug.print("Structure created:\n", .{});
     std.debug.print("  zion-workspace.toml - Workspace configuration\n", .{});
@@ -63,34 +66,39 @@ fn initWorkspace(allocator: Allocator, args: [][:0]u8) !void {
     std.debug.print("  zion workspace build          # Build all packages\n", .{});
 }
 
-fn addToWorkspace(allocator: Allocator, args: [][:0]u8) !void {
+fn addToWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     if (args.len < 1) {
         std.debug.print("Usage: zion workspace add <package-name>\n", .{});
         return;
     }
-    
+
     const package_name = args[0];
-    
+
     std.debug.print("Adding package '{s}' to workspace...\n", .{package_name});
-    
+
     // Check if we're in a workspace
     if (!checkWorkspaceConfig()) {
         std.debug.print("Not in a workspace directory. Run 'zion workspace init' first.\n", .{});
         return;
     }
-    
+
     // Create package directory
     const package_dir = try std.fmt.allocPrint(allocator, "packages/{s}", .{package_name});
     defer allocator.free(package_dir);
-    
-    try fs.cwd().makePath(package_dir);
-    
+
+    cwd.createDirPath(io, package_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     // Create basic package files
     try createPackageStructure(allocator, package_dir, package_name);
-    
+
     // Update workspace config
     try updateWorkspaceConfig(allocator, package_name);
-    
+
     std.debug.print("Package '{s}' added to workspace!\n", .{package_name});
     std.debug.print("Location: {s}/\n", .{package_dir});
 }
@@ -100,9 +108,9 @@ fn listWorkspaceMembers(allocator: Allocator) !void {
         std.debug.print("Not in a workspace directory\n", .{});
         return;
     }
-    
+
     std.debug.print("Workspace Members:\n", .{});
-    
+
     // Read workspace config and list members
     const members = try getWorkspaceMembers(allocator);
     defer {
@@ -111,7 +119,7 @@ fn listWorkspaceMembers(allocator: Allocator) !void {
         }
         allocator.free(members);
     }
-    
+
     if (members.len == 0) {
         std.debug.print("  (no packages)\n", .{});
     } else {
@@ -121,31 +129,30 @@ fn listWorkspaceMembers(allocator: Allocator) !void {
     }
 }
 
-fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
+fn buildWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
+    const io = try zion_root.getIo();
+
     if (!checkWorkspaceConfig()) {
         std.debug.print("Not in a workspace directory\n", .{});
         return;
     }
-    
+
     // Parse arguments
     var build_all = false;
     var parallel_jobs: u8 = 1;
-    var release_mode = false;
     var target_package: ?[]const u8 = null;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--all")) {
             build_all = true;
         } else if (std.mem.startsWith(u8, arg, "--jobs=") or std.mem.startsWith(u8, arg, "-j=")) {
             const jobs_str = arg[std.mem.indexOf(u8, arg, "=").? + 1..];
             parallel_jobs = std.fmt.parseInt(u8, jobs_str, 10) catch 1;
-        } else if (std.mem.eql(u8, arg, "--release")) {
-            release_mode = true;
         } else if (!std.mem.startsWith(u8, arg, "--")) {
             target_package = arg;
         }
     }
-    
+
     if (build_all) {
         std.debug.print("Building all workspace packages with {} parallel jobs...\n", .{parallel_jobs});
     } else if (target_package) |pkg| {
@@ -153,10 +160,10 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
     } else {
         std.debug.print("Building workspace packages...\n", .{});
     }
-    
+
     // Resolve workspace-level dependencies first
     try resolveWorkspaceDependencies(allocator);
-    
+
     const members = try getWorkspaceMembers(allocator);
     defer {
         for (members) |member| {
@@ -164,11 +171,11 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
         }
         allocator.free(members);
     }
-    
+
     // Filter members if specific package requested
-    var build_targets: std.ArrayList([]const u8) = .{};
+    var build_targets: std.ArrayListUnmanaged([]const u8) = .empty;
     defer build_targets.deinit(allocator);
-    
+
     if (target_package) |pkg| {
         // Build only specific package
         for (members) |member| {
@@ -187,7 +194,7 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
             try build_targets.append(allocator, member);
         }
     }
-    
+
     // Build packages in dependency order
     const build_order = try determineBuildOrder(allocator, build_targets.items);
     defer {
@@ -196,77 +203,79 @@ fn buildWorkspace(allocator: Allocator, args: [][:0]u8) !void {
         }
         allocator.free(build_order);
     }
-    
+
     var successful_builds: u32 = 0;
     var failed_builds: u32 = 0;
-    
-    // Create progress bar for builds
-    const progress = @import("../progress.zig");
-    var build_progress = progress.ProgressBar.init(allocator, "🏗️  Building workspace packages", build_order.len);
-    
-    for (build_order, 0..) |member, i| {
-        build_progress.update(i);
-        std.debug.print("\n🔨 Building {s}...\n", .{member});
-        
+
+    for (build_order) |member| {
+        std.debug.print("\nBuilding {s}...\n", .{member});
+
         const package_dir = try std.fmt.allocPrint(allocator, "packages/{s}", .{member});
         defer allocator.free(package_dir);
-        
-        // Change to package directory and build
-        const old_cwd = fs.cwd();
-        var package_cwd = fs.cwd().openDir(package_dir, .{}) catch |err| {
-            std.debug.print("  Error: Could not open {s}: {}\n", .{ package_dir, err });
+
+        // Build the package
+        const build_args = [_][]const u8{ "zig", "build" };
+        var child = std.process.spawn(io, .{
+            .argv = &build_args,
+            .stdin = .ignore,
+            .stdout = .pipe,
+            .stderr = .pipe,
+            .cwd = package_dir,
+        }) catch |err| {
+            std.debug.print("  Error spawning build for {s}: {}\n", .{ member, err });
+            failed_builds += 1;
             continue;
         };
-        defer package_cwd.close();
-        
-        // Build the package (simplified)
-        const build_args = [_][]const u8{ "zig", "build" };
-        var child = std.process.Child.init(&build_args, allocator);
-        child.cwd_dir = package_cwd;
-        
-        const result = child.spawnAndWait() catch |err| {
+
+        const term = child.wait(io) catch |err| {
             std.debug.print("  Error building {s}: {}\n", .{ member, err });
             failed_builds += 1;
             continue;
         };
-        
-        if (result.Exited == 0) {
-            std.debug.print("  ✅ Built {s}\n", .{member});
-            successful_builds += 1;
-        } else {
-            std.debug.print("  ❌ Failed to build {s}\n", .{member});
-            failed_builds += 1;
+
+        switch (term) {
+            .exited => |code| {
+                if (code == 0) {
+                    std.debug.print("  Built {s}\n", .{member});
+                    successful_builds += 1;
+                } else {
+                    std.debug.print("  Failed to build {s}\n", .{member});
+                    failed_builds += 1;
+                }
+            },
+            else => {
+                std.debug.print("  Failed to build {s}\n", .{member});
+                failed_builds += 1;
+            },
         }
-        
-        _ = old_cwd;
     }
-    
-    // Finish progress bar
-    build_progress.finish();
-    
-    std.debug.print("\n🎉 Workspace build complete!\n", .{});
-    std.debug.print("  ✅ Successful builds: {}\n", .{successful_builds});
-    std.debug.print("  ❌ Failed builds: {}\n", .{failed_builds});
-    
+
+    std.debug.print("\nWorkspace build complete!\n", .{});
+    std.debug.print("  Successful builds: {}\n", .{successful_builds});
+    std.debug.print("  Failed builds: {}\n", .{failed_builds});
+
     if (failed_builds > 0) {
-        std.debug.print("\n⚠️  Some packages failed to build. Check the output above for details.\n", .{});
+        std.debug.print("\nSome packages failed to build. Check the output above for details.\n", .{});
     }
 }
 
-fn testWorkspace(allocator: Allocator, args: [][:0]u8) !void {
+fn testWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+    _ = allocator;
+
     std.debug.print("Testing workspace...\n", .{});
     std.debug.print("(Test functionality would run tests for all packages)\n", .{});
-    _ = allocator;
 }
 
 fn cleanWorkspace(allocator: Allocator) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     std.debug.print("Cleaning workspace...\n", .{});
-    
+
     // Clean shared target directory
-    fs.cwd().deleteTree("target") catch {};
-    
+    cwd.deleteTree(io, "target") catch {};
+
     // Clean individual package caches
     const members = try getWorkspaceMembers(allocator);
     defer {
@@ -275,32 +284,36 @@ fn cleanWorkspace(allocator: Allocator) !void {
         }
         allocator.free(members);
     }
-    
+
     for (members) |member| {
         const cache_dir = try std.fmt.allocPrint(allocator, "packages/{s}/.zig-cache", .{member});
         defer allocator.free(cache_dir);
-        
-        fs.cwd().deleteTree(cache_dir) catch {};
-        
+
+        cwd.deleteTree(io, cache_dir) catch {};
+
         const out_dir = try std.fmt.allocPrint(allocator, "packages/{s}/zig-out", .{member});
         defer allocator.free(out_dir);
-        
-        fs.cwd().deleteTree(out_dir) catch {};
+
+        cwd.deleteTree(io, out_dir) catch {};
     }
-    
+
     std.debug.print("Workspace cleaned!\n", .{});
 }
 
 // Helper functions
 
 fn checkWorkspaceConfig() bool {
-    fs.cwd().access("zion-workspace.toml", .{}) catch return false;
+    const io = zion_root.getIo() catch return false;
+    const cwd = Dir.cwd();
+    cwd.access(io, "zion-workspace.toml", .{}) catch return false;
     return true;
 }
 
 fn createWorkspaceConfig(allocator: Allocator) !void {
     _ = allocator;
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const config_content =
         \\# Zion Workspace Configuration
         \\# Cargo-style workspace for Zig projects
@@ -324,25 +337,39 @@ fn createWorkspaceConfig(allocator: Allocator) !void {
         \\target_dir = "target"
         \\
     ;
-    
-    try fs.cwd().writeFile(.{ .sub_path = "zion-workspace.toml", .data = config_content });
+
+    const file = try cwd.createFile(io, "zion-workspace.toml", .{});
+    defer file.close(io);
+    try file.writeStreamingAll(io, config_content);
 }
 
 fn createWorkspaceStructure() !void {
-    try fs.cwd().makePath("packages");
-    try fs.cwd().makePath("target");
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.createDirPath(io, "packages") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "target") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
 }
 
 fn createPackageStructure(allocator: Allocator, package_dir: []const u8, package_name: []const u8) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create src directory
     const src_dir = try std.fmt.allocPrint(allocator, "{s}/src", .{package_dir});
     defer allocator.free(src_dir);
-    try fs.cwd().makePath(src_dir);
-    
+    cwd.createDirPath(io, src_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     // Create main.zig
     const main_file = try std.fmt.allocPrint(allocator, "{s}/src/main.zig", .{package_dir});
     defer allocator.free(main_file);
-    
+
     const main_content = try std.fmt.allocPrint(allocator,
         \\const std = @import("std");
         \\
@@ -352,13 +379,15 @@ fn createPackageStructure(allocator: Allocator, package_dir: []const u8, package
         \\
     , .{package_name});
     defer allocator.free(main_content);
-    
-    try fs.cwd().writeFile(.{ .sub_path = main_file, .data = main_content });
-    
+
+    const main_f = try cwd.createFile(io, main_file, .{});
+    defer main_f.close(io);
+    try main_f.writeStreamingAll(io, main_content);
+
     // Create build.zig
     const build_file = try std.fmt.allocPrint(allocator, "{s}/build.zig", .{package_dir});
     defer allocator.free(build_file);
-    
+
     const build_content = try std.fmt.allocPrint(allocator,
         \\const std = @import("std");
         \\
@@ -384,8 +413,10 @@ fn createPackageStructure(allocator: Allocator, package_dir: []const u8, package
         \\
     , .{package_name});
     defer allocator.free(build_content);
-    
-    try fs.cwd().writeFile(.{ .sub_path = build_file, .data = build_content });
+
+    const build_f = try cwd.createFile(io, build_file, .{});
+    defer build_f.close(io);
+    try build_f.writeStreamingAll(io, build_content);
 }
 
 fn updateWorkspaceConfig(allocator: Allocator, package_name: []const u8) !void {
@@ -396,25 +427,36 @@ fn updateWorkspaceConfig(allocator: Allocator, package_name: []const u8) !void {
 }
 
 fn getWorkspaceMembers(allocator: Allocator) ![][]const u8 {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Simple implementation - just list directories in packages/
-    var dir = fs.cwd().openDir("packages", .{ .iterate = true }) catch |err| {
+    var dir = cwd.openDir(io, "packages", .{ .iterate = true }) catch |err| {
         if (err == error.FileNotFound) {
             return try allocator.alloc([]const u8, 0);
         }
         return err;
     };
-    defer dir.close();
-    
-    var members: std.ArrayList([]const u8) = .{};
-    var iterator = dir.iterate();
-    while (try iterator.next()) |entry| {
+    defer dir.close(io);
+
+    var members: std.ArrayListUnmanaged([]const u8) = .empty;
+    var walker = try dir.walk(allocator);
+    defer walker.deinit();
+
+    // Only get top-level directories
+    while (try walker.next(io)) |entry| {
         if (entry.kind == .directory) {
-            const name = try allocator.dupe(u8, entry.name);
-            try members.append(allocator, name);
+            // Check if it's a top-level directory (no path separators)
+            if (std.mem.indexOf(u8, entry.path, "/") == null and
+                std.mem.indexOf(u8, entry.path, "\\") == null)
+            {
+                const name = try allocator.dupe(u8, entry.path);
+                try members.append(allocator, name);
+            }
         }
     }
-    
-    return members.toOwnedSlice(allocator);
+
+    return try members.toOwnedSlice(allocator);
 }
 
 fn printWorkspaceHelp() void {
@@ -449,40 +491,43 @@ fn printWorkspaceHelp() void {
 
 /// Resolve workspace-level dependencies
 fn resolveWorkspaceDependencies(allocator: Allocator) !void {
-    std.debug.print("🔍 Resolving workspace dependencies...\n", .{});
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    std.debug.print("Resolving workspace dependencies...\n", .{});
+
     // Check if workspace has a shared dependency file
     const workspace_deps_path = "zion-workspace-deps.toml";
-    
-    const deps_content = fs.cwd().readFileAlloc(workspace_deps_path, allocator, @enumFromInt(1024 * 1024)) catch {
+
+    const deps_content = cwd.readFileAlloc(io, workspace_deps_path, allocator, Io.Limit.limited(1024 * 1024)) catch {
         // No workspace dependencies file - that's fine
         std.debug.print("  No workspace-level dependencies found\n", .{});
         return;
     };
     defer allocator.free(deps_content);
-    
+
     std.debug.print("  Found workspace dependencies file\n", .{});
-    
+
     // Parse workspace dependencies (simplified TOML parsing)
     var lines = std.mem.splitSequence(u8, deps_content, "\n");
     var deps_found: u32 = 0;
-    
+
     while (lines.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r\n");
         if (trimmed.len == 0 or trimmed[0] == '#') continue;
-        
+
         if (std.mem.indexOf(u8, trimmed, "=")) |eq_pos| {
             const dep_name = std.mem.trim(u8, trimmed[0..eq_pos], " \t\"");
             const dep_spec = std.mem.trim(u8, trimmed[eq_pos + 1..], " \t\"");
-            
-            std.debug.print("    📦 {s} = {s}\n", .{ dep_name, dep_spec });
+
+            std.debug.print("    {s} = {s}\n", .{ dep_name, dep_spec });
             deps_found += 1;
         }
     }
-    
+
     if (deps_found > 0) {
-        std.debug.print("  ✅ Found {} workspace dependencies\n", .{deps_found});
-        std.debug.print("  💾 Shared dependencies will be available to all packages\n", .{});
+        std.debug.print("  Found {} workspace dependencies\n", .{deps_found});
+        std.debug.print("  Shared dependencies will be available to all packages\n", .{});
     }
 }
 
@@ -490,35 +535,26 @@ fn resolveWorkspaceDependencies(allocator: Allocator) !void {
 fn determineBuildOrder(allocator: Allocator, packages: []const []const u8) ![][]const u8 {
     // For now, return packages in original order
     // In a full implementation, this would analyze build.zig files to determine dependencies
-    var ordered_packages: std.ArrayList([]const u8) = .{};
-    
+    var ordered_packages: std.ArrayListUnmanaged([]const u8) = .empty;
+
     for (packages) |pkg| {
         try ordered_packages.append(allocator, try allocator.dupe(u8, pkg));
     }
-    
-    std.debug.print("📊 Build order determined: ", .{});
+
+    std.debug.print("Build order determined: ", .{});
     for (packages, 0..) |pkg, i| {
-        if (i > 0) std.debug.print(" → ", .{});
+        if (i > 0) std.debug.print(" -> ", .{});
         std.debug.print("{s}", .{pkg});
     }
     std.debug.print("\n", .{});
-    
+
     return try ordered_packages.toOwnedSlice(allocator);
 }
 
 /// Create workspace template scaffolding
 fn createWorkspaceTemplate(allocator: Allocator, template_name: []const u8) !void {
-    std.debug.print("🏗️  Creating workspace from template: {s}\n", .{template_name});
-    
-    // Define available templates structure
-    const WorkspaceTemplate = struct {
-        name: []const u8,
-        description: []const u8,
-        packages: [][]const u8,
-        shared_deps: [][]const u8,
-    };
-    _ = WorkspaceTemplate; // Unused for now, just for future reference
-    
+    std.debug.print("Creating workspace from template: {s}\n", .{template_name});
+
     if (std.mem.eql(u8, template_name, "library")) {
         try createLibraryWorkspace(allocator);
     } else if (std.mem.eql(u8, template_name, "application")) {
@@ -526,34 +562,49 @@ fn createWorkspaceTemplate(allocator: Allocator, template_name: []const u8) !voi
     } else if (std.mem.eql(u8, template_name, "fullstack")) {
         try createFullStackWorkspace(allocator);
     } else {
-        std.debug.print("❌ Unknown template: {s}\n", .{template_name});
+        std.debug.print("Unknown template: {s}\n", .{template_name});
         std.debug.print("Available templates: library, application, fullstack\n", .{});
         return;
     }
-    
-    std.debug.print("✅ Workspace template '{s}' created successfully!\n", .{template_name});
+
+    std.debug.print("Workspace template '{s}' created successfully!\n", .{template_name});
 }
 
 /// Create a library-focused workspace
 fn createLibraryWorkspace(allocator: Allocator) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create workspace structure
-    try fs.cwd().makeDir("packages");
-    try fs.cwd().makeDir("target");
-    try fs.cwd().makeDir("examples");
-    try fs.cwd().makeDir("docs");
-    
+    cwd.createDirPath(io, "packages") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "target") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "examples") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "docs") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     // Create library package
     const lib_dir = "packages/core";
-    try fs.cwd().makePath(lib_dir);
+    cwd.createDirPath(io, lib_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, lib_dir, "core");
-    
+
     // Create example package
     const example_dir = "packages/example";
-    try fs.cwd().makePath(example_dir);
+    cwd.createDirPath(io, example_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, example_dir, "example");
-    
+
     // Create workspace config
-    const workspace_config = 
+    const workspace_config =
         \\[workspace]
         \\members = [
         \\    "packages/core",
@@ -567,34 +618,49 @@ fn createLibraryWorkspace(allocator: Allocator) !void {
         \\[workspace.dependencies]
         \\# Add shared dependencies here
     ;
-    
-    const config_file = try fs.cwd().createFile("zion-workspace.toml", .{});
-    defer config_file.close();
-    try config_file.writeAll(workspace_config);
-    
-    std.debug.print("  📚 Created library workspace with core library and example\n", .{});
+
+    const config_file = try cwd.createFile(io, "zion-workspace.toml", .{});
+    defer config_file.close(io);
+    try config_file.writeStreamingAll(io, workspace_config);
+
+    std.debug.print("  Created library workspace with core library and example\n", .{});
 }
 
 /// Create an application-focused workspace
 fn createApplicationWorkspace(allocator: Allocator) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create workspace structure
-    try fs.cwd().makeDir("packages");
-    try fs.cwd().makeDir("target");
-    try fs.cwd().makeDir("assets");
-    try fs.cwd().makeDir("config");
-    
+    cwd.createDirPath(io, "packages") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "target") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "assets") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "config") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     // Create main application
     const app_dir = "packages/app";
-    try fs.cwd().makePath(app_dir);
+    cwd.createDirPath(io, app_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, app_dir, "app");
-    
+
     // Create utilities library
     const utils_dir = "packages/utils";
-    try fs.cwd().makePath(utils_dir);
+    cwd.createDirPath(io, utils_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, utils_dir, "utils");
-    
+
     // Create workspace config
-    const workspace_config = 
+    const workspace_config =
         \\[workspace]
         \\members = [
         \\    "packages/app",
@@ -608,43 +674,60 @@ fn createApplicationWorkspace(allocator: Allocator) !void {
         \\[workspace.dependencies]
         \\# Add shared dependencies here
     ;
-    
-    const config_file = try fs.cwd().createFile("zion-workspace.toml", .{});
-    defer config_file.close();
-    try config_file.writeAll(workspace_config);
-    
-    std.debug.print("  🚀 Created application workspace with main app and utilities\n", .{});
+
+    const config_file = try cwd.createFile(io, "zion-workspace.toml", .{});
+    defer config_file.close(io);
+    try config_file.writeStreamingAll(io, workspace_config);
+
+    std.debug.print("  Created application workspace with main app and utilities\n", .{});
 }
 
-/// Create a full-stack workspace  
+/// Create a full-stack workspace
 fn createFullStackWorkspace(allocator: Allocator) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create workspace structure
-    try fs.cwd().makeDir("packages");
-    try fs.cwd().makeDir("target");
-    try fs.cwd().makeDir("static");
-    try fs.cwd().makeDir("docker");
-    
+    cwd.createDirPath(io, "packages") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "target") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "static") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+    cwd.createDirPath(io, "docker") catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
     // Create backend
     const backend_dir = "packages/backend";
-    try fs.cwd().makePath(backend_dir);
+    cwd.createDirPath(io, backend_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, backend_dir, "backend");
-    
+
     // Create shared models
     const models_dir = "packages/shared";
-    try fs.cwd().makePath(models_dir);
+    cwd.createDirPath(io, models_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, models_dir, "shared");
-    
+
     // Create CLI tool
     const cli_dir = "packages/cli";
-    try fs.cwd().makePath(cli_dir);
+    cwd.createDirPath(io, cli_dir) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
     try createPackageStructure(allocator, cli_dir, "cli");
-    
+
     // Create workspace config
-    const workspace_config = 
+    const workspace_config =
         \\[workspace]
         \\members = [
         \\    "packages/backend",
-        \\    "packages/shared", 
+        \\    "packages/shared",
         \\    "packages/cli"
         \\]
         \\
@@ -656,10 +739,10 @@ fn createFullStackWorkspace(allocator: Allocator) !void {
         \\# Add shared dependencies here
         \\# Example: http = "1.0.0"
     ;
-    
-    const config_file = try fs.cwd().createFile("zion-workspace.toml", .{});
-    defer config_file.close();
-    try config_file.writeAll(workspace_config);
-    
-    std.debug.print("  🌐 Created full-stack workspace with backend, shared models, and CLI\n", .{});
+
+    const config_file = try cwd.createFile(io, "zion-workspace.toml", .{});
+    defer config_file.close(io);
+    try config_file.writeStreamingAll(io, workspace_config);
+
+    std.debug.print("  Created full-stack workspace with backend, shared models, and CLI\n", .{});
 }

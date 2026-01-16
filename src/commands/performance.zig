@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const perf = @import("../performance.zig");
+const zion_root = @import("../root.zig");
 
 /// Performance management and monitoring command
 pub fn performance(allocator: Allocator, args: []const []const u8) !void {
@@ -123,9 +124,9 @@ fn handleBenchmark(allocator: Allocator, args: []const []const u8) !void {
     std.debug.print("Running download performance tests...\n", .{});
 
     // Simulate benchmark results
-    const start_time = std.time.milliTimestamp();
-    std.Thread.sleep(1000 * std.time.ns_per_ms); // Simulate 1 second of work
-    const end_time = std.time.milliTimestamp();
+    const start_time = zion_root.milliTimestamp();
+    zion_root.sleep(1000 * std.time.ns_per_ms); // Simulate 1 second of work
+    const end_time = zion_root.milliTimestamp();
 
     std.debug.print("\n📊 Benchmark Results:\n", .{});
     std.debug.print("  Test duration: {d}ms\n", .{end_time - start_time});

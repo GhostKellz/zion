@@ -1,8 +1,11 @@
 const std = @import("std");
 const gpg_keyring = @import("../gpg_keyring.zig");
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
-pub fn keyring(allocator: Allocator, args: [][:0]u8) !void {
+pub fn keyring(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printUsage();
         return;
@@ -77,120 +80,157 @@ fn listKeys(allocator: Allocator) !void {
 
 fn trustFingerprint(allocator: Allocator, fingerprint: []const u8) !void {
     std.debug.print("🔐 Adding fingerprint to trusted list: {s}\n", .{fingerprint});
-    
+
     // Validate fingerprint format (should be 40 hex chars for SHA-1 or 64 for SHA-256)
     if (fingerprint.len != 40 and fingerprint.len != 64) {
         std.debug.print("❌ Invalid fingerprint length. Expected 40 or 64 hex characters.\n", .{});
         return;
     }
-    
+
     for (fingerprint) |char| {
         if (!std.ascii.isHex(char)) {
             std.debug.print("❌ Invalid fingerprint format. Must contain only hex characters.\n", .{});
             return;
         }
     }
-    
+
     // Load the trusted keys file and add this fingerprint
-    const home_dir = std.posix.getenv("HOME") orelse {
+    const home_dir = zion_root.getEnv("HOME") orelse {
         std.debug.print("❌ HOME environment variable not set\n", .{});
         return;
     };
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const zion_dir = try std.fmt.allocPrint(allocator, "{s}/.zion", .{home_dir});
     defer allocator.free(zion_dir);
-    
+
     const trusted_keys_file = try std.fmt.allocPrint(allocator, "{s}/trusted_keys.json", .{zion_dir});
     defer allocator.free(trusted_keys_file);
-    
+
     // Create .zion directory if it doesn't exist
-    std.fs.cwd().makeDir(zion_dir) catch |err| switch (err) {
+    cwd.createDir(io, zion_dir, .default_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
-    
-    // Simple JSON format for trusted keys
-    const trusted_entry = try std.fmt.allocPrint(allocator, 
-        "{{\"fingerprint\": \"{s}\", \"trusted\": true, \"added\": \"{d}\"}}\n", 
-        .{ fingerprint, std.time.timestamp() });
+
+    // Simple JSON format for trusted keys - get current timestamp
+    var tv: std.posix.timeval = undefined;
+    std.posix.gettimeofday(&tv, null);
+    const timestamp: i64 = tv.sec;
+
+    const trusted_entry = try std.fmt.allocPrint(allocator,
+        "{{\"fingerprint\": \"{s}\", \"trusted\": true, \"added\": \"{d}\"}}\n",
+        .{ fingerprint, timestamp });
     defer allocator.free(trusted_entry);
-    
-    // Append to file
-    const file = std.fs.cwd().openFile(trusted_keys_file, .{ .mode = .write_only }) catch |err| switch (err) {
-        error.FileNotFound => try std.fs.cwd().createFile(trusted_keys_file, .{}),
+
+    // Read existing content if file exists, then append new entry
+    const existing_content = cwd.readFileAlloc(io, trusted_keys_file, allocator, Io.Limit.limited(1024 * 1024)) catch |err| switch (err) {
+        error.FileNotFound => try allocator.alloc(u8, 0), // Empty content for new file
         else => return err,
     };
-    defer file.close();
-    
-    try file.seekFromEnd(0);
-    try file.writeAll(trusted_entry);
-    
+    defer allocator.free(existing_content);
+
+    // Concatenate existing content with new entry
+    const new_content = try std.mem.concat(allocator, u8, &.{ existing_content, trusted_entry });
+    defer allocator.free(new_content);
+
+    // Write back the full content
+    try cwd.writeFile(io, .{ .sub_path = trusted_keys_file, .data = new_content });
+
     std.debug.print("✅ Fingerprint added to trusted list\n", .{});
     std.debug.print("📁 Saved to: {s}\n", .{trusted_keys_file});
 }
 
 fn verifyArchKeyrings(allocator: Allocator) !void {
     std.debug.print("🐧 Verifying Arch Linux keyrings...\n", .{});
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const arch_keyrings = [_][]const u8{
         "/usr/share/pacman/keyrings/archlinux.gpg",
         "/usr/share/pacman/keyrings/archlinux-trusted",
         "/usr/share/pacman/keyrings/archlinux-revoked",
         "/etc/pacman.d/gnupg/pubring.gpg",
     };
-    
+
     var found_keyrings: u32 = 0;
     var verified_keys: u32 = 0;
-    
+
     for (arch_keyrings) |keyring_path| {
-        std.fs.cwd().access(keyring_path, .{}) catch |err| switch (err) {
+        cwd.access(io, keyring_path, .{}) catch |err| switch (err) {
             error.FileNotFound => {
                 std.debug.print("❌ Not found: {s}\n", .{keyring_path});
                 continue;
             },
             else => return err,
         };
-        
+
         found_keyrings += 1;
         std.debug.print("✅ Found: {s}\n", .{keyring_path});
-        
-        // Try to load keys from this keyring
-        const result = std.process.Child.run(.{
-            .allocator = allocator,
-            .argv = &[_][]const u8{ 
-                "gpg", 
-                "--list-keys", 
+
+        // Try to load keys from this keyring using spawn API
+        var child = std.process.spawn(io, .{
+            .argv = &[_][]const u8{
+                "gpg",
+                "--list-keys",
                 "--keyring", keyring_path,
-                "--with-colons" 
+                "--with-colons"
             },
-            .max_output_bytes = 1024 * 1024,
+            .stdin = .ignore,
+            .stdout = .pipe,
+            .stderr = .pipe,
         }) catch |err| {
-            std.debug.print("⚠️  Failed to read keyring {s}: {}\n", .{ keyring_path, err });
+            std.debug.print("⚠️  Failed to spawn gpg for {s}: {}\n", .{ keyring_path, err });
             continue;
         };
-        defer allocator.free(result.stdout);
-        defer allocator.free(result.stderr);
-        
-        if (result.term.Exited == 0) {
-            // Count keys in output
-            var key_count: u32 = 0;
-            var lines = std.mem.splitSequence(u8, result.stdout, "\n");
-            while (lines.next()) |line| {
-                if (std.mem.startsWith(u8, line, "pub:")) {
-                    key_count += 1;
-                }
+
+        var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+        defer stdout_list.deinit(allocator);
+
+        if (child.stdout) |stdout_file| {
+            var buffer: [4096]u8 = undefined;
+            while (true) {
+                const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+                if (n == 0) break;
+                stdout_list.appendSlice(allocator, buffer[0..n]) catch break;
             }
-            verified_keys += key_count;
-            std.debug.print("   📊 Contains {} public keys\n", .{key_count});
-        } else {
-            std.debug.print("⚠️  Failed to verify keyring: {s}\n", .{keyring_path});
+        }
+
+        const term = child.wait(io) catch {
+            std.debug.print("⚠️  Failed to wait for gpg: {s}\n", .{keyring_path});
+            continue;
+        };
+
+        switch (term) {
+            .exited => |code| {
+                if (code == 0) {
+                    // Count keys in output
+                    var key_count: u32 = 0;
+                    var lines = std.mem.splitSequence(u8, stdout_list.items, "\n");
+                    while (lines.next()) |line| {
+                        if (std.mem.startsWith(u8, line, "pub:")) {
+                            key_count += 1;
+                        }
+                    }
+                    verified_keys += key_count;
+                    std.debug.print("   📊 Contains {} public keys\n", .{key_count});
+                } else {
+                    std.debug.print("⚠️  Failed to verify keyring: {s}\n", .{keyring_path});
+                }
+            },
+            else => {
+                std.debug.print("⚠️  GPG terminated abnormally for: {s}\n", .{keyring_path});
+            },
         }
     }
-    
+
     std.debug.print("\n📈 Arch Linux Keyring Summary:\n", .{});
     std.debug.print("   Found keyrings: {}\n", .{found_keyrings});
     std.debug.print("   Verified keys: {}\n", .{verified_keys});
-    
+
     if (found_keyrings == 0) {
         std.debug.print("\n💡 No Arch Linux keyrings found. Install 'archlinux-keyring' package if on Arch Linux.\n", .{});
     } else if (verified_keys == 0) {
@@ -203,49 +243,77 @@ fn verifyArchKeyrings(allocator: Allocator) !void {
 fn showKeyringsStatus(allocator: Allocator) !void {
     std.debug.print("📊 Zion Keyring Status\n", .{});
     std.debug.print("=====================\n\n", .{});
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Check GPG installation
-    const gpg_result = std.process.Child.run(.{
-        .allocator = allocator,
+    var gpg_child = std.process.spawn(io, .{
         .argv = &[_][]const u8{ "gpg", "--version" },
-        .max_output_bytes = 4096,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .ignore,
     }) catch |err| {
         std.debug.print("❌ GPG not installed or not accessible: {}\n", .{err});
         return;
     };
-    defer allocator.free(gpg_result.stdout);
-    defer allocator.free(gpg_result.stderr);
-    
-    if (gpg_result.term.Exited == 0) {
-        var lines = std.mem.splitSequence(u8, gpg_result.stdout, "\n");
-        if (lines.next()) |first_line| {
-            std.debug.print("✅ GPG: {s}\n", .{first_line});
+
+    var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+    defer stdout_list.deinit(allocator);
+
+    if (gpg_child.stdout) |stdout_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            stdout_list.appendSlice(allocator, buffer[0..n]) catch break;
         }
-    } else {
-        std.debug.print("❌ GPG installation issues detected\n", .{});
     }
-    
-    // Check user keyring
-    const home_dir = std.posix.getenv("HOME") orelse "unknown";
-    const gpg_dir = try std.fmt.allocPrint(allocator, "{s}/.gnupg", .{home_dir});
-    defer allocator.free(gpg_dir);
-    
-    std.fs.cwd().access(gpg_dir, .{}) catch |err| switch (err) {
-        error.FileNotFound => {
-            std.debug.print("❌ User GPG directory not found: {s}\n", .{gpg_dir});
+
+    const term = gpg_child.wait(io) catch {
+        std.debug.print("❌ Failed to wait for GPG\n", .{});
+        return;
+    };
+
+    switch (term) {
+        .exited => |code| {
+            if (code == 0) {
+                var lines = std.mem.splitSequence(u8, stdout_list.items, "\n");
+                if (lines.next()) |first_line| {
+                    std.debug.print("✅ GPG: {s}\n", .{first_line});
+                }
+            } else {
+                std.debug.print("❌ GPG installation issues detected\n", .{});
+            }
         },
         else => {
-            std.debug.print("⚠️  Cannot access user GPG directory: {s}\n", .{gpg_dir});
+            std.debug.print("❌ GPG terminated abnormally\n", .{});
         },
-    };
-    
-    // If no error, it exists
-    if (std.fs.cwd().access(gpg_dir, .{})) |_| {
-        std.debug.print("✅ User GPG directory: {s}\n", .{gpg_dir});
-    } else |_| {
-        // Error already handled above
     }
-    
+
+    // Check user keyring
+    const home_dir = zion_root.getEnv("HOME") orelse "unknown";
+    const gpg_dir = try std.fmt.allocPrint(allocator, "{s}/.gnupg", .{home_dir});
+    defer allocator.free(gpg_dir);
+
+    const dir_exists = blk: {
+        cwd.access(io, gpg_dir, .{}) catch |err| switch (err) {
+            error.FileNotFound => {
+                std.debug.print("❌ User GPG directory not found: {s}\n", .{gpg_dir});
+                break :blk false;
+            },
+            else => {
+                std.debug.print("⚠️  Cannot access user GPG directory: {s}\n", .{gpg_dir});
+                break :blk false;
+            },
+        };
+        break :blk true;
+    };
+
+    if (dir_exists) {
+        std.debug.print("✅ User GPG directory: {s}\n", .{gpg_dir});
+    }
+
     // Check system keyrings
     try verifyArchKeyrings(allocator);
     
@@ -265,24 +333,37 @@ fn showKeyringsStatus(allocator: Allocator) !void {
 
 fn refreshKeyrings(allocator: Allocator) !void {
     std.debug.print("🔄 Refreshing keyrings from system...\n", .{});
-    
-    // Refresh GPG keys
-    const refresh_result = std.process.Child.run(.{
-        .allocator = allocator,
+
+    const io = try zion_root.getIo();
+
+    // Refresh GPG keys using spawn API
+    var child = std.process.spawn(io, .{
         .argv = &[_][]const u8{ "gpg", "--refresh-keys" },
-        .max_output_bytes = 1024 * 1024,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
     }) catch |err| {
-        std.debug.print("⚠️  GPG refresh failed: {}\n", .{err});
+        std.debug.print("⚠️  GPG refresh failed to spawn: {}\n", .{err});
         return;
     };
-    
-    defer allocator.free(refresh_result.stdout);
-    defer allocator.free(refresh_result.stderr);
-    
-    if (refresh_result.term.Exited == 0) {
-        std.debug.print("✅ GPG keys refreshed successfully\n", .{});
-    } else {
-        std.debug.print("⚠️  GPG refresh completed with warnings\n", .{});
+
+    // Wait for completion
+    const term = child.wait(io) catch |err| {
+        std.debug.print("⚠️  GPG refresh failed to wait: {}\n", .{err});
+        return;
+    };
+
+    switch (term) {
+        .exited => |code| {
+            if (code == 0) {
+                std.debug.print("✅ GPG keys refreshed successfully\n", .{});
+            } else {
+                std.debug.print("⚠️  GPG refresh completed with warnings\n", .{});
+            }
+        },
+        else => {
+            std.debug.print("⚠️  GPG refresh terminated abnormally\n", .{});
+        },
     }
     
     // Re-initialize keyrings

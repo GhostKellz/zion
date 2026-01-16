@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 const nvim_integration = @import("../nvim_integration.zig");
 
 /// Neovim integration command
-pub fn nvim(allocator: Allocator, args: [][:0]u8) !void {
+pub fn nvim(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printNvimHelp();
         return;

@@ -1,9 +1,12 @@
 const std = @import("std");
 const signature_verification = @import("../signature_verification.zig");
 const gpg_keyring = @import("../gpg_keyring.zig");
+const zion_root = @import("../root.zig");
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
-pub fn verify(allocator: Allocator, args: [][:0]u8) !void {
+pub fn verify(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 4) {
         std.debug.print("Usage: zion verify <package_file> <signature_file> [keystore_file]\n", .{});
         std.debug.print("\nVerifies the authenticity and integrity of a package using digital signatures.\n", .{});
@@ -18,16 +21,20 @@ pub fn verify(allocator: Allocator, args: [][:0]u8) !void {
     std.debug.print("  Package: {s}\n", .{package_file});
     std.debug.print("  Signature: {s}\n", .{signature_file});
     std.debug.print("  Keystore: {s}\n", .{keystore_file});
-    
+
+    // Get I/O context
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Load package data
-    const package_data = std.fs.cwd().readFileAlloc(package_file, allocator, @enumFromInt(100 * 1024 * 1024)) catch |err| {
+    const package_data = cwd.readFileAlloc(io, package_file, allocator, Io.Limit.limited(100 * 1024 * 1024)) catch |err| {
         std.debug.print("❌ Failed to read package file: {}\n", .{err});
         return;
     };
     defer allocator.free(package_data);
-    
-    // Load signature data  
-    const signature_data = std.fs.cwd().readFileAlloc(signature_file, allocator, @enumFromInt(1024 * 1024)) catch |err| {
+
+    // Load signature data
+    const signature_data = cwd.readFileAlloc(io, signature_file, allocator, Io.Limit.limited(1024 * 1024)) catch |err| {
         std.debug.print("❌ Failed to read signature file: {}\n", .{err});
         return;
     };

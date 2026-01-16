@@ -1,16 +1,21 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const ZonFile = @import("../manifest.zig").ZonFile;
+const zion_root = @import("../root.zig");
 
 /// Builds the project by invoking the Zig build system
 pub fn build(allocator: mem.Allocator) !void {
+    _ = allocator;
     const zon_path = "build.zig.zon";
     const build_path = "build.zig";
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Check if both files exist
-    const cwd = fs.cwd();
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -18,7 +23,7 @@ pub fn build(allocator: mem.Allocator) !void {
         return err;
     };
 
-    cwd.access(build_path, .{}) catch |err| {
+    cwd.access(io, build_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: build.zig not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -31,16 +36,17 @@ pub fn build(allocator: mem.Allocator) !void {
     // Invoke zig build
     const argv = [_][]const u8{ "zig", "build" };
 
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Inherit;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .inherit,
+        .stdout = .inherit,
+        .stderr = .inherit,
+    });
 
-    try child.spawn();
-    const term = try child.wait();
+    const term = try child.wait(io);
 
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code == 0) {
                 std.debug.print("\n✅ Build completed successfully!\n", .{});
             } else {

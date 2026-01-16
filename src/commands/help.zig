@@ -5,7 +5,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
     _ = allocator; // unused but required for API consistency
 
     const help_text =
-        \\Zion v1.0.6 - A Modern Zig Package Manager
+        \\Zion - A Modern Zig Package Manager
         \\
         \\USAGE:
         \\    zion <COMMAND>
@@ -23,7 +23,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    repair      Fix broken hashes and dependency issues
         \\    check       Check dependency health and project status
         \\    build       Build the project
-        \\    clean       Clean build artifacts and caches  
+        \\    clean       Clean build artifacts and caches
         \\    lock        Update the lock file
         \\    run         Run the project executable
         \\    test        Run project tests with filtering
@@ -35,7 +35,7 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    nvim        Neovim integration setup and management
         \\    security    Package signing, verification, and trust management
         \\    performance Performance monitoring and optimization
-    \\    ghostspec   GhostSpec testing workflows (install, run, report)
+        \\    ghostspec   GhostSpec testing workflows (install, run, report)
         \\    search      Search for Zig packages
         \\    registry    Manage package registries and test connectivity
         \\    template    Create projects from templates
@@ -49,21 +49,6 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    setup       One Nation Under Zig - complete setup wizard
         \\    keyring     GPG keyring management and signature verification
         \\    help        Show this help message
-        \\
-        \\🔥 NEW IN v1.0.6:
-        \\    GPG Integration      Full GPG keyring support with signature verification
-        \\    Arch Linux Support   Native Arch Linux keystore integration
-        \\    Zig v0.16.0 Ready    Compatible with latest Zig development version
-        \\    Enhanced Security    Package signature verification and trust management
-        \\    Build Cache System   Intelligent caching with source hash validation
-        \\    Production Polish    Enterprise-grade features and stability
-        \\
-        \\🚀 ENHANCED IN v0.7.0:
-        \\    add                 Now with multi-registry support and dependency analysis
-        \\    search              Now with advanced filters and categories
-        \\    registry            Now with health monitoring and multi-registry management
-        \\    publish             Publish packages to multiple registries (NEW)
-        \\    search-interactive  Interactive search mode with real-time filtering (NEW)
         \\
         \\EXAMPLES:
         \\    zion init                   # Initialize a new project
@@ -98,8 +83,8 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion zls install            # Get ZLS installation guidance
         \\    zion zls doctor             # Check ZLS health and setup
         \\    zion zls config             # Create optimal ZLS configuration
-    \\    zion ghostspec bootstrap    # Install and wire GhostSpec into the project
-    \\    zion ghostspec run          # Execute GhostSpec suites
+        \\    zion ghostspec bootstrap    # Install and wire GhostSpec into the project
+        \\    zion ghostspec run          # Execute GhostSpec suites
         \\    zion workspace init         # Initialize Cargo-style workspace
         \\    zion workspace add mylib    # Add package to workspace
         \\    zion workspace build        # Build all workspace packages
@@ -109,8 +94,6 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion keyring status         # Show GPG keyring status and health
         \\    zion keyring list           # List all available GPG keys
         \\    zion keyring archver        # Verify Arch Linux system keyrings
-        \\
-        \\🚀 v0.7.0 EXAMPLES:
         \\    zion publish --registry=zigistry --sign    # Publish with signing
         \\    zion add crypto --verify-signatures        # Add with security checks
         \\    zion search http --filter=web,network      # Advanced search

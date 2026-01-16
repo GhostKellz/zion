@@ -28,11 +28,15 @@ pub const AsyncCommandHandler = struct {
     const Self = @This();
     
     pub fn init(allocator: Allocator, io: zsync.Io) !*Self {
+        _ = io; // zsync.Io used for async operations (components use runtime directly)
+
         // Create runtime for async operations
         const runtime_instance = try zsync.Runtime.init(allocator, .{});
-        
-        // Initialize HTTP client
-        const client = try http_client.HttpClient.init(allocator, io);
+
+        // Get std.Io from the application context for HTTP client
+        // std.http.Client requires std.Io, not zsync.Io
+        const std_io = try zion.getIo();
+        const client = try http_client.HttpClient.init(allocator, std_io);
         
         // Initialize all async components
         const timeout_client = try TimeoutClient.init(allocator, runtime_instance, client);
@@ -147,16 +151,16 @@ pub const AsyncCommandHandler = struct {
     pub fn benchmarkPerformance(self: *Self) !void {
         std.debug.print("⚡ Running performance benchmarks...\n", .{});
         
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion.milliTimestamp();
         
         // Test racing registry
         _ = try self.racing_registry.searchRace("test");
-        const registry_time = std.time.milliTimestamp() - start_time;
+        const registry_time = zion.milliTimestamp() - start_time;
         
         // Test timeout client
-        const timeout_start = std.time.milliTimestamp();
+        const timeout_start = zion.milliTimestamp();
         _ = self.timeout_client.getWithTimeout("https://httpbin.org/delay/1", 5000) catch {};
-        const timeout_time = std.time.milliTimestamp() - timeout_start;
+        const timeout_time = zion.milliTimestamp() - timeout_start;
         
         std.debug.print("\n📊 Performance Results:\n", .{});
         std.debug.print("  Racing Registry: {d}ms\n", .{registry_time});

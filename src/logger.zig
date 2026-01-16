@@ -20,12 +20,13 @@ var is_initialized: bool = false;
 
 pub fn init() void {
     if (is_initialized) return;
-    
-    // Check environment variable for log level
-    if (std.process.getEnvVarOwned(std.heap.page_allocator, "ZION_LOG_LEVEL")) |level_str| {
-        defer std.heap.page_allocator.free(level_str);
+
+    // Check environment variable for log level using C library getenv
+    // This works without requiring allocation or the Init struct
+    if (std.c.getenv("ZION_LOG_LEVEL")) |level_ptr| {
+        const level_str = std.mem.sliceTo(level_ptr, 0);
         current_log_level = LogLevel.fromString(level_str);
-    } else |_| {
+    } else {
         // Check for debug build vs release build
         if (@import("builtin").mode == .Debug) {
             current_log_level = .debug;
@@ -33,7 +34,7 @@ pub fn init() void {
             current_log_level = .info;
         }
     }
-    
+
     is_initialized = true;
 }
 
@@ -91,9 +92,9 @@ pub fn clean(comptime fmt: []const u8, args: anytype) void {
 
 // Verbose logging (only in debug builds or when explicitly enabled)
 pub fn verbose(comptime fmt: []const u8, args: anytype) void {
-    if (std.process.getEnvVarOwned(std.heap.page_allocator, "ZION_VERBOSE")) |_| {
+    if (std.c.getenv("ZION_VERBOSE") != null) {
         std.debug.print("📝 [VERBOSE] " ++ fmt ++ "\n", args);
-    } else |_| {
+    } else {
         if (@import("builtin").mode == .Debug and shouldLog(.debug)) {
             std.debug.print("📝 [VERBOSE] " ++ fmt ++ "\n", args);
         }

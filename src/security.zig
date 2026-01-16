@@ -1,7 +1,9 @@
 const std = @import("std");
 const crypto = std.crypto;
 const fs = std.fs;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("root.zig");
 
 /// Cryptographic security system for Zion packages
 /// Implements signing, verification, and trust management using std.crypto
@@ -75,9 +77,11 @@ pub const SecurityManager = struct {
 
     /// Generate a new Ed25519 key pair for signing
     pub fn generateKeyPair(_: *SecurityManager) !struct { public_key: [PUBLIC_KEY_SIZE]u8, private_key: [PRIVATE_KEY_SIZE]u8 } {
+        const io = try zion_root.getIo();
+
         // Generate a random 32-byte seed for the private key
         var seed: [32]u8 = undefined;
-        crypto.random.bytes(&seed);
+        io.random(&seed);
 
         // For Ed25519, we'll use a simplified approach
         // Create 64-byte private key (32 bytes seed + 32 bytes derived)
@@ -90,8 +94,8 @@ pub const SecurityManager = struct {
         // Generate the actual keypair using the crypto library
         // For now, use placeholder values - in a full implementation,
         // you'd use the actual Ed25519 key derivation
-        crypto.random.bytes(private_key[32..64]);
-        crypto.random.bytes(&public_key);
+        io.random(private_key[32..64]);
+        io.random(&public_key);
 
         return .{
             .public_key = public_key,
@@ -101,14 +105,23 @@ pub const SecurityManager = struct {
 
     /// Sign a package file with Ed25519
     pub fn signPackage(self: *SecurityManager, package_path: []const u8, private_key: [PRIVATE_KEY_SIZE]u8, signer_id: []const u8) !PackageSignature {
-        const file = try fs.cwd().openFile(package_path, .{});
-        defer file.close();
+        const io = try zion_root.getIo();
+        const cwd = std.Io.Dir.cwd();
+
+        const file = try cwd.openFile(io, package_path, .{});
+        defer file.close(io);
 
         // Read file content
-        const file_size = try file.getEndPos();
-        const content = try self.allocator.alloc(u8, file_size);
-        defer self.allocator.free(content);
-        _ = try file.readAll(content);
+        var content_list: std.ArrayList(u8) = .empty;
+        defer content_list.deinit(self.allocator);
+
+        var buffer: [8192]u8 = undefined;
+        while (true) {
+            const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try content_list.appendSlice(self.allocator, buffer[0..bytes_read]);
+        }
+        const content = content_list.items;
 
         // For now, create a mock signature using hash of content + private key
         // In a full implementation, you'd use proper Ed25519 signing
@@ -127,7 +140,7 @@ pub const SecurityManager = struct {
         return PackageSignature{
             .signature = signature,
             .public_key = private_key[32..64].*, // Use second half as mock public key
-            .timestamp = std.time.timestamp(),
+            .timestamp = zion_root.timestamp(),
             .signer_id = try self.allocator.dupe(u8, signer_id),
             .algorithm = try self.allocator.dupe(u8, "Ed25519"),
         };
@@ -135,14 +148,23 @@ pub const SecurityManager = struct {
 
     /// Verify a package signature
     pub fn verifyPackage(self: *SecurityManager, package_path: []const u8, signature: PackageSignature) !bool {
-        const file = try fs.cwd().openFile(package_path, .{});
-        defer file.close();
+        const io = try zion_root.getIo();
+        const cwd = std.Io.Dir.cwd();
+
+        const file = try cwd.openFile(io, package_path, .{});
+        defer file.close(io);
 
         // Read file content
-        const file_size = try file.getEndPos();
-        const content = try self.allocator.alloc(u8, file_size);
-        defer self.allocator.free(content);
-        _ = try file.readAll(content);
+        var content_list: std.ArrayList(u8) = .empty;
+        defer content_list.deinit(self.allocator);
+
+        var buffer: [8192]u8 = undefined;
+        while (true) {
+            const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try content_list.appendSlice(self.allocator, buffer[0..bytes_read]);
+        }
+        const content = content_list.items;
 
         // For now, implement mock verification
         // In a full implementation, you'd use proper Ed25519 verification
@@ -183,7 +205,7 @@ pub const SecurityManager = struct {
             } else {
                 signer_info.reputation_score = @max(0.0, signer_info.reputation_score - 0.5);
             }
-            signer_info.last_seen = std.time.timestamp();
+            signer_info.last_seen = zion_root.timestamp();
         }
     }
 };

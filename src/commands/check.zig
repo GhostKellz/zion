@@ -1,11 +1,14 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const github = @import("../github.zig");
+const zion_root = @import("../root.zig");
 
 pub const HealthStatus = enum {
     healthy,
@@ -22,7 +25,7 @@ pub const PackageHealth = struct {
         return PackageHealth{
             .name = name,
             .status = .healthy,
-            .issues = .{},
+            .issues = .empty,
         };
     }
     
@@ -44,12 +47,13 @@ pub const PackageHealth = struct {
 /// Check the health of all dependencies and project structure
 pub fn check(allocator: Allocator) !void {
     std.debug.print("🩺 Checking project health...\n", .{});
-    
+
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
-    
-    cwd.access(zon_path, .{}) catch |err| {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("❌ build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -66,7 +70,7 @@ pub fn check(allocator: Allocator) !void {
     
     std.debug.print("📋 Analyzing {d} dependencies...\n\n", .{zon_file.dependencies.count()});
     
-    var package_healths: std.ArrayList(PackageHealth) = .{};
+    var package_healths: std.ArrayList(PackageHealth) = .empty;
     defer {
         for (package_healths.items) |*health| {
             health.deinit(allocator);
@@ -106,7 +110,7 @@ pub fn check(allocator: Allocator) !void {
         defer allocator.free(cache_path);
         
         const cached_exists = blk: {
-            cwd.access(cache_path, .{}) catch |err| {
+            cwd.access(io, cache_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     break :blk false;
                 }
@@ -140,7 +144,7 @@ pub fn check(allocator: Allocator) !void {
         defer allocator.free(deps_path);
         
         const extracted_exists = blk: {
-            cwd.access(deps_path, .{}) catch |err| {
+            cwd.access(io, deps_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     break :blk false;
                 }
@@ -154,7 +158,7 @@ pub fn check(allocator: Allocator) !void {
             const build_zig_path = try std.fmt.allocPrint(allocator, "{s}/build.zig", .{deps_path});
             defer allocator.free(build_zig_path);
             
-            cwd.access(build_zig_path, .{}) catch |err| {
+            cwd.access(io, build_zig_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     try health.addIssue(allocator, .warning, "No build.zig found in package");
                     std.debug.print("  ⚠️  No build.zig found\n", .{});
@@ -218,7 +222,7 @@ pub fn check(allocator: Allocator) !void {
     std.debug.print("🏗️  Checking project structure...\n", .{});
     
     // Check for build.zig
-    cwd.access("build.zig", .{}) catch |err| {
+    cwd.access(io, "build.zig", .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("  ⚠️  build.zig not found\n", .{});
             if (overall_status == .healthy) overall_status = .warning;
@@ -226,9 +230,9 @@ pub fn check(allocator: Allocator) !void {
             std.debug.print("  ✅ build.zig found\n", .{});
         }
     };
-    
+
     // Check for src directory
-    cwd.access("src", .{}) catch |err| {
+    cwd.access(io, "src", .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("  ⚠️  src/ directory not found\n", .{});
             if (overall_status == .healthy) overall_status = .warning;
@@ -236,9 +240,9 @@ pub fn check(allocator: Allocator) !void {
             std.debug.print("  ✅ src/ directory found\n", .{});
         }
     };
-    
+
     // Check for main.zig
-    cwd.access("src/main.zig", .{}) catch |err| {
+    cwd.access(io, "src/main.zig", .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("  ⚠️  src/main.zig not found\n", .{});
             if (overall_status == .healthy) overall_status = .warning;
@@ -304,6 +308,8 @@ pub fn check(allocator: Allocator) !void {
 
 /// Check if a URL is accessible
 fn checkUrlAccessibility(allocator: Allocator, url: []const u8) !bool {
+    const io = try zion_root.getIo();
+
     const argv = [_][]const u8{
         "curl",
         "-s",
@@ -312,44 +318,44 @@ fn checkUrlAccessibility(allocator: Allocator, url: []const u8) !bool {
         "--max-time", "10", // 10 second timeout
         url,
     };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    const term = try child.wait();
-    
-    // Read and discard output
-    var stdout_output_buf: std.ArrayList(u8) = .{};
-    defer stdout_output_buf.deinit(allocator);
-    
-    var stdout_read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stdout.?.readAll(stdout_read_buf[0..]);
-        if (bytes_read == 0) break;
-        try stdout_output_buf.appendSlice(allocator, stdout_read_buf[0..bytes_read]);
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
+
+    // Read and discard stdout output using scatter/gather API
+    var stdout_buf: std.ArrayList(u8) = .empty;
+    defer stdout_buf.deinit(allocator);
+
+    if (child.stdout) |stdout_pipe| {
+        var stdout_read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = stdout_pipe.readStreaming(io, &.{stdout_read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stdout_buf.appendSlice(allocator, stdout_read_buf[0..bytes_read]);
+        }
     }
-    
-    const stdout = try allocator.dupe(u8, stdout_output_buf.items);
-    defer allocator.free(stdout);
-    
-    var stderr_output_buf: std.ArrayList(u8) = .{};
-    defer stderr_output_buf.deinit(allocator);
-    
-    var stderr_read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stderr.?.readAll(stderr_read_buf[0..]);
-        if (bytes_read == 0) break;
-        try stderr_output_buf.appendSlice(allocator, stderr_read_buf[0..bytes_read]);
+
+    // Read and discard stderr output using scatter/gather API
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
+
+    if (child.stderr) |stderr_pipe| {
+        var stderr_read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = stderr_pipe.readStreaming(io, &.{stderr_read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stderr_buf.appendSlice(allocator, stderr_read_buf[0..bytes_read]);
+        }
     }
-    
-    const stderr = try allocator.dupe(u8, stderr_output_buf.items);
-    defer allocator.free(stderr);
-    
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             return code == 0;
         },
         else => {

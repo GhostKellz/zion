@@ -11,22 +11,22 @@ const Release = @import("registry_client.zig").Release;
 pub const RegistryManager = struct {
     allocator: Allocator,
     config: *ZionConfig,
-    clients: std.ArrayList(RegistryClient),
+    clients: std.ArrayListUnmanaged(RegistryClient),
     io: zsync.BlockingIo,
-    
+
     pub fn init(allocator: Allocator, zion_config: *ZionConfig) !RegistryManager {
         return RegistryManager{
             .allocator = allocator,
             .config = zion_config,
-            .clients = .{},
+            .clients = .empty,
             .io = zsync.createBlockingIo(allocator),
         };
     }
-    
+
     pub fn initClients(self: *RegistryManager) !void {
         for (self.config.registries.items) |reg_config| {
             if (reg_config.enabled) {
-                const client = RegistryClient.init(self.allocator, reg_config);
+                const client = try RegistryClient.init(self.allocator, reg_config);
                 try self.clients.append(self.allocator, client);
             }
         }

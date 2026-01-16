@@ -5,6 +5,9 @@ const json = std.json;
 const zsync = @import("zsync");
 const Allocator = std.mem.Allocator;
 const print = std.debug.print;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// Enhanced Zig version manager with zsync async support
 pub fn enhanced_zig_manager(allocator: Allocator, args: [][:0]u8) !void {
@@ -227,8 +230,8 @@ fn showZigStatus(allocator: Allocator) !void {
     print("🌍 Environment:\n", .{});
     print("  Platform: {s}\n", .{try getPlatformString(allocator)});
     print("  Architecture: {s}\n", .{@tagName(std.builtin.target.cpu.arch)});
-    
-    if (std.posix.getenv("PATH")) |path| {
+
+    if (zion_root.getEnv("PATH")) |path| {
         print("  PATH includes zig: ", .{});
         if (std.mem.indexOf(u8, path, "zig") != null) {
             print("✅ Yes\n", .{});
@@ -236,24 +239,13 @@ fn showZigStatus(allocator: Allocator) !void {
             print("❌ No\n", .{});
         }
     }
-    
+
     // ZLS integration check
     print("\n📝 IDE Integration:\n", .{});
-    const zls_available = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "zls", "--version" },
-        .max_output_bytes = 1024,
-    }) catch null;
-    
-    if (zls_available) |result| {
-        defer allocator.free(result.stdout);
-        defer allocator.free(result.stderr);
-        
-        if (result.term == .Exited and result.term.Exited == 0) {
-            print("  ZLS: ✅ Available\n", .{});
-        } else {
-            print("  ZLS: ❌ Not available\n", .{});
-        }
+    const io = try zion_root.getIo();
+    const zls_ok = checkCommandSimple(allocator, io, &.{ "zls", "--version" }) catch false;
+    if (zls_ok) {
+        print("  ZLS: ✅ Available\n", .{});
     } else {
         print("  ZLS: ❌ Not available\n", .{});
     }
@@ -289,12 +281,10 @@ const DownloadInfo = struct {
 };
 
 fn getCurrentZigInfo(allocator: Allocator) !ZigInfo {
-    // Try to find zig in PATH
-    const zig_result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "zig", "version" },
-        .max_output_bytes = 1024,
-    }) catch {
+    const io = try zion_root.getIo();
+
+    // Try to find zig in PATH using spawn API
+    const version = runCommandGetOutput(allocator, io, &.{ "zig", "version" }) catch {
         return ZigInfo{
             .version = try allocator.dupe(u8, "unknown"),
             .path = try allocator.dupe(u8, "not found"),
@@ -303,51 +293,33 @@ fn getCurrentZigInfo(allocator: Allocator) !ZigInfo {
             .available = false,
         };
     };
-    defer allocator.free(zig_result.stdout);
-    defer allocator.free(zig_result.stderr);
-    
-    if (zig_result.term != .Exited or zig_result.term.Exited != 0) {
-        return ZigInfo{
-            .version = try allocator.dupe(u8, "unknown"),
-            .path = try allocator.dupe(u8, "not found"),
-            .source = try allocator.dupe(u8, "unknown"),
-            .platform = try getPlatformString(allocator),
-            .available = false,
-        };
-    }
-    
-    const version = std.mem.trim(u8, zig_result.stdout, " \t\n\r");
-    
+    defer allocator.free(version);
+
     // Get zig path
-    const which_result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "which", "zig" },
-        .max_output_bytes = 1024,
-    }) catch {
+    const zig_path = runCommandGetOutput(allocator, io, &.{ "which", "zig" }) catch {
         return ZigInfo{
-            .version = try allocator.dupe(u8, version),
+            .version = try allocator.dupe(u8, std.mem.trim(u8, version, " \t\n\r")),
             .path = try allocator.dupe(u8, "unknown"),
             .source = try allocator.dupe(u8, "unknown"),
             .platform = try getPlatformString(allocator),
             .available = true,
         };
     };
-    defer allocator.free(which_result.stdout);
-    defer allocator.free(which_result.stderr);
-    
-    const zig_path = std.mem.trim(u8, which_result.stdout, " \t\n\r");
-    
+    defer allocator.free(zig_path);
+
+    const trimmed_path = std.mem.trim(u8, zig_path, " \t\n\r");
+
     // Determine source
-    const source = if (std.mem.indexOf(u8, zig_path, ".zion") != null)
+    const source = if (std.mem.indexOf(u8, trimmed_path, ".zion") != null)
         "zion"
-    else if (std.mem.indexOf(u8, zig_path, "/usr") != null or std.mem.indexOf(u8, zig_path, "/opt") != null)
+    else if (std.mem.indexOf(u8, trimmed_path, "/usr") != null or std.mem.indexOf(u8, trimmed_path, "/opt") != null)
         "system"
     else
         "unknown";
-    
+
     return ZigInfo{
-        .version = try allocator.dupe(u8, version),
-        .path = try allocator.dupe(u8, zig_path),
+        .version = try allocator.dupe(u8, std.mem.trim(u8, version, " \t\n\r")),
+        .path = try allocator.dupe(u8, trimmed_path),
         .source = try allocator.dupe(u8, source),
         .platform = try getPlatformString(allocator),
         .available = true,
@@ -372,11 +344,12 @@ fn getPlatformString(allocator: Allocator) ![]const u8 {
 }
 
 fn ensureZigDirEnhanced(allocator: Allocator) !void {
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const io = try zion_root.getIo();
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const zig_dir = try std.fmt.allocPrint(allocator, "{s}/.zion/zig", .{home_dir});
     defer allocator.free(zig_dir);
-    
-    std.fs.makeDirAbsolute(zig_dir) catch |err| switch (err) {
+
+    Dir.createDirAbsolute(io, zig_dir, .default_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
@@ -400,48 +373,50 @@ fn getZigDownloadInfo(allocator: Allocator, version: []const u8) !DownloadInfo {
 }
 
 fn downloadAndInstallZigEnhanced(allocator: Allocator, info: DownloadInfo) !void {
+    const io = try zion_root.getIo();
     // Async download with zsync would go here
     print("🚀 Downloading {s}...\n", .{info.url.?});
-    
+
     // For now, just create placeholder
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const install_dir = try std.fmt.allocPrint(allocator, "{s}/.zion/zig/{s}", .{ home_dir, info.version });
     defer allocator.free(install_dir);
-    
-    std.fs.makeDirAbsolute(install_dir) catch |err| switch (err) {
+
+    Dir.createDirAbsolute(io, install_dir, .default_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
-    
+
     print("✅ Downloaded and extracted to {s}\n", .{install_dir});
 }
 
 fn listInstalledVersionsEnhanced(allocator: Allocator) !void {
-    const home_dir = std.posix.getenv("HOME") orelse {
+    const io = try zion_root.getIo();
+    const home_dir = zion_root.getEnv("HOME") orelse {
         print("  ❌ No home directory found\n", .{});
         return;
     };
-    
+
     const zig_dir = try std.fmt.allocPrint(allocator, "{s}/.zion/zig", .{home_dir});
     defer allocator.free(zig_dir);
-    
-    var dir = fs.openDirAbsolute(zig_dir, .{ .iterate = true }) catch {
+
+    var dir = Dir.openDirAbsolute(io, zig_dir, .{ .iterate = true }) catch {
         print("  📅 No versions installed\n", .{});
         print("  💡 Use 'zion zig install <version>' to install Zig\n", .{});
         return;
     };
-    defer dir.close();
-    
-    var iterator = dir.iterate();
+    defer dir.close(io);
+
+    var iterator = dir.iterate(io, allocator);
     var count: u32 = 0;
-    
+
     while (try iterator.next()) |entry| {
         if (entry.kind == .directory) {
             print("  ✅ {s}\n", .{entry.name});
             count += 1;
         }
     }
-    
+
     if (count == 0) {
         print("  📅 No versions installed\n", .{});
     }
@@ -476,22 +451,23 @@ fn useSystemZig(allocator: Allocator) !void {
 }
 
 fn useZionZig(allocator: Allocator, version: []const u8) !void {
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const io = try zion_root.getIo();
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const zig_path = try std.fmt.allocPrint(allocator, "{s}/.zion/zig/{s}/zig", .{ home_dir, version });
     defer allocator.free(zig_path);
-    
+
     // Check if version is installed
-    std.fs.accessAbsolute(zig_path, .{}) catch {
+    Dir.accessAbsolute(io, zig_path, .{}) catch {
         print("❌ Zig {s} is not installed\n", .{version});
         print("💡 Use 'zion zig install {s}' first\n", .{version});
         return;
     };
-    
+
     print("💻 Switching to Zig {s}...\n", .{version});
-    
+
     // Add to PATH precedence
     // This would involve PATH manipulation or symlink creation
-    
+
     print("✅ Now using Zig {s}\n", .{version});
     print("💡 Use 'zion zig current' to verify\n", .{});
 }
@@ -501,37 +477,95 @@ fn removeVersionEnhanced(allocator: Allocator, args: [][]const u8) !void {
         print("❌ Usage: zion zig remove <version>\n", .{});
         return;
     }
-    
+
     const version = args[0];
-    
+
     if (std.mem.eql(u8, version, "system")) {
         print("❌ Cannot remove system Zig installation\n", .{});
         return;
     }
-    
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+
+    const io = try zion_root.getIo();
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const version_dir = try std.fmt.allocPrint(allocator, "{s}/.zion/zig/{s}", .{ home_dir, version });
     defer allocator.free(version_dir);
-    
+
     // Check if version exists
-    std.fs.accessAbsolute(version_dir, .{}) catch {
+    Dir.accessAbsolute(io, version_dir, .{}) catch {
         print("❌ Zig {s} is not installed\n", .{version});
         return;
     };
-    
+
     print("🗑️ Removing Zig {s}...\n", .{version});
-    
-    try std.fs.deleteTreeAbsolute(version_dir);
-    
+
+    try Dir.deleteTreeAbsolute(io, version_dir);
+
     print("✅ Zig {s} removed successfully\n", .{version});
 }
 
 fn updateZigVersions(allocator: Allocator) !void {
     print("🔄 Updating Zig version index...\n", .{});
-    
+
     // This would fetch latest version info from ziglang.org
     _ = allocator;
-    
+
     print("✅ Version index updated\n", .{});
     print("💡 Use 'zion zig list --remote' to see latest versions\n", .{});
+}
+
+/// Helper function to check if a command runs successfully (no output capture)
+fn checkCommandSimple(allocator: Allocator, io: Io, argv: []const []const u8) !bool {
+    _ = allocator;
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    }) catch return false;
+
+    const term = child.wait(io) catch return false;
+
+    switch (term) {
+        .exited => |code| return code == 0,
+        else => return false,
+    }
+}
+
+/// Helper function to run a command and get its stdout
+fn runCommandGetOutput(allocator: Allocator, io: Io, argv: []const []const u8) ![]const u8 {
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    }) catch return error.SpawnFailed;
+
+    var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+    errdefer stdout_list.deinit(allocator);
+
+    if (child.stdout) |stdout_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            try stdout_list.appendSlice(allocator, buffer[0..n]);
+        }
+    }
+
+    const term = child.wait(io) catch return error.WaitFailed;
+
+    switch (term) {
+        .exited => |code| {
+            if (code == 0) {
+                return try stdout_list.toOwnedSlice(allocator);
+            } else {
+                stdout_list.deinit(allocator);
+                return error.CommandFailed;
+            }
+        },
+        else => {
+            stdout_list.deinit(allocator);
+            return error.CommandFailed;
+        },
+    }
 }

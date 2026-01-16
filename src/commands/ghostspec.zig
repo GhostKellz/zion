@@ -1,11 +1,15 @@
 const std = @import("std");
 const integration = @import("../ghostspec_integration.zig");
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 const compat_path = "data/ghostspec-compat.json";
 
 fn loadCompatValue(allocator: std.mem.Allocator) !json.Parsed(json.Value) {
-    const max_bytes: std.Io.Limit = @enumFromInt(128 * 1024);
-    const contents = try std.fs.cwd().readFileAlloc(compat_path, allocator, max_bytes);
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const contents = try cwd.readFileAlloc(io, compat_path, allocator, Io.Limit.limited(128 * 1024));
     errdefer allocator.free(contents);
 
     const tree = try json.parseFromSlice(json.Value, allocator, contents, .{ .ignore_unknown_fields = true });
@@ -201,7 +205,6 @@ fn handleRun(ctx: CommandContext) !void {
     executeIntegrationWorkflow(ctx, .run) catch |err| switch (err) {
         error.CommandFailed => return,
         error.SpawnFailed => return,
-        else => return err,
     };
     std.debug.print("✅ GhostSpec run completed.\n", .{});
 }
@@ -211,7 +214,6 @@ fn handleFuzz(ctx: CommandContext) !void {
     executeIntegrationWorkflow(ctx, .fuzz) catch |err| switch (err) {
         error.CommandFailed => return,
         error.SpawnFailed => return,
-        else => return err,
     };
     std.debug.print("✅ GhostSpec fuzz run completed.\n", .{});
 }
@@ -221,7 +223,6 @@ fn handleBench(ctx: CommandContext) !void {
     executeIntegrationWorkflow(ctx, .bench) catch |err| switch (err) {
         error.CommandFailed => return,
         error.SpawnFailed => return,
-        else => return err,
     };
     std.debug.print("✅ GhostSpec benchmarks completed.\n", .{});
 }
@@ -231,7 +232,6 @@ fn handleReport(ctx: CommandContext) !void {
     executeIntegrationWorkflow(ctx, .report) catch |err| switch (err) {
         error.CommandFailed => return,
         error.SpawnFailed => return,
-        else => return err,
     };
     std.debug.print("📄 JSON output (when enabled) is stored at {s}.\n", .{integration.default_report_path});
 }
@@ -241,7 +241,6 @@ fn handleCi(ctx: CommandContext) !void {
     executeIntegrationWorkflow(ctx, .ci) catch |err| switch (err) {
         error.CommandFailed => return,
         error.SpawnFailed => return,
-        else => return err,
     };
     std.debug.print("✅ GhostSpec CI profile finished.\n", .{});
 }

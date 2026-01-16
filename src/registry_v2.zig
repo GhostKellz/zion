@@ -2,8 +2,11 @@ const std = @import("std");
 const http = std.http;
 const json = std.json;
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const Dir = Io.Dir;
 const enhanced_config = @import("enhanced_config.zig");
 const RegistryConfig = enhanced_config.RegistryConfig;
+const zion_root = @import("root.zig");
 
 /// Package structure with enhanced metadata for v0.7.0
 pub const Package = struct {
@@ -177,15 +180,17 @@ pub const RegistryHealth = struct {
 pub const RegistryClient = struct {
     allocator: Allocator,
     config: RegistryConfig,
+    io: Io,
     http_client: std.http.Client,
     health_metrics: RegistryHealth,
     cache: ?PackageCache = null,
-    
-    pub fn init(allocator: Allocator, registry_config: RegistryConfig) RegistryClient {
+
+    pub fn init(allocator: Allocator, registry_config: RegistryConfig, io: Io) RegistryClient {
         return RegistryClient{
             .allocator = allocator,
             .config = registry_config,
-            .http_client = std.http.Client{ .allocator = allocator },
+            .io = io,
+            .http_client = std.http.Client{ .allocator = allocator, .io = io },
             .health_metrics = RegistryHealth{
                 .name = registry_config.name,
                 .status = .unknown,
@@ -211,7 +216,7 @@ pub const RegistryClient = struct {
     
     /// Check registry health
     pub fn checkHealth(self: *RegistryClient) !void {
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
         
         const health_url = try std.fmt.allocPrint(self.allocator, "{s}/health", .{self.config.base_url});
         defer self.allocator.free(health_url);
@@ -223,7 +228,7 @@ pub const RegistryClient = struct {
         };
         defer self.allocator.free(response);
         
-        const end_time = std.time.milliTimestamp();
+        const end_time = zion_root.milliTimestamp();
         self.health_metrics.response_time_ms = @intCast(end_time - start_time);
         self.health_metrics.last_checked = end_time;
         self.health_metrics.status = .healthy;
@@ -377,7 +382,7 @@ pub const RegistryClient = struct {
             
             // Exponential backoff
             const backoff_ms = std.math.pow(u32, 2, retry_count) * 1000;
-            std.Thread.sleep(backoff_ms * std.time.ns_per_ms);
+            zion_root.sleep(backoff_ms * std.time.ns_per_ms);
         }
         
         return error.MaxRetriesExceeded;
@@ -695,55 +700,64 @@ pub const PackageCache = struct {
     allocator: Allocator,
     cache_dir: []const u8,
     ttl_hours: u32,
-    
+
     pub fn init(allocator: Allocator, cache_dir: []const u8, ttl_hours: u32) !PackageCache {
         // Create cache directory if it doesn't exist
-        try std.fs.cwd().makePath(cache_dir);
-        
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        try cwd.createDirPath(io, cache_dir);
+
         return PackageCache{
             .allocator = allocator,
             .cache_dir = try allocator.dupe(u8, cache_dir),
             .ttl_hours = ttl_hours,
         };
     }
-    
+
     pub fn deinit(self: *PackageCache) void {
         self.allocator.free(self.cache_dir);
     }
-    
+
     pub fn getAlias(self: *PackageCache, short_name: []const u8) !?[]const u8 {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+
         const cache_file = try std.fmt.allocPrint(self.allocator, "{s}/aliases/{s}.json", .{ self.cache_dir, short_name });
         defer self.allocator.free(cache_file);
-        
-        const file = std.fs.cwd().openFile(cache_file, .{}) catch return null;
-        defer file.close();
-        
-        const stat = try file.stat();
-        const now = std.time.timestamp();
-        const age_hours = @divTrunc(now - stat.mtime, std.time.ns_per_hour);
-        
+
+        const file = cwd.openFile(io, cache_file, .{}) catch return null;
+        defer file.close(io);
+
+        const stat = try file.stat(io);
+        const now = zion_root.timestamp();
+        const mtime_sec = stat.mtime.toSeconds();
+        const age_hours: i64 = @divTrunc(now - mtime_sec, std.time.s_per_hour);
+
         if (age_hours > self.ttl_hours) {
             return null; // Cache expired
         }
-        
-        const file_size = try file.getEndPos();
+
+        const file_size = try file.length(io);
         const content = try self.allocator.alloc(u8, file_size);
-        _ = try file.readAll(content);
+        _ = try file.readPositionalAll(io, content, 0);
         return content;
     }
-    
+
     pub fn putAlias(self: *PackageCache, short_name: []const u8, full_name: []const u8) !void {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+
         const aliases_dir = try std.fmt.allocPrint(self.allocator, "{s}/aliases", .{self.cache_dir});
         defer self.allocator.free(aliases_dir);
-        
-        try std.fs.cwd().makePath(aliases_dir);
-        
+
+        try cwd.createDirPath(io, aliases_dir);
+
         const cache_file = try std.fmt.allocPrint(self.allocator, "{s}/{s}.json", .{ aliases_dir, short_name });
         defer self.allocator.free(cache_file);
-        
-        const file = try std.fs.cwd().createFile(cache_file, .{});
-        defer file.close();
-        
-        try file.writeAll(full_name);
+
+        const file = try cwd.createFile(io, cache_file, .{});
+        defer file.close(io);
+
+        try file.writeStreamingAll(io, full_name);
     }
 };

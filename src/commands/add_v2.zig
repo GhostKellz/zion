@@ -1,7 +1,9 @@
 const std = @import("std");
-const fs = std.fs;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("../root.zig");
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
@@ -162,9 +164,10 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
-    
-    cwd.access(zon_path, .{}) catch |err| {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("❌ build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -242,7 +245,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         package.version,
         package.registry_name,
         package.license orelse "Unknown",
-        std.time.timestamp(),
+        zion_root.timestamp(),
     });
     defer allocator.free(metadata);
     
@@ -368,32 +371,34 @@ fn isLicenseCompatible(package_license: []const u8, required_license: []const u8
 
 /// Ensure the deps directory exists
 fn ensureDepsDir(dev_only: bool) !void {
-    const cwd = fs.cwd();
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create .zion directory
-    cwd.makeDir(".zion") catch |err| {
+    cwd.createDir(io, ".zion", .default_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
-    
+
     // Create appropriate deps directory
     const deps_dir = if (dev_only) ".zion/dev-deps" else ".zion/deps";
-    cwd.makeDir(deps_dir) catch |err| {
+    cwd.createDir(io, deps_dir, .default_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
 }
 
 /// Extract tarball (reused from original)
 fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []const u8) !void {
-    const cwd = fs.cwd();
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Remove existing directory if it exists
-    cwd.deleteTree(dest_path) catch |err| {
+    cwd.deleteTree(io, dest_path) catch |err| {
         if (err != error.FileNotFound) return err;
     };
-    
+
     // Create destination directory
-    try cwd.makePath(dest_path);
-    
+    try cwd.createDirPath(io, dest_path);
+
     // Use tar to extract
     const argv = [_][]const u8{
         "tar",
@@ -403,41 +408,38 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
         dest_path,
         "--strip-components=1",
     };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    
-    const stderr = if (child.stderr) |stderr_pipe| blk: {
-        var output_buf: std.ArrayList(u8) = .{};
-        defer output_buf.deinit(allocator);
-        
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
+
+    // Read stderr using scatter/gather API
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
+
+    if (child.stderr) |stderr_pipe| {
         var read_buf: [4096]u8 = undefined;
         while (true) {
-            const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
+            const bytes_read = stderr_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
             if (bytes_read == 0) break;
-            try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
-        
-        break :blk try allocator.dupe(u8, output_buf.items);
-    } else
-        try allocator.dupe(u8, "No error output available");
-    defer allocator.free(stderr);
-    
-    const term = try child.wait();
-    
+    }
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("tar extraction failed (exit code {d}): {s}\n", .{ code, stderr });
+                std.debug.print("tar extraction failed (exit code {d}): {s}\n", .{ code, stderr_buf.items });
                 return error.ExtractionFailed;
             }
         },
         else => {
-            std.debug.print("tar extraction terminated abnormally: {s}\n", .{stderr});
+            std.debug.print("tar extraction terminated abnormally: {s}\n", .{stderr_buf.items});
             return error.ExtractionFailed;
         },
     }

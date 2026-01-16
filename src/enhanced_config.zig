@@ -1,7 +1,27 @@
 const std = @import("std");
-const fs = std.fs;
 const json = std.json;
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const Dir = Io.Dir;
+const zion_root = @import("root.zig");
+
+/// Helper to get environment variable as a slice (Zig 0.16.0 compatibility)
+/// Accepts string literals which are sentinel-terminated
+fn getEnvVar(name: [*:0]const u8) ?[]const u8 {
+    const ptr = std.c.getenv(name) orelse return null;
+    return std.mem.sliceTo(ptr, 0);
+}
+
+/// Helper for dynamically constructed env var names
+fn getEnvVarDynamic(name: []const u8) ?[]const u8 {
+    // Stack buffer for null-terminated copy
+    var buf: [256]u8 = undefined;
+    if (name.len >= buf.len) return null;
+    @memcpy(buf[0..name.len], name);
+    buf[name.len] = 0;
+    const ptr = std.c.getenv(@ptrCast(buf[0..name.len :0])) orelse return null;
+    return std.mem.sliceTo(ptr, 0);
+}
 
 /// Registry configuration for v0.7.0 multi-registry support
 pub const RegistryConfig = struct {
@@ -15,7 +35,7 @@ pub const RegistryConfig = struct {
     
     pub fn getApiUrl(self: RegistryConfig, allocator: std.mem.Allocator) ![]const u8 {
         return std.fmt.allocPrint(allocator, "{s}/api/{s}", .{
-            std.mem.trimRight(u8, self.base_url, "/"),
+            std.mem.trimEnd(u8, self.base_url, "/"),
             self.api_version
         });
     }
@@ -167,12 +187,12 @@ pub const ZionConfig = struct {
     /// Load configuration from environment variables
     fn loadFromEnvironment(self: *ZionConfig) !void {
         // GitHub username
-        if (std.posix.getenv("ZION_GITHUB_USERNAME")) |username| {
+        if (getEnvVar("ZION_GITHUB_USERNAME")) |username| {
             self.github_username = try self.allocator.dupe(u8, username);
         }
         
         // GitHub organizations (comma-separated)
-        if (std.posix.getenv("ZION_GITHUB_ORGS")) |orgs_str| {
+        if (getEnvVar("ZION_GITHUB_ORGS")) |orgs_str| {
             var it = std.mem.splitScalar(u8, orgs_str, ',');
             while (it.next()) |org| {
                 const trimmed = std.mem.trim(u8, org, " ");
@@ -183,32 +203,32 @@ pub const ZionConfig = struct {
         }
         
         // Boolean settings
-        if (std.posix.getenv("ZION_AUTO_ADD_TO_BUILD")) |val| {
+        if (getEnvVar("ZION_AUTO_ADD_TO_BUILD")) |val| {
             self.auto_add_to_build = std.mem.eql(u8, val, "true") or std.mem.eql(u8, val, "1");
         }
         
-        if (std.posix.getenv("ZION_VERIFY_SIGNATURES")) |val| {
+        if (getEnvVar("ZION_VERIFY_SIGNATURES")) |val| {
             self.verify_signatures = std.mem.eql(u8, val, "true") or std.mem.eql(u8, val, "1");
         }
         
         // Numeric settings
-        if (std.posix.getenv("ZION_CACHE_TTL_HOURS")) |val| {
+        if (getEnvVar("ZION_CACHE_TTL_HOURS")) |val| {
             self.cache_ttl_hours = std.fmt.parseInt(u32, val, 10) catch self.cache_ttl_hours;
         }
         
-        if (std.posix.getenv("ZION_MAX_CACHE_SIZE_MB")) |val| {
+        if (getEnvVar("ZION_MAX_CACHE_SIZE_MB")) |val| {
             self.max_cache_size_mb = std.fmt.parseInt(u32, val, 10) catch self.max_cache_size_mb;
         }
         
-        if (std.posix.getenv("ZION_CONCURRENT_DOWNLOADS")) |val| {
+        if (getEnvVar("ZION_CONCURRENT_DOWNLOADS")) |val| {
             self.concurrent_downloads = std.fmt.parseInt(u32, val, 10) catch self.concurrent_downloads;
         }
         
         // Enhanced v0.7.0 Registry configuration
         // Primary registry from environment
-        if (std.posix.getenv("ZION_REGISTRY_URL")) |registry_url| {
+        if (getEnvVar("ZION_REGISTRY_URL")) |registry_url| {
             self.registry_url = try self.allocator.dupe(u8, registry_url);
-            const auth_token = std.posix.getenv("ZION_REGISTRY_TOKEN");
+            const auth_token = getEnvVar("ZION_REGISTRY_TOKEN");
             
             try self.registries.append(self.allocator, RegistryConfig{
                 .name = try self.allocator.dupe(u8, "custom"),
@@ -227,7 +247,7 @@ pub const ZionConfig = struct {
         }
         
         // Multiple registries support
-        if (std.posix.getenv("ZION_REGISTRIES")) |registries_str| {
+        if (getEnvVar("ZION_REGISTRIES")) |registries_str| {
             var it = std.mem.splitScalar(u8, registries_str, ',');
             var priority: u32 = 1;
             
@@ -239,7 +259,7 @@ pub const ZionConfig = struct {
                     // Check for specific auth token
                     const auth_env_name = try std.fmt.allocPrint(self.allocator, "ZION_REGISTRY_TOKEN_{}", .{priority});
                     defer self.allocator.free(auth_env_name);
-                    const auth_token = std.posix.getenv(auth_env_name);
+                    const auth_token = getEnvVarDynamic(auth_env_name);
                     
                     try self.registries.append(self.allocator, RegistryConfig{
                         .name = registry_name,
@@ -260,7 +280,7 @@ pub const ZionConfig = struct {
         }
         
         // Always add GitHub as fallback (lowest priority)
-        const github_token = std.posix.getenv("ZION_GITHUB_TOKEN") orelse std.posix.getenv("GITHUB_TOKEN");
+        const github_token = getEnvVar("ZION_GITHUB_TOKEN") orelse getEnvVar("GITHUB_TOKEN");
         try self.registries.append(self.allocator, RegistryConfig{
             .name = try self.allocator.dupe(u8, "github"),
             .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
@@ -283,7 +303,7 @@ pub const ZionConfig = struct {
         }.lessThan);
         
         // Legacy fallback registries support (for backward compatibility)
-        if (std.posix.getenv("ZION_FALLBACK_REGISTRIES")) |registries_str| {
+        if (getEnvVar("ZION_FALLBACK_REGISTRIES")) |registries_str| {
             var it = std.mem.splitScalar(u8, registries_str, ',');
             while (it.next()) |registry| {
                 const trimmed = std.mem.trim(u8, registry, " ");
@@ -294,25 +314,26 @@ pub const ZionConfig = struct {
         }
         
         // Registry timeout
-        if (std.posix.getenv("ZION_REGISTRY_TIMEOUT")) |val| {
+        if (getEnvVar("ZION_REGISTRY_TIMEOUT")) |val| {
             self.registry_timeout_sec = std.fmt.parseInt(u32, val, 10) catch 30;
         }
         
         // Registry retries
-        if (std.posix.getenv("ZION_REGISTRY_RETRIES")) |val| {
+        if (getEnvVar("ZION_REGISTRY_RETRIES")) |val| {
             self.registry_retries = std.fmt.parseInt(u32, val, 10) catch 3;
         }
         
         // Prefer registry over GitHub
-        if (std.posix.getenv("ZION_PREFER_REGISTRY")) |val| {
+        if (getEnvVar("ZION_PREFER_REGISTRY")) |val| {
             self.prefer_registry_over_github = std.mem.eql(u8, val, "true") or std.mem.eql(u8, val, "1");
         }
     }
     
     /// Load configuration from zion.json file
     fn loadFromJsonFile(self: *ZionConfig) !void {
-        const cwd = fs.cwd();
-        const config_data = try cwd.readFileAlloc("zion.json", self.allocator, @enumFromInt(1024 * 1024));
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        const config_data = try cwd.readFileAlloc(io, "zion.json", self.allocator, Io.Limit.limited(1024 * 1024));
         defer self.allocator.free(config_data);
         
         var parsed = try json.parseFromSlice(json.Value, self.allocator, config_data, .{});
@@ -351,8 +372,9 @@ pub const ZionConfig = struct {
     
     /// Load configuration from zion.lua file (simple key-value parser)
     fn loadFromLuaFile(self: *ZionConfig) !void {
-        const cwd = fs.cwd();
-        const lua_data = try cwd.readFileAlloc("zion.lua", self.allocator, @enumFromInt(1024 * 1024));
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        const lua_data = try cwd.readFileAlloc(io, "zion.lua", self.allocator, Io.Limit.limited(1024 * 1024));
         defer self.allocator.free(lua_data);
         
         std.debug.print("📋 Loading Lua configuration...\n", .{});
@@ -540,11 +562,12 @@ fn createSampleJsonConfig(allocator: Allocator) !void {
         \\
     ;
     
-    const cwd = fs.cwd();
-    const file = try cwd.createFile("zion.json", .{});
-    defer file.close();
-    
-    try file.writeAll(sample_json);
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const file = try cwd.createFile(io, "zion.json", .{});
+    defer file.close(io);
+
+    try file.writeStreamingAll(io, sample_json);
     std.debug.print("✅ Created sample zion.json configuration\n", .{});
     _ = allocator;
 }
@@ -594,11 +617,12 @@ fn createSampleLuaConfig(allocator: Allocator) !void {
         \\
     ;
     
-    const cwd = fs.cwd();
-    const file = try cwd.createFile("zion.lua", .{});
-    defer file.close();
-    
-    try file.writeAll(sample_lua);
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const file = try cwd.createFile(io, "zion.lua", .{});
+    defer file.close(io);
+
+    try file.writeStreamingAll(io, sample_lua);
     std.debug.print("✅ Created sample zion.lua configuration\n", .{});
     std.debug.print("💡 This will enable Neovim integration and package shortcuts\n", .{});
     _ = allocator;

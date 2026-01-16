@@ -1,8 +1,11 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
+const zion_root = @import("../root.zig");
 
 /// List all dependencies in the project
 pub fn list(allocator: Allocator, json_mode: bool) !void {
@@ -12,10 +15,11 @@ pub fn list(allocator: Allocator, json_mode: bool) !void {
 /// List dependencies with additional options
 pub fn listWithOptions(allocator: Allocator, json_mode: bool, show_outdated: bool, show_versions: bool) !void {
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     // Check if build.zig.zon exists
-    cwd.access(zon_path, .{}) catch |err| {
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -40,6 +44,8 @@ pub fn listWithOptions(allocator: Allocator, json_mode: bool, show_outdated: boo
 /// Print dependencies in JSON format
 fn printJsonList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile) !void {
     _ = allocator;
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     std.debug.print("[\n", .{});
 
@@ -61,7 +67,7 @@ fn printJsonList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile)
         defer std.heap.page_allocator.free(deps_path);
 
         const installed = blk: {
-            fs.cwd().access(deps_path, .{}) catch {
+            cwd.access(io, deps_path, .{}) catch {
                 break :blk false;
             };
             break :blk true;
@@ -96,6 +102,8 @@ fn printJsonList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile)
 /// Print dependencies in table format
 fn printTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile) !void {
     _ = allocator;
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
 
     std.debug.print("📦 Dependencies for project '{s}' v{s}:\n", .{ zon_file.name, zon_file.version });
     std.debug.print("──────────────────────────────────────────────────────────────────────\n", .{});
@@ -115,7 +123,7 @@ fn printTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile
         defer std.heap.page_allocator.free(deps_path);
 
         const is_installed = blk: {
-            fs.cwd().access(deps_path, .{}) catch {
+            cwd.access(io, deps_path, .{}) catch {
                 break :blk false;
             };
             break :blk true;
@@ -202,10 +210,12 @@ fn extractRepoInfo(allocator: Allocator, url: []const u8) !RepoInfo {
 /// Enhanced table format with additional options
 fn printEnhancedTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *LockFile, show_outdated: bool, show_versions: bool) !void {
     _ = show_outdated; // TODO: Implement outdated checking
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     std.debug.print("📦 Dependencies for project '{s}' v{s}:\n", .{ zon_file.name, zon_file.version });
     std.debug.print("──────────────────────────────────────────────────────────────────────────────────\n", .{});
-    
+
     if (show_versions) {
         std.debug.print("Name                 Status     Repository                     Version       Hash\n", .{});
     } else {
@@ -226,7 +236,7 @@ fn printEnhancedTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *
         defer allocator.free(deps_path);
 
         const is_installed = blk: {
-            fs.cwd().access(deps_path, .{}) catch {
+            cwd.access(io, deps_path, .{}) catch {
                 break :blk false;
             };
             break :blk true;

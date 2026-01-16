@@ -3,6 +3,8 @@ const http = std.http;
 const json = std.json;
 const Allocator = std.mem.Allocator;
 const RegistryConfig = @import("registry_config.zig").RegistryConfig;
+const zion_root = @import("root.zig");
+const Io = std.Io;
 
 pub const Package = struct {
     name: []const u8,
@@ -58,12 +60,15 @@ pub const RegistryClient = struct {
     allocator: Allocator,
     config: RegistryConfig,
     http_client: http.Client,
-    
-    pub fn init(allocator: Allocator, registry_config: RegistryConfig) RegistryClient {
+    io: Io,
+
+    pub fn init(allocator: Allocator, registry_config: RegistryConfig) !RegistryClient {
+        const io = try zion_root.getIo();
         return RegistryClient{
             .allocator = allocator,
             .config = registry_config,
-            .http_client = http.Client{ .allocator = allocator },
+            .http_client = http.Client{ .allocator = allocator, .io = io },
+            .io = io,
         };
     }
     
@@ -153,7 +158,7 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
         
         // Deep clone the releases
-        var releases: std.ArrayList(Release) = .{};
+        var releases: std.ArrayListUnmanaged(Release) = .empty;
         for (parsed.value) |release| {
             try releases.append(self.allocator, Release{
                 .tag_name = try self.allocator.dupe(u8, release.tag_name),
@@ -222,12 +227,12 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayListUnmanaged(Package) = .empty;
         for (parsed.value.items) |item| {
             try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, item.name),
                 .full_name = try self.allocator.dupe(u8, item.full_name),
-                .description = if (item.description) |desc| 
+                .description = if (item.description) |desc|
                     try self.allocator.dupe(u8, desc) else null,
                 .version = try self.allocator.dupe(u8, "latest"),
                 .tarball_url = try self.allocator.dupe(u8, item.clone_url),
@@ -237,10 +242,10 @@ pub const RegistryClient = struct {
                 .star_count = item.stargazers_count,
             });
         }
-        
+
         return packages.toOwnedSlice(self.allocator);
     }
-    
+
     fn parseZigistrySearchResults(self: *RegistryClient, response: []const u8) ![]Package {
         const parsed = try json.parseFromSlice(struct {
             packages: []struct {
@@ -258,7 +263,7 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
         
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayListUnmanaged(Package) = .empty;
         for (parsed.value.packages) |pkg| {
             const is_ziglibs = std.mem.eql(u8, pkg.owner, "ziglibs");
             
@@ -291,22 +296,22 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
         
         // Deep clone packages
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayListUnmanaged(Package) = .empty;
         for (parsed.value.items) |pkg| {
             try packages.append(self.allocator, Package{
                 .name = try self.allocator.dupe(u8, pkg.name),
                 .full_name = try self.allocator.dupe(u8, pkg.full_name),
-                .description = if (pkg.description) |desc| 
+                .description = if (pkg.description) |desc|
                     try self.allocator.dupe(u8, desc) else null,
                 .version = try self.allocator.dupe(u8, pkg.version),
                 .tarball_url = try self.allocator.dupe(u8, pkg.tarball_url),
-                .sha256_hash = if (pkg.sha256_hash) |hash| 
+                .sha256_hash = if (pkg.sha256_hash) |hash|
                     try self.allocator.dupe(u8, hash) else null,
                 .published_at = try self.allocator.dupe(u8, pkg.published_at),
                 .registry_name = try self.allocator.dupe(u8, self.config.name),
             });
         }
-        
+
         return packages.toOwnedSlice(self.allocator);
     }
 };

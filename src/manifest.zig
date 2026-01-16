@@ -1,6 +1,9 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("root.zig");
 
 /// Represents a dependency in the build.zig.zon file
 pub const Dependency = struct {
@@ -101,8 +104,9 @@ pub const ZonFile = struct {
 
     /// Load ZON file from disk
     pub fn loadFromFile(allocator: Allocator, file_path: []const u8) !ZonFile {
-        const cwd = fs.cwd();
-        const content = try cwd.readFileAlloc(file_path, allocator, @enumFromInt(10 * 1024 * 1024));
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        const content = try cwd.readFileAlloc(io, file_path, allocator, Io.Limit.limited(10 * 1024 * 1024));
         defer allocator.free(content);
 
         return parseZonContent(allocator, content);
@@ -239,22 +243,23 @@ pub const ZonFile = struct {
 
     /// Save ZON file to disk with proper Zig identifier format
     pub fn saveToFile(self: *const ZonFile, file_path: []const u8) !void {
-        const cwd = fs.cwd();
-        const file = try cwd.createFile(file_path, .{ .truncate = true });
-        defer file.close();
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        const file = try cwd.createFile(io, file_path, .{ .truncate = true });
+        defer file.close(io);
 
         // Write ZON format with proper identifier syntax
-        try file.writeAll(".{\n");
-        
+        try file.writeStreamingAll(io, ".{\n");
+
         const name_line = try std.fmt.allocPrint(self.allocator, "    .name = .{s},\n", .{self.name});
         defer self.allocator.free(name_line);
-        try file.writeAll(name_line);
-        
+        try file.writeStreamingAll(io, name_line);
+
         const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{self.version});
         defer self.allocator.free(version_line);
-        try file.writeAll(version_line);
-        
-        try file.writeAll("    .dependencies = .{\n");
+        try file.writeStreamingAll(io, version_line);
+
+        try file.writeStreamingAll(io, "    .dependencies = .{\n");
 
         var it = self.dependencies.iterator();
         while (it.next()) |entry| {
@@ -262,49 +267,49 @@ pub const ZonFile = struct {
             const dep = entry.value_ptr.*;
             const dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
             defer self.allocator.free(dep_name_line);
-            try file.writeAll(dep_name_line);
-            
+            try file.writeStreamingAll(io, dep_name_line);
+
             const dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
             defer self.allocator.free(dep_url_line);
-            try file.writeAll(dep_url_line);
-            
+            try file.writeStreamingAll(io, dep_url_line);
+
             const dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
             defer self.allocator.free(dep_hash_line);
-            try file.writeAll(dep_hash_line);
-            
-            try file.writeAll("        },\n");
+            try file.writeStreamingAll(io, dep_hash_line);
+
+            try file.writeStreamingAll(io, "        },\n");
         }
 
-        try file.writeAll("    },\n");
+        try file.writeStreamingAll(io, "    },\n");
 
         // Add development dependencies section if any exist
         if (self.dev_dependencies.count() > 0) {
-            try file.writeAll("    .dev_dependencies = .{\n");
-            
+            try file.writeStreamingAll(io, "    .dev_dependencies = .{\n");
+
             var dev_it = self.dev_dependencies.iterator();
             while (dev_it.next()) |entry| {
                 const name = entry.key_ptr.*;
                 const dep = entry.value_ptr.*;
-                
+
                 const dev_dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
                 defer self.allocator.free(dev_dep_name_line);
-                try file.writeAll(dev_dep_name_line);
-                
+                try file.writeStreamingAll(io, dev_dep_name_line);
+
                 const dev_dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
                 defer self.allocator.free(dev_dep_url_line);
-                try file.writeAll(dev_dep_url_line);
-                
+                try file.writeStreamingAll(io, dev_dep_url_line);
+
                 const dev_dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
                 defer self.allocator.free(dev_dep_hash_line);
-                try file.writeAll(dev_dep_hash_line);
-                
-                try file.writeAll("        },\n");
+                try file.writeStreamingAll(io, dev_dep_hash_line);
+
+                try file.writeStreamingAll(io, "        },\n");
             }
-            
-            try file.writeAll("    },\n");
+
+            try file.writeStreamingAll(io, "    },\n");
         }
-        
-        try file.writeAll("}\n");
+
+        try file.writeStreamingAll(io, "}\n");
     }
 
     /// Add a development dependency

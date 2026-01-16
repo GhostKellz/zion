@@ -1,11 +1,14 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const github = @import("../github.zig");
+const zion_root = @import("../root.zig");
 
 /// Show outdated dependencies
-pub fn outdated(allocator: Allocator, args: [][:0]u8) !void {
+pub fn outdated(allocator: Allocator, args: []const [:0]const u8) !void {
     var json_output = false;
     
     // Parse arguments
@@ -20,9 +23,10 @@ pub fn outdated(allocator: Allocator, args: [][:0]u8) !void {
     
     // Load project dependencies
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
-    
-    cwd.access(zon_path, .{}) catch |err| {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("❌ build.zig.zon not found. Run 'zion init' first.\n", .{});
             return;
@@ -37,7 +41,7 @@ pub fn outdated(allocator: Allocator, args: [][:0]u8) !void {
         std.debug.print("🔍 Checking for outdated dependencies...\n\n", .{});
     }
     
-    var outdated_packages: std.ArrayList(OutdatedPackage) = .{};
+    var outdated_packages: std.ArrayList(OutdatedPackage) = .empty;
     defer {
         for (outdated_packages.items) |*pkg| {
             pkg.deinit(allocator);

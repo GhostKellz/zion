@@ -1,20 +1,24 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
+const zion_root = @import("../root.zig");
 
 /// Repair broken hashes and dependency issues in the project
 pub fn repair(allocator: Allocator) !void {
     std.debug.print("🔧 Repairing project dependencies...\n", .{});
-    
+
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
-    
-    cwd.access(zon_path, .{}) catch |err| {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("Error: build.zig.zon not found. Run 'zion init' first.\n", .{});
             return error.FileNotFound;
@@ -38,15 +42,15 @@ pub fn repair(allocator: Allocator) !void {
     var error_count: usize = 0;
     var verified_count: usize = 0;
     
-    var repaired_packages: std.ArrayList([]const u8) = .{};
+    var repaired_packages: std.ArrayList([]const u8) = .empty;
     defer {
         for (repaired_packages.items) |pkg_name| {
             allocator.free(pkg_name);
         }
         repaired_packages.deinit(allocator);
     }
-    
-    var failed_packages: std.ArrayList([]const u8) = .{};
+
+    var failed_packages: std.ArrayList([]const u8) = .empty;
     defer {
         for (failed_packages.items) |pkg_name| {
             allocator.free(pkg_name);
@@ -68,7 +72,7 @@ pub fn repair(allocator: Allocator) !void {
         
         // Check if file exists in cache
         const cached_exists = blk: {
-            cwd.access(cache_path, .{}) catch |err| {
+            cwd.access(io, cache_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     break :blk false;
                 }
@@ -206,18 +210,19 @@ pub fn repair(allocator: Allocator) !void {
 
 /// Extract a tarball to a destination directory
 fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []const u8) !void {
-    const cwd = fs.cwd();
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Remove existing directory if it exists
-    cwd.deleteTree(dest_path) catch |err| {
+    cwd.deleteTree(io, dest_path) catch |err| {
         if (err != error.FileNotFound) {
             return err;
         }
     };
-    
+
     // Create destination directory
-    try cwd.makePath(dest_path);
-    
+    try cwd.createDirPath(io, dest_path);
+
     // Use tar to extract
     const argv = [_][]const u8{
         "tar",
@@ -227,38 +232,38 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
         dest_path,
         "--strip-components=1",
     };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    const term = try child.wait();
-    
-    // Read stderr for error messages
-    var output_buf: std.ArrayList(u8) = .{};
-    defer output_buf.deinit(allocator);
-    
-    var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = try child.stderr.?.readAll(read_buf[0..]);
-        if (bytes_read == 0) break;
-        try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .pipe,
+        .stderr = .pipe,
+    });
+
+    // Read stderr for error messages using scatter/gather API
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
+
+    if (child.stderr) |stderr_pipe| {
+        var read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = stderr_pipe.readStreaming(io, &.{read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+        }
     }
-    
-    const stderr = try allocator.dupe(u8, output_buf.items);
-    defer allocator.free(stderr);
-    
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("tar extraction failed (exit code {d}): {s}\n", .{ code, stderr });
+                std.debug.print("tar extraction failed (exit code {d}): {s}\n", .{ code, stderr_buf.items });
                 return error.ExtractionFailed;
             }
         },
         else => {
-            std.debug.print("tar extraction terminated abnormally: {s}\n", .{stderr});
+            std.debug.print("tar extraction terminated abnormally: {s}\n", .{stderr_buf.items});
             return error.ExtractionFailed;
         },
     }

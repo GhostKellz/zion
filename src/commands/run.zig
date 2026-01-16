@@ -1,20 +1,26 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
 
 /// Run the project executable
-pub fn run(allocator: Allocator, args: [][:0]u8) !void {
+pub fn run(allocator: Allocator, args: []const [:0]const u8) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Parse arguments
     var bin_name: ?[]const u8 = null;
-    var run_args: std.ArrayList([]const u8) = .{};
+    var run_args: std.ArrayList([]const u8) = .empty;
     defer run_args.deinit(allocator);
-    
+
     var i: usize = 2; // Skip "zion" and "run"
     var found_separator = false;
-    
+
     while (i < args.len) {
         const arg = args[i];
-        
+
         if (std.mem.eql(u8, arg, "--")) {
             found_separator = true;
             i += 1;
@@ -30,23 +36,23 @@ pub fn run(allocator: Allocator, args: [][:0]u8) !void {
         }
         i += 1;
     }
-    
+
     // Add remaining args after --
     while (i < args.len) {
         try run_args.append(allocator, args[i]);
         i += 1;
     }
-    
+
     // Determine the executable name
-    const executable_name = bin_name orelse try getDefaultExecutableName(allocator);
+    const executable_name = bin_name orelse try getDefaultExecutableName(allocator, io, cwd);
     defer if (bin_name == null) allocator.free(executable_name);
-    
+
     // Check if we need to build first
     const exe_path = try std.fmt.allocPrint(allocator, "zig-out/bin/{s}", .{executable_name});
     defer allocator.free(exe_path);
-    
+
     const needs_build = blk: {
-        fs.cwd().access(exe_path, .{}) catch |err| {
+        cwd.access(io, exe_path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 break :blk true;
             }
@@ -54,39 +60,41 @@ pub fn run(allocator: Allocator, args: [][:0]u8) !void {
         };
         break :blk false;
     };
-    
+
     if (needs_build) {
         std.debug.print("🔨 Building project...\n", .{});
-        try buildProject(allocator);
+        try buildProject(io);
     }
-    
+
     // Run the executable
     std.debug.print("🚀 Running {s}...\n", .{executable_name});
-    
-    var cmd_args: std.ArrayList([]const u8) = .{};
+
+    var cmd_args: std.ArrayList([]const u8) = .empty;
     defer cmd_args.deinit(allocator);
-    
+
     try cmd_args.append(allocator, exe_path);
     for (run_args.items) |arg| {
         try cmd_args.append(allocator, arg);
     }
-    
+
     // Execute the binary
-    var child = std.process.Child.init(cmd_args.items, allocator);
-    child.stdin_behavior = .Inherit;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
-    
-    const term = try child.spawnAndWait();
-    
+    var child = try std.process.spawn(io, .{
+        .argv = cmd_args.items,
+        .stdin = .inherit,
+        .stdout = .inherit,
+        .stderr = .inherit,
+    });
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
                 std.debug.print("💥 Process exited with code {d}\n", .{code});
             }
         },
-        .Signal => |signal| {
-            std.debug.print("💥 Process terminated by signal {d}\n", .{signal});
+        .signal => |sig| {
+            std.debug.print("💥 Process terminated by signal {}\n", .{sig});
         },
         else => {
             std.debug.print("💥 Process terminated abnormally\n", .{});
@@ -95,58 +103,68 @@ pub fn run(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Get the default executable name from build.zig.zon
-fn getDefaultExecutableName(allocator: Allocator) ![]const u8 {
-    const cwd = fs.cwd();
-    
+fn getDefaultExecutableName(allocator: Allocator, io: Io, cwd: Dir) ![]const u8 {
     // Try to read build.zig.zon to get the project name
-    const zon_content = cwd.readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| {
+    const file = cwd.openFile(io, "build.zig.zon", .{}) catch |err| {
         if (err == error.FileNotFound) {
             return allocator.dupe(u8, "main"); // Default fallback
         }
         return err;
     };
-    defer allocator.free(zon_content);
-    
-    // Simple parsing to find .name = 
-    if (std.mem.indexOf(u8, zon_content, ".name = .")) |start| {
+    defer file.close(io);
+
+    var zon_content: std.ArrayList(u8) = .empty;
+    defer zon_content.deinit(allocator);
+
+    var buffer: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+        if (bytes_read == 0) break;
+        try zon_content.appendSlice(allocator, buffer[0..bytes_read]);
+    }
+
+    // Simple parsing to find .name =
+    if (std.mem.indexOf(u8, zon_content.items, ".name = .")) |start| {
         const name_start = start + 9; // ".name = .".len
         var name_end = name_start;
-        
-        while (name_end < zon_content.len) {
-            const c = zon_content[name_end];
+
+        while (name_end < zon_content.items.len) {
+            const c = zon_content.items[name_end];
             if (!std.ascii.isAlphanumeric(c) and c != '_') break;
             name_end += 1;
         }
-        
+
         if (name_end > name_start) {
-            return allocator.dupe(u8, zon_content[name_start..name_end]);
+            return allocator.dupe(u8, zon_content.items[name_start..name_end]);
         }
     }
-    
+
     // Fallback: try quoted string format
-    if (std.mem.indexOf(u8, zon_content, ".name = \"")) |start| {
+    if (std.mem.indexOf(u8, zon_content.items, ".name = \"")) |start| {
         const name_start = start + 9; // ".name = \"".len
-        if (std.mem.indexOfScalarPos(u8, zon_content, name_start, '"')) |name_end| {
-            return allocator.dupe(u8, zon_content[name_start..name_end]);
+        if (std.mem.indexOfScalarPos(u8, zon_content.items, name_start, '"')) |name_end| {
+            return allocator.dupe(u8, zon_content.items[name_start..name_end]);
         }
     }
-    
+
     return allocator.dupe(u8, "main");
 }
 
 /// Build the project using zig build
-fn buildProject(allocator: Allocator) !void {
+fn buildProject(io: Io) !void {
     const argv = [_][]const u8{ "zig", "build" };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
-    
-    const term = try child.spawnAndWait();
-    
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .inherit,
+        .stderr = .inherit,
+    });
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
                 std.debug.print("❌ Build failed with exit code {d}\n", .{code});
                 return error.BuildFailed;

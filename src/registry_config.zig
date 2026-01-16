@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const zion_root = @import("root.zig");
 
 /// Registry configuration for multi-registry support
 pub const RegistryConfig = struct {
@@ -18,7 +19,7 @@ pub const RegistryConfig = struct {
         }
         
         return std.fmt.allocPrint(allocator, "{s}/api/{s}", .{
-            std.mem.trimRight(u8, self.base_url, "/"),
+            std.mem.trimEnd(u8, self.base_url, "/"),
             self.api_version
         });
     }
@@ -52,8 +53,8 @@ pub const ZionConfig = struct {
     
     pub fn loadFromEnvironment(self: *ZionConfig) !void {
         // Primary registry from environment
-        if (std.posix.getenv("ZION_REGISTRY_URL")) |registry_url| {
-            const auth_token = std.posix.getenv("ZION_REGISTRY_TOKEN");
+        if (zion_root.getEnv("ZION_REGISTRY_URL")) |registry_url| {
+            const auth_token = zion_root.getEnv("ZION_REGISTRY_TOKEN");
             
             try self.registries.append(self.allocator, RegistryConfig{
                 .name = try self.allocator.dupe(u8, "custom"),
@@ -65,7 +66,7 @@ pub const ZionConfig = struct {
         }
         
         // Multiple registries support
-        if (std.posix.getenv("ZION_REGISTRIES")) |registries_str| {
+        if (zion_root.getEnv("ZION_REGISTRIES")) |registries_str| {
             var it = std.mem.splitScalar(u8, registries_str, ',');
             var priority: u32 = 1;
             
@@ -108,11 +109,11 @@ pub const ZionConfig = struct {
         }.lessThan);
         
         // Load other config
-        if (std.posix.getenv("ZION_GITHUB_USERNAME")) |username| {
+        if (zion_root.getEnv("ZION_GITHUB_USERNAME")) |username| {
             self.github_username = try self.allocator.dupe(u8, username);
         }
         
-        if (std.posix.getenv("ZION_CACHE_DIR")) |cache_dir| {
+        if (zion_root.getEnv("ZION_CACHE_DIR")) |cache_dir| {
             self.cache_dir = try self.allocator.dupe(u8, cache_dir);
         }
     }

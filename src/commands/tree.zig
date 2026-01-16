@@ -1,10 +1,13 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
+const zion_root = @import("../root.zig");
 
 /// Display dependency tree
-pub fn tree(allocator: Allocator, args: [][:0]u8) !void {
+pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
     var max_depth: ?u32 = null;
     var show_duplicates = false;
     var show_versions = true;
@@ -35,9 +38,10 @@ pub fn tree(allocator: Allocator, args: [][:0]u8) !void {
     
     // Load project info
     const zon_path = "build.zig.zon";
-    const cwd = fs.cwd();
-    
-    cwd.access(zon_path, .{}) catch |err| {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    cwd.access(io, zon_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("❌ build.zig.zon not found. Run 'zion init' first.\n", .{});
             return;

@@ -6,9 +6,12 @@ const json = std.json;
 const RegistryManager = @import("../enhanced_registry_manager.zig").RegistryManager;
 const ZionConfig = @import("../registry_config.zig").ZionConfig;
 const Package = @import("../registry_client.zig").Package;
+const zion_root = @import("../root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// Advanced Zigistry integration commands
-pub fn zigistry(allocator: Allocator, args: [][:0]u8) !void {
+pub fn zigistry(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len == 0) {
         try showZigistryHelp();
         return;
@@ -81,13 +84,13 @@ fn showZigistryHelp() !void {
     , .{});
 }
 
-fn zigistryLogin(allocator: Allocator, args: [][:0]u8) !void {
+fn zigistryLogin(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
     
     print("🔐 Zigistry Authentication\n\n", .{});
     
     // Check if already authenticated
-    if (std.posix.getenv("ZIGISTRY_TOKEN")) |token| {
+    if (zion_root.getEnv("ZIGISTRY_TOKEN")) |token| {
         print("✅ Already authenticated with Zigistry\n", .{});
         
         // Verify token
@@ -108,7 +111,7 @@ fn zigistryLogin(allocator: Allocator, args: [][:0]u8) !void {
     print("💡 Or add to your shell profile for persistence\n", .{});
 }
 
-fn zigistryPublish(allocator: Allocator, args: [][:0]u8) !void {
+fn zigistryPublish(allocator: Allocator, args: []const [:0]const u8) !void {
     var sign_package = false;
     
     for (args) |arg| {
@@ -120,14 +123,16 @@ fn zigistryPublish(allocator: Allocator, args: [][:0]u8) !void {
     print("📦 Publishing to Zigistry\n\n", .{});
     
     // Check authentication
-    const token = std.posix.getenv("ZIGISTRY_TOKEN") orelse {
+    const token = zion_root.getEnv("ZIGISTRY_TOKEN") orelse {
         print("❌ Not authenticated with Zigistry\n", .{});
         print("💡 Run 'zion zigistry login' first\n", .{});
         return;
     };
     
     // Verify build.zig.zon exists
-    const zon_content = std.fs.cwd().readFileAlloc("build.zig.zon", allocator, @enumFromInt(1024 * 1024)) catch |err| switch (err) {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const zon_content = cwd.readFileAlloc(io, "build.zig.zon", allocator, Io.Limit.limited(1024 * 1024)) catch |err| switch (err) {
         error.FileNotFound => {
             print("❌ No build.zig.zon found\n", .{});
             print("💡 Run 'zion init' to create a project\n", .{});
@@ -206,7 +211,7 @@ fn showZigistryConnectionStatus(allocator: Allocator) !void {
     print("🔌 Zigistry Connection Status\n\n", .{});
     
     // Check authentication
-    if (std.posix.getenv("ZIGISTRY_TOKEN")) |token| {
+    if (zion_root.getEnv("ZIGISTRY_TOKEN")) |token| {
         print("🔐 Authentication: ✅ Configured\n", .{});
         
         if (try verifyZigistryToken(allocator, token)) {
@@ -236,7 +241,7 @@ fn showZigistryConnectionStatus(allocator: Allocator) !void {
     }
 }
 
-fn zigistryAnalytics(allocator: Allocator, args: [][:0]u8) !void {
+fn zigistryAnalytics(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len == 0) {
         // Show overall analytics
         try showZigistryOverallAnalytics(allocator);

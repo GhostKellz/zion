@@ -1,17 +1,22 @@
 const std = @import("std");
-const fs = std.fs;
+const root = @import("../root.zig");
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const Dir = Io.Dir;
+const File = Io.File;
 
 /// Initialize a new Zig project
 pub fn init(allocator: Allocator) !void {
     _ = allocator; // unused but required for API consistency
 
-    const cwd = fs.cwd();
+    // Get std.Io from application context for filesystem operations
+    const io = try root.getIo();
+    const cwd = Dir.cwd();
 
     std.debug.print("Initializing Zion project...\n", .{});
 
     // Create src directory
-    cwd.makeDir("src") catch |err| {
+    cwd.createDir(io, "src", .default_dir) catch |err| {
         if (err != error.PathAlreadyExists) {
             return err;
         }
@@ -27,9 +32,9 @@ pub fn init(allocator: Allocator) !void {
         \\
     ;
 
-    if (cwd.createFile("src/main.zig", .{})) |main_file| {
-        defer main_file.close();
-        try main_file.writeAll(main_zig_content);
+    if (cwd.createFile(io, "src/main.zig", .{})) |main_file| {
+        defer main_file.close(io);
+        try main_file.writeStreamingAll(io, main_zig_content);
         std.debug.print("Created src/main.zig\n", .{});
     } else |err| {
         if (err == error.PathAlreadyExists) {
@@ -71,9 +76,9 @@ pub fn init(allocator: Allocator) !void {
         \\
     ;
 
-    if (cwd.createFile("build.zig", .{})) |build_file| {
-        defer build_file.close();
-        try build_file.writeAll(build_zig_content);
+    if (cwd.createFile(io, "build.zig", .{})) |build_file| {
+        defer build_file.close(io);
+        try build_file.writeStreamingAll(io, build_zig_content);
         std.debug.print("Created build.zig\n", .{});
     } else |err| {
         if (err == error.PathAlreadyExists) {
@@ -94,9 +99,9 @@ pub fn init(allocator: Allocator) !void {
         \\
     ;
 
-    if (cwd.createFile("build.zig.zon", .{})) |zon_file| {
-        defer zon_file.close();
-        try zon_file.writeAll(zon_content);
+    if (cwd.createFile(io, "build.zig.zon", .{})) |zon_file| {
+        defer zon_file.close(io);
+        try zon_file.writeStreamingAll(io, zon_content);
         std.debug.print("Created build.zig.zon\n", .{});
     } else |err| {
         if (err == error.PathAlreadyExists) {

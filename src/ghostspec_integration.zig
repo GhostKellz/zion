@@ -1,6 +1,9 @@
 const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("root.zig");
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 const add_v2 = @import("commands/add_v2.zig");
 const remove_cmd = @import("commands/remove.zig");
@@ -87,12 +90,13 @@ pub fn uninstall(allocator: Allocator) !void {
 }
 
 pub fn ensureBuildIntegration(allocator: Allocator) !bool {
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     const build_path = "build.zig";
 
-    const raw = cwd.readFileAlloc(build_path, allocator, @enumFromInt(1024 * 1024)) catch |err| {
+    const raw = cwd.readFileAlloc(io, build_path, allocator, Io.Limit.limited(1024 * 1024)) catch |err| {
         if (err == error.FileNotFound) {
-            std.debug.print("⚠️  build.zig not found; skipping automatic wiring.\n", .{});
+            std.debug.print("build.zig not found; skipping automatic wiring.\n", .{});
             return false;
         }
         return err;
@@ -112,7 +116,7 @@ pub fn ensureBuildIntegration(allocator: Allocator) !bool {
             const parts = [_][]const u8{ raw[0..insert_pos], snippet, raw[insert_pos..] };
             break :blk std.mem.concat(allocator, u8, &parts);
         } else {
-            const trimmed = std.mem.trimRight(u8, raw, " \n\t");
+            const trimmed = std.mem.trimEnd(u8, raw, " \n\t");
             const brace_index = std.mem.lastIndexOfScalar(u8, trimmed, '}') orelse return error.InvalidBuildFile;
             const parts = [_][]const u8{ raw[0..brace_index], snippet, raw[brace_index..] };
             break :blk std.mem.concat(allocator, u8, &parts);
@@ -120,47 +124,65 @@ pub fn ensureBuildIntegration(allocator: Allocator) !bool {
     };
     defer allocator.free(updated);
 
-    var file = try cwd.createFile(build_path, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll(updated);
-    std.debug.print("🔧 Added GhostSpec build wiring to build.zig.\n", .{});
+    const file = try cwd.createFile(io, build_path, .{ .truncate = true });
+    defer file.close(io);
+    try file.writeStreamingAll(io, updated);
+    std.debug.print("Added GhostSpec build wiring to build.zig.\n", .{});
     return true;
 }
 
 pub fn scaffoldSuite(allocator: Allocator, options: ScaffoldOptions) !bool {
     _ = allocator;
-    const cwd = fs.cwd();
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     const dest = options.destination;
     const dir_path = std.fs.path.dirname(dest) orelse ".";
 
-    try cwd.makePath(dir_path);
+    cwd.createDirPath(io, dir_path) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
 
     if (!options.force) {
-        if (cwd.access(dest, .{})) |_| {
-            std.debug.print("ℹ️  {s} already exists; use --force to overwrite.\n", .{dest});
-            return false;
-        } else |err| switch (err) {
-            error.FileNotFound => {},
-            else => return err,
+        cwd.access(io, dest, .{}) catch |err| {
+            if (err != error.FileNotFound) return err;
+            // File doesn't exist, continue to create it
+        };
+        // If access succeeded, file exists
+        if (!options.force) {
+            cwd.access(io, dest, .{}) catch {
+                // File doesn't exist, continue to create
+            };
+            // Check again to see if file exists
+            const file_exists = blk: {
+                cwd.access(io, dest, .{}) catch break :blk false;
+                break :blk true;
+            };
+            if (file_exists) {
+                std.debug.print("{s} already exists; use --force to overwrite.\n", .{dest});
+                return false;
+            }
         }
     }
 
-    var file = cwd.createFile(dest, .{
+    const file = cwd.createFile(io, dest, .{
         .truncate = true,
     }) catch |err| {
-        if (err == error.PathAlreadyExists or err == error.FileAlreadyExists) {
+        if (err == error.PathAlreadyExists) {
             return false;
         }
         return err;
     };
-    defer file.close();
+    defer file.close(io);
 
-    try file.writeAll(scaffold_template);
-    std.debug.print("🛠️  Wrote GhostSpec suite scaffold to {s}.\n", .{dest});
+    try file.writeStreamingAll(io, scaffold_template);
+    std.debug.print("Wrote GhostSpec suite scaffold to {s}.\n", .{dest});
     return true;
 }
 
 pub fn ensureArtifactLayout() !bool {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const paths = [_][]const u8{
         ".zion/ghostspec",
         ".zion/ghostspec/corpus",
@@ -168,13 +190,14 @@ pub fn ensureArtifactLayout() !bool {
         ".zion/ghostspec/reports",
     };
 
-    const cwd = fs.cwd();
     var created = false;
 
     for (paths) |path| {
-        cwd.access(path, .{}) catch |err| switch (err) {
+        cwd.access(io, path, .{}) catch |err| switch (err) {
             error.FileNotFound => {
-                try cwd.makePath(path);
+                cwd.createDirPath(io, path) catch |create_err| {
+                    if (create_err != error.PathAlreadyExists) return create_err;
+                };
                 created = true;
             },
             else => return err,
@@ -189,9 +212,9 @@ pub fn ensureArtifactLayout() !bool {
 }
 
 pub fn executeWorkflow(allocator: Allocator, mode: RunMode, extra_args: []const []const u8) CommandFailed!void {
-    var args = std.ArrayList([]const u8).initCapacity(allocator, 0) catch {
-        return CommandFailed.CommandFailed;
-    };
+    const io = zion_root.getIo() catch return CommandFailed.CommandFailed;
+
+    var args: std.ArrayListUnmanaged([]const u8) = .empty;
     defer args.deinit(allocator);
 
     args.appendSlice(allocator, &.{ "zig", "build", "ghostspec-test" }) catch {
@@ -229,24 +252,28 @@ pub fn executeWorkflow(allocator: Allocator, mode: RunMode, extra_args: []const 
         .run => {},
     }
 
-    var child = std.process.Child.init(args.items, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
-
-    const term = child.spawnAndWait() catch {
+    var child = std.process.spawn(io, .{
+        .argv = args.items,
+        .stdin = .ignore,
+        .stdout = .inherit,
+        .stderr = .inherit,
+    }) catch {
         return CommandFailed.SpawnFailed;
     };
 
+    const term = child.wait(io) catch {
+        return CommandFailed.CommandFailed;
+    };
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("❌ GhostSpec workflow exited with code {d}.\n", .{code});
+                std.debug.print("GhostSpec workflow exited with code {d}.\n", .{code});
                 return CommandFailed.CommandFailed;
             }
         },
-        .Signal => |sig| {
-            std.debug.print("❌ GhostSpec workflow interrupted by signal {d}.\n", .{sig});
+        .signal => |sig| {
+            std.debug.print("GhostSpec workflow interrupted by signal {d}.\n", .{sig});
             return CommandFailed.CommandFailed;
         },
         else => return CommandFailed.CommandFailed,
@@ -256,7 +283,7 @@ pub fn executeWorkflow(allocator: Allocator, mode: RunMode, extra_args: []const 
 fn ensureDependency(allocator: Allocator, update: bool) !bool {
     var zon = manifest.ZonFile.loadFromFile(allocator, "build.zig.zon") catch |err| {
         if (err == error.FileNotFound) {
-            std.debug.print("⚠️  build.zig.zon not found. Run 'zion init' first.\n", .{});
+            std.debug.print("build.zig.zon not found. Run 'zion init' first.\n", .{});
         }
         return err;
     };
@@ -264,7 +291,7 @@ fn ensureDependency(allocator: Allocator, update: bool) !bool {
 
     const already = zon.dependencies.contains("ghostspec");
     if (already and !update) {
-        std.debug.print("ℹ️  GhostSpec dependency already present.\n", .{});
+        std.debug.print("GhostSpec dependency already present.\n", .{});
         return false;
     }
 
@@ -281,15 +308,16 @@ fn buildSnippet() []const u8 {
 }
 
 fn createGitKeep(path: []const u8) !void {
-    const cwd = fs.cwd();
-    var file = cwd.createFile(path, .{ .exclusive = true }) catch |err| switch (err) {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const file = cwd.createFile(io, path, .{ .exclusive = true }) catch |err| switch (err) {
         error.PathAlreadyExists => return,
         else => return err,
     };
-    defer file.close();
+    file.close(io);
 }
 
-fn ensureFilter(args: *std.ArrayList([]const u8), allocator: Allocator, pattern: []const u8) CommandFailed!void {
+fn ensureFilter(args: *std.ArrayListUnmanaged([]const u8), allocator: Allocator, pattern: []const u8) CommandFailed!void {
     if (sliceHasToken(args.items[3..], "--test-filter")) {
         return;
     }
@@ -298,7 +326,7 @@ fn ensureFilter(args: *std.ArrayList([]const u8), allocator: Allocator, pattern:
     args.append(allocator, pattern) catch return CommandFailed.CommandFailed;
 }
 
-fn ensureForwardSeparator(args: *std.ArrayList([]const u8), allocator: Allocator) CommandFailed!void {
+fn ensureForwardSeparator(args: *std.ArrayListUnmanaged([]const u8), allocator: Allocator) CommandFailed!void {
     if (sliceHasToken(args.items[3..], "--")) {
         return;
     }

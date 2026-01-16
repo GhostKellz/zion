@@ -1,9 +1,12 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const zion_root = @import("../root.zig");
 
 /// Project analysis and debugging command
-pub fn debug(allocator: Allocator, args: []const []const u8) !void {
+pub fn debug(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         try printDebugHelp();
         return;
@@ -69,9 +72,15 @@ fn handleProjectDebug(allocator: Allocator) !void {
         ".zion/deps",
     };
 
+    const io = zion_root.getIo() catch {
+        std.debug.print("  ⚠️ Unable to get I/O context\n", .{});
+        return;
+    };
+    const cwd = Dir.cwd();
+
     for (files_to_check) |file_path| {
         const exists = blk: {
-            std.fs.cwd().access(file_path, .{}) catch {
+            cwd.access(io, file_path, .{}) catch {
                 break :blk false;
             };
             break :blk true;

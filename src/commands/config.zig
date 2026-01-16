@@ -6,7 +6,7 @@ const ZionConfig = @import("../enhanced_config.zig").ZionConfig;
 const ConfigFormat = @import("../enhanced_config.zig").ConfigFormat;
 
 /// Configuration management commands
-pub fn config(allocator: Allocator, args: [][:0]u8) !void {
+pub fn config(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printConfigHelp();
         return;
@@ -31,7 +31,7 @@ pub fn config(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Initialize configuration files
-fn initConfig(allocator: Allocator, args: [][:0]u8) !void {
+fn initConfig(allocator: Allocator, args: []const [:0]const u8) !void {
     const format: ConfigFormat = if (args.len > 0 and std.mem.eql(u8, args[0], "--lua"))
         .lua
     else if (args.len > 0 and std.mem.eql(u8, args[0], "--json"))
@@ -57,7 +57,7 @@ fn initConfig(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Get a configuration value
-fn getConfig(allocator: Allocator, args: [][:0]u8) !void {
+fn getConfig(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 1) {
         std.debug.print("❌ Usage: zion config get <key>\n", .{});
         return;
@@ -91,7 +91,7 @@ fn getConfig(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Set a configuration value
-fn setConfig(allocator: Allocator, args: [][:0]u8) !void {
+fn setConfig(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 2) {
         std.debug.print("❌ Usage: zion config set <key> <value>\n", .{});
         std.debug.print("\nAvailable keys:\n", .{});

@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const zion_root = @import("zion");
 
 /// Enhanced HTTP client with retry logic, connection reuse, and optimized memory management
 /// Provides HTTP/1.1 functionality with exponential backoff and comprehensive error handling
@@ -9,23 +10,26 @@ pub const HttpClient = struct {
     header_buffer: []u8,
     max_retries: u32,
     timeout_ms: u64,
-    
-    pub fn init(allocator: Allocator, runtime: anytype) !*HttpClient {
-        _ = runtime; // Ignore runtime parameter for compatibility
-        
+
+    /// Initialize HTTP client with allocator and std.Io for network operations
+    /// The std.Io is required by Zig 0.16's std.http.Client for I/O operations
+    pub fn init(allocator: Allocator, io: std.Io) !*HttpClient {
         const client = try allocator.create(HttpClient);
-        
+
         // Pre-allocate header buffer for reuse
         const header_buffer = try allocator.alloc(u8, 8192); // Larger buffer for better performance
-        
+
         client.* = .{
             .allocator = allocator,
-            .persistent_client = std.http.Client{ .allocator = allocator },
+            .persistent_client = std.http.Client{
+                .allocator = allocator,
+                .io = io,
+            },
             .header_buffer = header_buffer,
             .max_retries = 3,
             .timeout_ms = 30000, // 30 seconds default timeout
         };
-        
+
         return client;
     }
     
@@ -57,9 +61,10 @@ pub const HttpClient = struct {
                         retry_count, self.max_retries + 1, err, backoff_ms
                     });
                     
-                    // Exponential backoff with jitter
-                    const jitter = std.crypto.random.intRangeLessThan(u64, 0, backoff_ms / 4);
-                    std.Thread.sleep((backoff_ms + jitter) * 1000000); // Convert to nanoseconds
+                    // Exponential backoff with jitter (using timestamp-based pseudo-random)
+                    const max_jitter = backoff_ms / 4;
+                    const jitter = if (max_jitter > 0) @as(u64, @intCast(@mod(zion_root.milliTimestamp(), @as(i64, @intCast(max_jitter))))) else 0;
+                    zion_root.sleep((backoff_ms + jitter) * 1000000); // Convert to nanoseconds
                     backoff_ms = @min(backoff_ms * 2, 30000); // Cap at 30 seconds
                     continue;
                 } else {
@@ -77,7 +82,7 @@ pub const HttpClient = struct {
     /// Core request implementation with optimized memory management
     fn makeRequest(self: *HttpClient, method: std.http.Method, url: []const u8, data: ?[]const u8) !HttpResponse {
         _ = data; // POST data handling will be implemented later
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
         
         // Parse URL
         const uri = std.Uri.parse(url) catch |err| {
@@ -95,13 +100,13 @@ pub const HttpClient = struct {
                 error.UnknownHostName => error.UnknownHost,
                 error.ConnectionRefused => error.ConnectionRefused,
                 error.NetworkUnreachable => error.NetworkUnreachable,
-                error.ConnectionTimedOut => error.ConnectionTimeout,
+                error.Timeout => error.ConnectionTimeout,
                 else => error.HttpRequestFailed,
             };
         };
         // FetchResult doesn't need explicit deinitialization
         
-        const elapsed = std.time.milliTimestamp() - start_time;
+        const elapsed = zion_root.milliTimestamp() - start_time;
         const status_code = @intFromEnum(fetch_result.status);
         
         // Log successful request  

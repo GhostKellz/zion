@@ -1,8 +1,11 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 const json = std.json;
 const Allocator = std.mem.Allocator;
 const ZionConfig = @import("enhanced_config.zig").ZionConfig;
+const zion_root = @import("root.zig");
 
 /// Neovim integration for zion - provides Lua API for zion-nvim plugin
 pub const NvimIntegration = struct {
@@ -509,17 +512,21 @@ pub fn createNvimPlugin(allocator: Allocator) !void {
     ;
     
     // Create the plugin directory
-    const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+    const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const plugin_dir = try std.fmt.allocPrint(allocator, "{s}/.config/nvim/lua/zion", .{home_dir});
     defer allocator.free(plugin_dir);
-    
-    try fs.cwd().makePath(plugin_dir);
-    
+
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    try cwd.createDirPath(io, plugin_dir);
+
     // Write the plugin file
     const plugin_path = try std.fmt.allocPrint(allocator, "{s}/init.lua", .{plugin_dir});
     defer allocator.free(plugin_path);
-    
-    try fs.cwd().writeFile(.{ .sub_path = plugin_path, .data = plugin_content });
+
+    const file = try cwd.createFile(io, plugin_path, .{});
+    defer file.close(io);
+    try file.writeStreamingAll(io, plugin_content);
     
     std.debug.print("✅ Created Neovim plugin: {s}\n", .{plugin_path});
     std.debug.print("\n💡 Add this to your Neovim config:\n", .{});

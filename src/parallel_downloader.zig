@@ -2,7 +2,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 const Mutex = std.Thread.Mutex;
-const fs = std.fs;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("root.zig");
 const downloader = @import("downloader.zig");
 
 /// Configuration for parallel downloads
@@ -355,8 +357,10 @@ fn enhancedDownloadFromUrl(
     errdefer allocator.free(cache_path);
     
     // Check if cached
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
     const cached_file_exists = blk: {
-        fs.cwd().access(cache_path, .{}) catch |err| {
+        cwd.access(io, cache_path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 break :blk false;
             }
@@ -364,22 +368,22 @@ fn enhancedDownloadFromUrl(
         };
         break :blk true;
     };
-    
+
     if (!cached_file_exists) {
         // Enhanced download with better progress reporting
-        const start_time = std.time.milliTimestamp();
+        const start_time = zion_root.milliTimestamp();
         std.debug.print("📥 Downloading {s}...\\n", .{package_name});
-        
+
         // Use enhanced curl with progress
         try downloadWithEnhancedCurl(allocator, url, cache_path);
-        
-        const end_time = std.time.milliTimestamp();
+
+        const end_time = zion_root.milliTimestamp();
         const download_time = end_time - start_time;
-        
+
         // Performance metrics
-        const file = try fs.cwd().openFile(cache_path, .{});
-        defer file.close();
-        const file_size = try file.getEndPos();
+        const file = try cwd.openFile(io, cache_path, .{});
+        defer file.close(io);
+        const file_size = try file.length(io);
         
         if (download_time > 0) {
             const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
@@ -405,72 +409,74 @@ fn enhancedDownloadFromUrl(
 
 /// Enhanced curl with better progress and chunking for large files
 fn downloadWithEnhancedCurl(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Ensure output directory exists
-    if (fs.path.dirname(output_path)) |dir| {
-        try fs.cwd().makePath(dir);
+    if (Dir.path.dirname(output_path)) |dir| {
+        cwd.createDirPath(io, dir) catch |err| {
+            if (err != error.PathAlreadyExists) {
+                return err;
+            }
+        };
     }
-    
+
     const argv = [_][]const u8{
         "curl",
         "-L", // Follow redirects
         "-f", // Fail on HTTP errors
         "--progress-bar", // Show progress bar
         "--retry", "3",
-        "--retry-delay", "2", 
+        "--retry-delay", "2",
         "--max-time", "300",
         "--connect-timeout", "10",
         "-o", output_path,
         url,
     };
-    
-    var child = std.process.Child.init(&argv, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Inherit; // Show curl's progress bar
-    child.stderr_behavior = .Pipe;
-    
-    try child.spawn();
-    const term = try child.wait();
-    
+
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .inherit, // Show curl's progress bar
+        .stderr = .pipe,
+    });
+
     // Read stderr for error messages
-    const stderr = if (child.stderr) |stderr_pipe|
-        blk: {
-            var output_buf: std.ArrayList(u8) = .{};
-            defer output_buf.deinit(allocator);
-            
-            var read_buf: [4096]u8 = undefined;
-            while (true) {
-                const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
-                if (bytes_read == 0) break;
-                try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
-            }
-            
-            break :blk try allocator.dupe(u8, output_buf.items);
+    var stderr_buf: std.ArrayList(u8) = .empty;
+    defer stderr_buf.deinit(allocator);
+
+    if (child.stderr) |stderr_file| {
+        var read_buf: [4096]u8 = undefined;
+        while (true) {
+            const bytes_read = stderr_file.readStreaming(io, &.{read_buf[0..]}) catch break;
+            if (bytes_read == 0) break;
+            try stderr_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
-    else
-        try allocator.dupe(u8, "No error output available");
-    defer allocator.free(stderr);
-    
+    }
+
+    const term = try child.wait(io);
+
     switch (term) {
-        .Exited => |code| {
+        .exited => |code| {
             if (code != 0) {
-                std.debug.print("Enhanced curl failed with exit code {d}: {s}\\n", .{ code, stderr });
+                std.debug.print("Enhanced curl failed with exit code {d}: {s}\n", .{ code, stderr_buf.items });
                 // Fallback to basic downloader
                 return downloader.downloadWithCurlImproved(allocator, url, output_path);
             }
         },
         else => {
-            std.debug.print("Enhanced curl terminated abnormally: {s}\\n", .{stderr});
+            std.debug.print("Enhanced curl terminated abnormally: {s}\n", .{stderr_buf.items});
             return error.DownloadFailed;
         },
     }
-    
+
     // Verify download
-    const file = fs.cwd().openFile(output_path, .{}) catch {
+    const file = cwd.openFile(io, output_path, .{}) catch {
         return error.DownloadFailed;
     };
-    defer file.close();
-    
-    const file_size = try file.getEndPos();
+    defer file.close(io);
+
+    const file_size = try file.length(io);
     if (file_size == 0) {
         return error.DownloadFailed;
     }

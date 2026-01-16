@@ -2,6 +2,9 @@ const std = @import("std");
 const fs = std.fs;
 const json = std.json;
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
+const Io = std.Io;
+const zion_root = @import("../root.zig");
 const enhanced_config = @import("../enhanced_config.zig");
 const registry_manager = @import("../registry_manager.zig");
 const registry_v2 = @import("../registry_v2.zig");
@@ -278,14 +281,17 @@ fn getDefaultPublishRegistry(config: *enhanced_config.ZionConfig) []const u8 {
 
 /// Validate project structure for publishing
 fn validateProjectForPublishing() !void {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     const required_files = [_][]const u8{
         "build.zig",
         "build.zig.zon",
         "src/",
     };
-    
+
     for (required_files) |file| {
-        fs.cwd().access(file, .{}) catch |err| {
+        cwd.access(io, file, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 std.debug.print("❌ Required file/directory missing: {s}\n", .{file});
                 return error.InvalidProject;
@@ -293,14 +299,14 @@ fn validateProjectForPublishing() !void {
             return err;
         };
     }
-    
+
     // Check for common documentation files
     const doc_files = [_][]const u8{ "README.md", "LICENSE", "CHANGELOG.md" };
-    var missing_docs: std.ArrayList([]const u8) = .{};
+    var missing_docs: std.ArrayList([]const u8) = .empty;
     defer missing_docs.deinit(std.heap.page_allocator);
-    
+
     for (doc_files) |file| {
-        fs.cwd().access(file, .{}) catch {
+        cwd.access(io, file, .{}) catch {
             try missing_docs.append(std.heap.page_allocator, file);
         };
     }
@@ -316,37 +322,40 @@ fn validateProjectForPublishing() !void {
 
 /// Read package metadata from build.zig.zon and other sources
 fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Read build.zig.zon
     var zon_file = try ZonFile.loadFromFile(allocator, "build.zig.zon");
     defer zon_file.deinit();
-    
+
     // Extract basic information
     const name = try allocator.dupe(u8, zon_file.name);
     const version = try allocator.dupe(u8, zon_file.version);
-    
+
     // Try to read additional metadata from package.json or zion.toml if they exist
     var description: ?[]const u8 = null;
     const author: ?[]const u8 = null;
     var license: ?[]const u8 = null;
     const homepage: ?[]const u8 = null;
     const repository: ?[]const u8 = null;
-    var keywords: std.ArrayList([]const u8) = .{};
-    var categories: std.ArrayList([]const u8) = .{};
-    
+    var keywords: std.ArrayList([]const u8) = .empty;
+    var categories: std.ArrayList([]const u8) = .empty;
+
     // Try to read from README.md for description
-    if (fs.cwd().readFileAlloc("README.md", allocator, @enumFromInt(1024 * 1024))) |readme_content| {
+    if (cwd.readFileAlloc(io, "README.md", allocator, Io.Limit.limited(1024 * 1024))) |readme_content| {
         defer allocator.free(readme_content);
-        
+
         // Extract first paragraph as description
         if (extractDescriptionFromReadme(allocator, readme_content)) |desc| {
             description = desc;
         }
     } else |_| {}
-    
+
     // Try to read LICENSE file
-    if (fs.cwd().readFileAlloc("LICENSE", allocator, @enumFromInt(1024))) |license_content| {
+    if (cwd.readFileAlloc(io, "LICENSE", allocator, Io.Limit.limited(1024))) |license_content| {
         defer allocator.free(license_content);
-        
+
         if (detectLicenseType(license_content)) |license_type| {
             license = try allocator.dupe(u8, license_type);
         }
@@ -428,29 +437,50 @@ fn checkExistingPackage(client: *registry_v2.RegistryClient, metadata: PackageMe
 /// Build package for publishing
 fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, options: PublishOptions) ![]const u8 {
     _ = options;
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Create temporary build directory
-    const temp_dir = try std.fmt.allocPrint(allocator, "/tmp/zion-publish-{d}", .{std.time.timestamp()});
-    try fs.cwd().makePath(temp_dir);
-    
+    const temp_dir = try std.fmt.allocPrint(allocator, "/tmp/zion-publish-{d}", .{zion_root.timestamp()});
+    try cwd.createDirPath(io, temp_dir);
+
     // Run build to ensure everything compiles
     std.debug.print("   Running: zig build\n", .{});
-    const build_result = try std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{ "zig", "build" },
+    const argv = [_][]const u8{ "zig", "build" };
+    var child = try std.process.spawn(io, .{
+        .argv = &argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .pipe,
     });
-    defer allocator.free(build_result.stdout);
-    defer allocator.free(build_result.stderr);
-    
-    if (build_result.term != .Exited or build_result.term.Exited != 0) {
-        std.debug.print("❌ Build failed:\n{s}", .{build_result.stderr});
-        return error.BuildFailed;
+    var stderr_list: std.ArrayList(u8) = .empty;
+    defer stderr_list.deinit(allocator);
+
+    // Read stderr for error messages
+    if (child.stderr) |stderr_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stderr_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            try stderr_list.appendSlice(allocator, buffer[0..n]);
+        }
     }
-    
+    const term = try child.wait(io);
+
+    switch (term) {
+        .exited => |code| {
+            if (code != 0) {
+                std.debug.print("❌ Build failed:\n{s}", .{stderr_list.items});
+                return error.BuildFailed;
+            }
+        },
+        else => return error.BuildFailed,
+    }
+
     // Create package tarball
     const package_name = try std.fmt.allocPrint(allocator, "{s}-{s}.tar.gz", .{ metadata.name, metadata.version });
     const package_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ temp_dir, package_name });
-    
+
     // Include essential files
     const include_files = [_][]const u8{
         "src/",
@@ -460,30 +490,47 @@ fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, optio
         "LICENSE",
         "CHANGELOG.md",
     };
-    
-    var tar_args: std.ArrayList([]const u8) = .{};
+
+    var tar_args: std.ArrayList([]const u8) = .empty;
     defer tar_args.deinit(allocator);
-    
+
     try tar_args.appendSlice(allocator, &[_][]const u8{ "tar", "-czf", package_path });
-    
+
     for (include_files) |file| {
-        fs.cwd().access(file, .{}) catch continue;
+        cwd.access(io, file, .{}) catch continue;
         try tar_args.append(allocator, file);
     }
     
     std.debug.print("   Creating package archive...\n", .{});
-    const tar_result = try std.process.Child.run(.{
-        .allocator = allocator,
+    var tar_child = try std.process.spawn(io, .{
         .argv = tar_args.items,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .pipe,
     });
-    defer allocator.free(tar_result.stdout);
-    defer allocator.free(tar_result.stderr);
-    
-    if (tar_result.term != .Exited or tar_result.term.Exited != 0) {
-        std.debug.print("❌ Package creation failed:\n{s}", .{tar_result.stderr});
-        return error.PackagingFailed;
+    var tar_stderr: std.ArrayList(u8) = .empty;
+    defer tar_stderr.deinit(allocator);
+
+    if (tar_child.stderr) |stderr_file| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = stderr_file.readStreaming(io, &.{buffer[0..]}) catch break;
+            if (n == 0) break;
+            try tar_stderr.appendSlice(allocator, buffer[0..n]);
+        }
     }
-    
+    const tar_term = try tar_child.wait(io);
+
+    switch (tar_term) {
+        .exited => |code| {
+            if (code != 0) {
+                std.debug.print("❌ Package creation failed:\n{s}", .{tar_stderr.items});
+                return error.PackagingFailed;
+            }
+        },
+        else => return error.PackagingFailed,
+    }
+
     return package_path;
 }
 
@@ -491,21 +538,24 @@ fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, optio
 fn verifyPackageIntegrity(allocator: Allocator, package_path: []const u8, metadata: PackageMetadata) !void {
     _ = allocator;
     _ = metadata;
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
     // Check package size
-    const file = try fs.cwd().openFile(package_path, .{});
-    defer file.close();
-    
-    const file_size = try file.getEndPos();
-    const max_size = 100 * 1024 * 1024; // 100MB
-    
+    const file = try cwd.openFile(io, package_path, .{});
+    defer file.close(io);
+
+    const stat = try file.stat(io);
+    const file_size = stat.size;
+    const max_size: u64 = 100 * 1024 * 1024; // 100MB
+
     if (file_size > max_size) {
         std.debug.print("❌ Package too large: {d}MB (max {d}MB)\n", .{ file_size / (1024 * 1024), max_size / (1024 * 1024) });
         return error.PackageTooLarge;
     }
-    
+
     std.debug.print("   Package size: {d}KB\n", .{file_size / 1024});
-    
+
     // TODO: Add more integrity checks
     // - Verify archive can be extracted
     // - Check for suspicious files
@@ -533,21 +583,23 @@ fn uploadPackage(
     signature: ?security.PackageSignature,
 ) !UploadResult {
     _ = signature;
-    
-    const start_time = std.time.milliTimestamp();
-    
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+
+    const start_time = zion_root.milliTimestamp();
+
     // Read package file
-    const package_data = try fs.cwd().readFileAlloc(package_path, allocator, @enumFromInt(100 * 1024 * 1024));
+    const package_data = try cwd.readFileAlloc(io, package_path, allocator, Io.Limit.limited(100 * 1024 * 1024));
     defer allocator.free(package_data);
-    
+
     // Prepare metadata JSON
     const metadata_json = try serializeMetadata(allocator, metadata);
     defer allocator.free(metadata_json);
-    
+
     // Create multipart form data
     const boundary = "----ZionPackageUpload";
-    
-    var form_data: std.ArrayList(u8) = .{};
+
+    var form_data: std.ArrayList(u8) = .empty;
     defer form_data.deinit(allocator);
     
     // Add metadata
@@ -579,7 +631,7 @@ fn uploadPackage(
     const response = try client.makeRequest("POST", upload_url, form_data.items);
     defer allocator.free(response);
     
-    const end_time = std.time.milliTimestamp();
+    const end_time = zion_root.milliTimestamp();
     
     // Parse response
     const parsed_response = try parseUploadResponse(allocator, response);

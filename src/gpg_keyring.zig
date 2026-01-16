@@ -1,6 +1,9 @@
 const std = @import("std");
 const signature_verification = @import("signature_verification.zig");
+const zion_root = @import("root.zig");
 const Allocator = std.mem.Allocator;
+const Dir = std.Io.Dir;
+const Io = std.Io;
 
 /// GPG keyring integration for Zion package verification
 /// Supports both user GPG keys and system keyrings like Arch Linux
@@ -14,7 +17,7 @@ pub const GPGKeyring = struct {
         return GPGKeyring{
             .allocator = allocator,
             .user_keyring_path = "",
-            .system_keyrings = .{},
+            .system_keyrings = .empty,
             .trusted_fingerprints = std.StringHashMap(bool).init(allocator),
         };
     }
@@ -39,56 +42,80 @@ pub const GPGKeyring = struct {
     /// Load GPG keys from user keyring
     pub fn loadUserKeys(self: *GPGKeyring) !void {
         // Get user's GPG directory
-        const home_dir = std.posix.getenv("HOME") orelse return error.NoHomeDirectory;
+        const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDirectory;
         const gpg_dir = try std.fmt.allocPrint(self.allocator, "{s}/.gnupg", .{home_dir});
         defer self.allocator.free(gpg_dir);
-        
+
         std.debug.print("🔑 Loading user GPG keys from {s}\n", .{gpg_dir});
-        
+
+        // Get I/O context
+        const io = try zion_root.getIo();
+
         // Run gpg command to list keys
-        const result = std.process.Child.run(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "gpg", "--list-keys", "--with-colons", "--fingerprint" },
-            .max_output_bytes = 1024 * 1024, // 1MB max output
+        const argv = [_][]const u8{ "gpg", "--list-keys", "--with-colons", "--fingerprint" };
+        var child = std.process.spawn(io, .{
+            .argv = &argv,
+            .stdin = .ignore,
+            .stdout = .pipe,
+            .stderr = .pipe,
         }) catch |err| {
             std.debug.print("⚠️  Failed to run GPG command: {}\n", .{err});
             return;
         };
-        defer self.allocator.free(result.stdout);
-        defer self.allocator.free(result.stderr);
-        
-        if (result.term.Exited != 0) {
-            std.debug.print("⚠️  GPG command failed with exit code: {}\n", .{result.term.Exited});
-            return;
+
+        // Read stdout
+        var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+        defer stdout_list.deinit(self.allocator);
+        if (child.stdout) |stdout_file| {
+            var buffer: [4096]u8 = undefined;
+            while (true) {
+                const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+                if (n == 0) break;
+                try stdout_list.appendSlice(self.allocator, buffer[0..n]);
+            }
         }
-        
-        try self.parseGPGOutput(result.stdout);
+
+        const term = try child.wait(io);
+        switch (term) {
+            .exited => |code| {
+                if (code != 0) {
+                    std.debug.print("⚠️  GPG command failed with exit code: {}\n", .{code});
+                    return;
+                }
+            },
+            else => return,
+        }
+
+        try self.parseGPGOutput(stdout_list.items);
     }
     
     /// Load system keyrings (like Arch Linux keyring)
     pub fn loadSystemKeyrings(self: *GPGKeyring) !void {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+
         const system_keyring_paths = [_][]const u8{
             "/usr/share/pacman/keyrings/archlinux.gpg",
             "/usr/share/pacman/keyrings/archlinux-trusted",
             "/etc/pacman.d/gnupg/pubring.gpg",
         };
-        
+
         for (system_keyring_paths) |keyring_path| {
             // Check if keyring exists
-            std.fs.cwd().access(keyring_path, .{}) catch |err| switch (err) {
+            cwd.access(io, keyring_path, .{}) catch |err| switch (err) {
                 error.FileNotFound => {
                     std.debug.print("🔍 Keyring not found: {s}\n", .{keyring_path});
                     continue;
                 },
                 else => return err,
             };
-            
+
             std.debug.print("🔑 Loading system keyring: {s}\n", .{keyring_path});
-            
+
             // Add to system keyrings list
             const owned_path = try self.allocator.dupe(u8, keyring_path);
             try self.system_keyrings.append(self.allocator, owned_path);
-            
+
             // Load keys from this keyring
             try self.loadKeysFromKeyring(keyring_path);
         }
@@ -96,29 +123,49 @@ pub const GPGKeyring = struct {
     
     /// Load keys from a specific keyring file
     fn loadKeysFromKeyring(self: *GPGKeyring, keyring_path: []const u8) !void {
-        const result = std.process.Child.run(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ 
-                "gpg", 
-                "--list-keys", 
-                "--keyring", keyring_path,
-                "--with-colons", 
-                "--fingerprint" 
-            },
-            .max_output_bytes = 1024 * 1024,
+        const io = try zion_root.getIo();
+
+        const argv = [_][]const u8{
+            "gpg",
+            "--list-keys",
+            "--keyring", keyring_path,
+            "--with-colons",
+            "--fingerprint",
+        };
+        var child = std.process.spawn(io, .{
+            .argv = &argv,
+            .stdin = .ignore,
+            .stdout = .pipe,
+            .stderr = .pipe,
         }) catch |err| {
             std.debug.print("⚠️  Failed to load keyring {s}: {}\n", .{ keyring_path, err });
             return;
         };
-        defer self.allocator.free(result.stdout);
-        defer self.allocator.free(result.stderr);
-        
-        if (result.term.Exited != 0) {
-            std.debug.print("⚠️  GPG keyring command failed for {s}: exit code {}\n", .{ keyring_path, result.term.Exited });
-            return;
+
+        // Read stdout
+        var stdout_list: std.ArrayListUnmanaged(u8) = .empty;
+        defer stdout_list.deinit(self.allocator);
+        if (child.stdout) |stdout_file| {
+            var buffer: [4096]u8 = undefined;
+            while (true) {
+                const n = stdout_file.readStreaming(io, &.{buffer[0..]}) catch break;
+                if (n == 0) break;
+                try stdout_list.appendSlice(self.allocator, buffer[0..n]);
+            }
         }
-        
-        try self.parseGPGOutput(result.stdout);
+
+        const term = try child.wait(io);
+        switch (term) {
+            .exited => |code| {
+                if (code != 0) {
+                    std.debug.print("⚠️  GPG keyring command failed for {s}: exit code {}\n", .{ keyring_path, code });
+                    return;
+                }
+            },
+            else => return,
+        }
+
+        try self.parseGPGOutput(stdout_list.items);
     }
     
     /// Parse GPG --with-colons output format
@@ -168,50 +215,78 @@ pub const GPGKeyring = struct {
     
     /// Verify a signature using GPG
     pub fn verifySignature(self: *GPGKeyring, signed_data: []const u8, signature_data: []const u8) !bool {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+
         // Write signed data to temporary file
         const temp_data_path = "/tmp/zion_verify_data";
         const temp_sig_path = "/tmp/zion_verify_signature";
-        
+
         // Write data file
-        const data_file = try std.fs.cwd().createFile(temp_data_path, .{});
-        defer data_file.close();
-        try data_file.writeAll(signed_data);
-        
+        const data_file = try cwd.createFile(io, temp_data_path, .{});
+        defer data_file.close(io);
+        try data_file.writeStreamingAll(io, signed_data);
+
         // Write signature file
-        const sig_file = try std.fs.cwd().createFile(temp_sig_path, .{});
-        defer sig_file.close();
-        try sig_file.writeAll(signature_data);
-        
+        const sig_file = try cwd.createFile(io, temp_sig_path, .{});
+        defer sig_file.close(io);
+        try sig_file.writeStreamingAll(io, signature_data);
+
         // Run GPG verification
-        const result = std.process.Child.run(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ 
-                "gpg", 
-                "--verify", 
-                temp_sig_path,
-                temp_data_path
-            },
-            .max_output_bytes = 1024 * 1024,
+        const argv = [_][]const u8{
+            "gpg",
+            "--verify",
+            temp_sig_path,
+            temp_data_path,
+        };
+        var child = std.process.spawn(io, .{
+            .argv = &argv,
+            .stdin = .ignore,
+            .stdout = .pipe,
+            .stderr = .pipe,
         }) catch |err| {
             std.debug.print("⚠️  GPG verify command failed: {}\n", .{err});
+            // Cleanup temp files
+            cwd.deleteFile(io, temp_data_path) catch {};
+            cwd.deleteFile(io, temp_sig_path) catch {};
             return false;
         };
-        defer self.allocator.free(result.stdout);
-        defer self.allocator.free(result.stderr);
-        
-        // Cleanup temp files
-        std.fs.cwd().deleteFile(temp_data_path) catch {};
-        std.fs.cwd().deleteFile(temp_sig_path) catch {};
-        
-        if (result.term.Exited == 0) {
-            std.debug.print("✅ GPG signature verification successful\n", .{});
-            return true;
-        } else {
-            std.debug.print("❌ GPG signature verification failed\n", .{});
-            if (result.stderr.len > 0) {
-                std.debug.print("GPG Error: {s}\n", .{result.stderr});
+
+        // Read stderr for error messages
+        var stderr_list: std.ArrayListUnmanaged(u8) = .empty;
+        defer stderr_list.deinit(self.allocator);
+        if (child.stderr) |stderr_file| {
+            var buffer: [4096]u8 = undefined;
+            while (true) {
+                const n = stderr_file.readStreaming(io, &.{buffer[0..]}) catch break;
+                if (n == 0) break;
+                try stderr_list.appendSlice(self.allocator, buffer[0..n]);
             }
-            return false;
+        }
+
+        const term = try child.wait(io);
+
+        // Cleanup temp files
+        cwd.deleteFile(io, temp_data_path) catch {};
+        cwd.deleteFile(io, temp_sig_path) catch {};
+
+        switch (term) {
+            .exited => |code| {
+                if (code == 0) {
+                    std.debug.print("✅ GPG signature verification successful\n", .{});
+                    return true;
+                } else {
+                    std.debug.print("❌ GPG signature verification failed\n", .{});
+                    if (stderr_list.items.len > 0) {
+                        std.debug.print("GPG Error: {s}\n", .{stderr_list.items});
+                    }
+                    return false;
+                }
+            },
+            else => {
+                std.debug.print("❌ GPG signature verification failed (abnormal termination)\n", .{});
+                return false;
+            },
         }
     }
     
@@ -222,14 +297,14 @@ pub const GPGKeyring = struct {
     
     /// Get list of trusted fingerprints
     pub fn getTrustedFingerprints(self: *const GPGKeyring) []const []const u8 {
-        var fingerprints: std.ArrayList([]const u8) = .{};
+        var fingerprints: std.ArrayListUnmanaged([]const u8) = .empty;
         defer fingerprints.deinit(self.allocator);
-        
+
         var iter = self.trusted_fingerprints.iterator();
         while (iter.next()) |entry| {
             fingerprints.append(self.allocator, entry.key_ptr.*) catch continue;
         }
-        
+
         return fingerprints.toOwnedSlice(self.allocator) catch &[_][]const u8{};
     }
     

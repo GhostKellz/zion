@@ -9,6 +9,7 @@ const Release = registry_v2.Release;
 const Dependency = registry_v2.Dependency;
 const SearchFilters = registry_v2.SearchFilters;
 const RegistryHealth = registry_v2.RegistryHealth;
+const zion_root = @import("root.zig");
 
 /// Registry Manager for v0.7.0 - coordinates multiple registries
 pub const RegistryManager = struct {
@@ -31,9 +32,10 @@ pub const RegistryManager = struct {
     }
     
     pub fn initClients(self: *RegistryManager) !void {
+        const io = try zion_root.getIo();
         for (self.config.registries.items) |reg_config| {
             if (reg_config.enabled) {
-                var client = RegistryClient.init(self.allocator, reg_config);
+                var client = RegistryClient.init(self.allocator, reg_config, io);
                 
                 // Enable caching if configured
                 if (self.config.max_cache_size_mb > 0) {
