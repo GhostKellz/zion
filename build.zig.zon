@@ -10,7 +10,7 @@
         },
         .phantom = .{
             .url = "https://github.com/ghostkellz/phantom/archive/main.tar.gz",
-            .hash = "phantom-0.8.3-E0eWBDdzHgCd84_D9gc8kS4BN6zOEylkep9bQuSFOq0e",
+            .hash = "phantom-0.8.3-E0eWBPFzHgCg5D5en6bbutPLfUYsE8thrvL_ruJ3Zxuh",
         },
         .ghostspec = .{
             .url = "https://github.com/ghostkellz/ghostspec/archive/main.tar.gz",
