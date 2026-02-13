@@ -15,9 +15,9 @@ pub fn enhanced_zig_manager(allocator: Allocator, args: [][:0]u8) !void {
         try printEnhancedZigHelp();
         return;
     }
-    
+
     const subcommand = args[0];
-    
+
     if (std.mem.eql(u8, subcommand, "list")) {
         try listVersionsEnhanced(allocator, args[1..]);
     } else if (std.mem.eql(u8, subcommand, "install")) {
@@ -77,7 +77,7 @@ fn printEnhancedZigHelp() !void {
 fn listVersionsEnhanced(allocator: Allocator, args: [][:0]u8) !void {
     var show_remote = false;
     var show_dev = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--remote") or std.mem.eql(u8, arg, "-r")) {
             show_remote = true;
@@ -85,18 +85,18 @@ fn listVersionsEnhanced(allocator: Allocator, args: [][:0]u8) !void {
             show_dev = true;
         }
     }
-    
+
     print("🔧 Zion Zig Version Manager\n\n", .{});
-    
+
     // Show current version first
     print("🎯 Current Version:\n", .{});
     try showCurrentEnhanced(allocator, &[_][]const u8{});
     print("\n", .{});
-    
+
     // Show installed versions
     print("💻 Installed Versions:\n", .{});
     try listInstalledVersionsEnhanced(allocator);
-    
+
     if (show_remote) {
         print("\n🌍 Available Remote Versions:\n", .{});
         try listRemoteVersionsEnhanced(allocator, show_dev);
@@ -115,25 +115,25 @@ fn installVersionEnhanced(allocator: Allocator, args: [][]const u8) !void {
         print("  zion zig install master                     # Latest master\n", .{});
         return;
     }
-    
+
     const version = args[0];
     print("📦 Installing Zig {s}...\n", .{version});
-    
+
     // Create zig installation directory
     try ensureZigDirEnhanced(allocator);
-    
+
     // Get download URL and info
     const download_info = try getZigDownloadInfo(allocator, version);
     defer download_info.deinit(allocator);
-    
+
     if (download_info.url == null) {
         print("❌ Version {s} not found or not available for this platform\n", .{version});
         return;
     }
-    
+
     // Download with zsync async support
     try downloadAndInstallZigEnhanced(allocator, download_info);
-    
+
     print("✅ Zig {s} installed successfully!\n", .{version});
     print("💡 Use 'zion zig use {s}' to switch to this version\n", .{version});
 }
@@ -146,9 +146,9 @@ fn useVersionEnhanced(allocator: Allocator, args: [][]const u8) !void {
         print("  zion zig use system     # Use system Zig (pacman/brew)\n", .{});
         return;
     }
-    
+
     const version = args[0];
-    
+
     if (std.mem.eql(u8, version, "system")) {
         try useSystemZig(allocator);
     } else {
@@ -158,16 +158,16 @@ fn useVersionEnhanced(allocator: Allocator, args: [][]const u8) !void {
 
 fn showCurrentEnhanced(allocator: Allocator, args: [][]const u8) !void {
     var json_output = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--json")) {
             json_output = true;
         }
     }
-    
+
     const zig_info = try getCurrentZigInfo(allocator);
     defer zig_info.deinit(allocator);
-    
+
     if (json_output) {
         // JSON output for IDE integration
         print("{{\n", .{});
@@ -194,7 +194,7 @@ fn showCurrentEnhanced(allocator: Allocator, args: [][]const u8) !void {
 fn showWhichZig(allocator: Allocator) !void {
     const zig_info = try getCurrentZigInfo(allocator);
     defer zig_info.deinit(allocator);
-    
+
     if (zig_info.available) {
         print("{s}\n", .{zig_info.path});
     } else {
@@ -204,11 +204,11 @@ fn showWhichZig(allocator: Allocator) !void {
 
 fn showZigStatus(allocator: Allocator) !void {
     print("📈 Zig Environment Status\n\n", .{});
-    
+
     // Current Zig info
     const zig_info = try getCurrentZigInfo(allocator);
     defer zig_info.deinit(allocator);
-    
+
     print("🎯 Current Zig:\n", .{});
     if (zig_info.available) {
         print("  Version: {s}\n", .{zig_info.version});
@@ -217,15 +217,15 @@ fn showZigStatus(allocator: Allocator) !void {
     } else {
         print("  ❌ Not available\n", .{});
     }
-    
+
     print("\n", .{});
-    
+
     // Installed versions
     print("💻 Installed Versions:\n", .{});
     try listInstalledVersionsEnhanced(allocator);
-    
+
     print("\n", .{});
-    
+
     // Environment info
     print("🌍 Environment:\n", .{});
     print("  Platform: {s}\n", .{try getPlatformString(allocator)});
@@ -258,7 +258,7 @@ const ZigInfo = struct {
     source: []const u8, // "zion", "system", "unknown"
     platform: []const u8,
     available: bool,
-    
+
     fn deinit(self: ZigInfo, allocator: Allocator) void {
         allocator.free(self.version);
         allocator.free(self.path);
@@ -272,7 +272,7 @@ const DownloadInfo = struct {
     version: []const u8,
     sha256: ?[]const u8,
     size: ?u64,
-    
+
     fn deinit(self: DownloadInfo, allocator: Allocator) void {
         if (self.url) |url| allocator.free(url);
         allocator.free(self.version);
@@ -333,13 +333,13 @@ fn getPlatformString(allocator: Allocator) ![]const u8 {
         .windows => "windows",
         else => "unknown",
     };
-    
+
     const arch = switch (std.builtin.target.cpu.arch) {
         .x86_64 => "x86_64",
         .aarch64 => "aarch64",
         else => "unknown",
     };
-    
+
     return try std.fmt.allocPrint(allocator, "{s}-{s}", .{ platform, arch });
 }
 
@@ -360,10 +360,9 @@ fn getZigDownloadInfo(allocator: Allocator, version: []const u8) !DownloadInfo {
     // For now, return a mock structure
     const platform = try getPlatformString(allocator);
     defer allocator.free(platform);
-    
-    const url = try std.fmt.allocPrint(allocator, 
-        "https://ziglang.org/builds/zig-{s}-{s}.tar.xz", .{ platform, version });
-    
+
+    const url = try std.fmt.allocPrint(allocator, "https://ziglang.org/builds/zig-{s}-{s}.tar.xz", .{ platform, version });
+
     return DownloadInfo{
         .url = url,
         .version = try allocator.dupe(u8, version),
@@ -426,26 +425,26 @@ fn listRemoteVersionsEnhanced(allocator: Allocator, show_dev: bool) !void {
     // This would fetch from ziglang.org/download/index.json
     // For now, show mock versions
     _ = allocator;
-    
+
     print("  • 0.11.0 (stable)\n", .{});
     print("  • 0.10.1 (stable)\n", .{});
     print("  • 0.9.1 (stable)\n", .{});
-    
+
     if (show_dev) {
         print("  • 0.12.0-dev.3180+83e578a18 (development)\n", .{});
         print("  • 0.12.0-dev.3179+8d92bb7e0 (development)\n", .{});
     }
-    
+
     print("\n💡 Use 'zion zig install <version>' to install\n", .{});
 }
 
 fn useSystemZig(allocator: Allocator) !void {
     _ = allocator;
     print("💻 Switching to system Zig...\n", .{});
-    
+
     // Remove zion zig from PATH precedence
     // This would involve PATH manipulation
-    
+
     print("✅ Now using system Zig\n", .{});
     print("💡 Use 'zion zig current' to verify\n", .{});
 }

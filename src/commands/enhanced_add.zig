@@ -11,19 +11,19 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
         try showAddHelp();
         return;
     }
-    
+
     var package_names = std.ArrayList([]const u8).empty;
     defer package_names.deinit(allocator);
-    
+
     var prefer_ziglibs = false;
     var specific_version: ?[]const u8 = null;
     var registry_filter: ?[]const u8 = null;
-    
+
     // Parse arguments
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
-        
+
         if (std.mem.eql(u8, arg, "--prefer-ziglibs")) {
             prefer_ziglibs = true;
         } else if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-v")) {
@@ -40,29 +40,29 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
             try package_names.append(allocator, arg);
         }
     }
-    
+
     if (package_names.items.len == 0) {
         print("❌ No packages specified\n", .{});
         try showAddHelp();
         return;
     }
-    
+
     // Load configuration
     var config = ZionConfig.init(allocator);
     defer config.deinit();
     try config.loadFromEnvironment();
-    
+
     // Initialize registry manager
     var manager = try RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     print("📦 Adding {} package(s)...\n\n", .{package_names.items.len});
-    
+
     var success_count: u32 = 0;
     var failed_packages = std.ArrayList([]const u8).empty;
     defer failed_packages.deinit(allocator);
-    
+
     for (package_names.items) |package_name| {
         if (try addSinglePackage(allocator, &manager, package_name, .{
             .prefer_ziglibs = prefer_ziglibs,
@@ -74,18 +74,18 @@ pub fn enhanced_add(allocator: Allocator, args: [][:0]u8) !void {
             try failed_packages.append(allocator, package_name);
         }
     }
-    
+
     // Summary
     print("\n📈 Summary:\n", .{});
     print("✅ Successfully added: {}\n", .{success_count});
-    
+
     if (failed_packages.items.len > 0) {
         print("❌ Failed to add: {}\n", .{failed_packages.items.len});
         for (failed_packages.items) |pkg| {
             print("  • {s}\n", .{pkg});
         }
     }
-    
+
     if (success_count > 0) {
         print("\n💡 Run 'zig build' to verify your dependencies\n", .{});
     }
@@ -99,27 +99,27 @@ const AddOptions = struct {
 
 fn addSinglePackage(allocator: Allocator, manager: *RegistryManager, package_name: []const u8, options: AddOptions) !bool {
     print("🔍 Resolving: {s}", .{package_name});
-    
+
     if (options.prefer_ziglibs) {
         print(" (prefer Ziglibs)", .{});
     }
-    
+
     if (options.registry_filter) |registry| {
         print(" (registry: {s})", .{registry});
     }
-    
+
     print("...\n", .{});
-    
+
     // First try Ziglibs if preferred
     var package: ?Package = null;
-    
+
     if (options.prefer_ziglibs) {
         const ziglibs_packages = try manager.searchZiglibs(package_name);
         defer {
             for (ziglibs_packages) |pkg| pkg.deinit(allocator);
             allocator.free(ziglibs_packages);
         }
-        
+
         // Find exact match or best match
         for (ziglibs_packages) |pkg| {
             if (std.mem.eql(u8, pkg.name, package_name) or std.mem.endsWith(u8, pkg.full_name, package_name)) {
@@ -139,28 +139,28 @@ fn addSinglePackage(allocator: Allocator, manager: *RegistryManager, package_nam
                     .star_count = pkg.star_count,
                     .rating = pkg.rating,
                 };
-                
+
                 print("🎆 Found Ziglibs package: {s}\n", .{pkg.full_name});
                 break;
             }
         }
     }
-    
+
     // Fallback to general resolution
     if (package == null) {
         package = try manager.resolvePackage(package_name);
     }
-    
+
     if (package == null) {
         print("❌ Package not found: {s}\n", .{package_name});
-        
+
         // Show suggestions
         const suggestions = try manager.searchPackages(package_name, 5);
         defer {
             for (suggestions) |pkg| pkg.deinit(allocator);
             allocator.free(suggestions);
         }
-        
+
         if (suggestions.len > 0) {
             print("   Did you mean:\n", .{});
             for (suggestions[0..@min(3, suggestions.len)]) |pkg| {
@@ -169,36 +169,36 @@ fn addSinglePackage(allocator: Allocator, manager: *RegistryManager, package_nam
                 print("\n", .{});
             }
         }
-        
+
         return false;
     }
-    
+
     defer package.?.deinit(allocator);
     const pkg = package.?;
-    
+
     // Show package info
     print("✅ Found: {s} ({s})", .{ pkg.full_name, pkg.version });
-    
+
     if (pkg.is_ziglibs) {
         print(" 🎆 Ziglibs", .{});
         if (pkg.quality_score) |score| {
             print(" [{}%]", .{score});
         }
     }
-    
+
     if (pkg.star_count) |stars| {
         print(" ⭐ {}", .{stars});
     }
-    
+
     print(" from {s}\n", .{pkg.registry_name});
-    
+
     if (pkg.description) |desc| {
         print("   {s}\n", .{desc});
     }
-    
+
     // Add to build.zig.zon
     try addToBuildZon(allocator, pkg, options.specific_version);
-    
+
     print("✅ Added {s} to dependencies\n", .{pkg.full_name});
     return true;
 }
@@ -213,22 +213,22 @@ fn addToBuildZon(allocator: Allocator, package: Package, version_override: ?[]co
         else => return err,
     };
     defer allocator.free(file_content);
-    
+
     // Generate dependency entry
     const target_version = version_override orelse package.version;
-    
+
     print("\n📝 Add this to your build.zig.zon dependencies:\n", .{});
     print(".{s} = .{{\n", .{package.name});
     print("    .url = \"{s}\",\n", .{package.tarball_url});
-    
+
     if (package.sha256_hash) |hash| {
         print("    .hash = \"{s}\",\n", .{hash});
     } else {
         print("    // .hash = \"...\", // Run `zig build` to get hash\n", .{});
     }
-    
+
     print("}},\n\n", .{});
-    
+
     // For automatic addition, would need proper Zig AST parsing
     _ = target_version;
 }

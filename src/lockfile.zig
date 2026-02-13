@@ -19,7 +19,7 @@ pub const LockedPackage = struct {
     integrity: ?[]const u8 = null,
     dependencies: ?[][]const u8 = null,
     dev_only: bool = false,
-    
+
     pub fn deinit(self: *LockedPackage, allocator: Allocator) void {
         allocator.free(self.name);
         allocator.free(self.url);
@@ -89,7 +89,7 @@ pub const LockFile = struct {
         for (self.packages.items) |*pkg| {
             if (std.mem.eql(u8, pkg.name, name)) {
                 pkg.deinit(self.allocator);
-                
+
                 pkg.* = LockedPackage{
                     .name = try self.allocator.dupe(u8, name),
                     .url = try self.allocator.dupe(u8, url),

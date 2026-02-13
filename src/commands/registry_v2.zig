@@ -10,9 +10,9 @@ pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8)
         try showRegistryHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "list")) {
         try listRegistries(allocator);
     } else if (std.mem.eql(u8, subcommand, "add")) {
@@ -111,7 +111,7 @@ fn showRegistryHelp() !void {
 fn listRegistries(allocator: std.mem.Allocator) !void {
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     if (config.registries.items.len == 0) {
         std.debug.print("📭 No registries configured.\n", .{});
         std.debug.print("\n💡 To add a registry:\n", .{});
@@ -119,14 +119,14 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
         std.debug.print("   or use: zion registry add <url>\n", .{});
         return;
     }
-    
+
     std.debug.print("🌐 Configured Registries ({d} total):\n\n", .{config.registries.items.len});
-    
+
     // Show registries in priority order
     for (config.registries.items, 0..) |registry, i| {
         const status_emoji = "🔄"; // Would show actual status after health check
         const auth_indicator = if (registry.auth_token != null) "🔐" else "🔓";
-        
+
         std.debug.print("{d}. {s} {s} {s}\n", .{ i + 1, status_emoji, auth_indicator, registry.name });
         std.debug.print("   URL: {s}\n", .{registry.base_url});
         std.debug.print("   Priority: {d} | API: {s} | Timeout: {d}ms\n", .{
@@ -135,13 +135,13 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
             registry.timeout_ms,
         });
         std.debug.print("   Status: {s}\n", .{if (registry.enabled) "✅ Enabled" else "❌ Disabled"});
-        
+
         if (registry.auth_token != null) {
             std.debug.print("   Auth: ✅ Token configured\n", .{});
         } else {
             std.debug.print("   Auth: ❌ No authentication\n", .{});
         }
-        
+
         // Show registry capabilities (would be detected via API)
         std.debug.print("   Features: ", .{});
         if (std.mem.eql(u8, registry.name, "github")) {
@@ -151,10 +151,10 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
         } else {
             std.debug.print("releases, tags, search, aliases\n", .{});
         }
-        
+
         std.debug.print("\n", .{});
     }
-    
+
     // Show configuration source
     std.debug.print("📋 Configuration Sources:\n", .{});
     if (zion_root.getEnv("ZION_REGISTRY_URL")) |_| {
@@ -164,7 +164,7 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
         std.debug.print("   ✅ ZION_REGISTRIES environment variable\n", .{});
     }
     std.debug.print("   ℹ️  Default GitHub fallback\n", .{});
-    
+
     std.debug.print("\n💡 Commands:\n", .{});
     std.debug.print("   zion registry health     # Check registry health\n", .{});
     std.debug.print("   zion registry test       # Test all registries\n", .{});
@@ -174,17 +174,17 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
 /// Add a new registry
 fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[]const u8) !void {
     std.debug.print("➕ Adding registry: {s}\n", .{url});
-    
+
     // Validate URL format
     if (!std.mem.startsWith(u8, url, "http://") and !std.mem.startsWith(u8, url, "https://")) {
         std.debug.print("❌ Invalid URL format. Must start with http:// or https://\n", .{});
         return;
     }
-    
+
     const registry_name = name orelse generateRegistryName(url);
-    
+
     std.debug.print("📝 To add this registry permanently:\n\n", .{});
-    
+
     // For primary registry
     if (name == null) {
         std.debug.print("   # Set as primary registry:\n", .{});
@@ -199,10 +199,10 @@ fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[]const u8)
         }
         std.debug.print("   export ZION_REGISTRY_TOKEN_{s}=\"your-auth-token\"  # if needed\n", .{registry_name});
     }
-    
+
     std.debug.print("\n   # Or add to your shell profile (~/.bashrc, ~/.zshrc, etc.)\n", .{});
     std.debug.print("\n🔍 Testing registry connection...\n", .{});
-    
+
     // Test the registry
     try testRegistryUrl(allocator, url);
 }
@@ -210,22 +210,22 @@ fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[]const u8)
 /// Remove a registry
 fn removeRegistry(allocator: std.mem.Allocator, name_or_url: []const u8) !void {
     std.debug.print("➖ Removing registry: {s}\n", .{name_or_url});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Find the registry to remove
     var found = false;
     for (config.registries.items) |registry| {
         if (std.mem.eql(u8, registry.name, name_or_url) or std.mem.eql(u8, registry.base_url, name_or_url)) {
             found = true;
-            
+
             std.debug.print("📋 Found registry:\n", .{});
             std.debug.print("   Name: {s}\n", .{registry.name});
             std.debug.print("   URL: {s}\n", .{registry.base_url});
-            
+
             std.debug.print("\n📝 To remove this registry:\n", .{});
-            
+
             if (std.mem.eql(u8, registry.name, "custom") and registry.priority == 0) {
                 std.debug.print("   # Remove primary registry:\n", .{});
                 std.debug.print("   unset ZION_REGISTRY_URL\n", .{});
@@ -234,11 +234,11 @@ fn removeRegistry(allocator: std.mem.Allocator, name_or_url: []const u8) !void {
                 std.debug.print("   # Remove from ZION_REGISTRIES environment variable\n", .{});
                 std.debug.print("   # Edit your shell profile to remove: {s}\n", .{registry.base_url});
             }
-            
+
             break;
         }
     }
-    
+
     if (!found) {
         std.debug.print("❌ Registry not found: {s}\n", .{name_or_url});
         std.debug.print("💡 Use 'zion registry list' to see available registries\n", .{});
@@ -248,10 +248,10 @@ fn removeRegistry(allocator: std.mem.Allocator, name_or_url: []const u8) !void {
 /// Test a specific registry
 fn testRegistry(allocator: std.mem.Allocator, name: []const u8) !void {
     std.debug.print("🔍 Testing registry: {s}\n\n", .{name});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Find the registry
     for (config.registries.items) |registry| {
         if (std.mem.eql(u8, registry.name, name)) {
@@ -259,7 +259,7 @@ fn testRegistry(allocator: std.mem.Allocator, name: []const u8) !void {
             return;
         }
     }
-    
+
     std.debug.print("❌ Registry '{s}' not found\n", .{name});
     std.debug.print("💡 Use 'zion registry list' to see available registries\n", .{});
 }
@@ -267,40 +267,40 @@ fn testRegistry(allocator: std.mem.Allocator, name: []const u8) !void {
 /// Test all configured registries
 fn testAllRegistries(allocator: std.mem.Allocator) !void {
     std.debug.print("🔍 Testing all configured registries...\n\n", .{});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     if (config.registries.items.len == 0) {
         std.debug.print("📭 No registries configured to test\n", .{});
         return;
     }
-    
+
     var healthy_count: u32 = 0;
     var total_response_time: u64 = 0;
-    
+
     for (config.registries.items, 0..) |registry, i| {
         std.debug.print("[{d}/{d}] Testing {s}...\n", .{ i + 1, config.registries.items.len, registry.name });
-        
+
         const start_time = zion_root.milliTimestamp();
         const is_healthy = testRegistryConfig(allocator, registry) catch false;
         const response_time = @as(u64, @intCast(zion_root.milliTimestamp() - start_time));
-        
+
         if (is_healthy) {
             healthy_count += 1;
             total_response_time += response_time;
         }
-        
+
         std.debug.print("\n", .{});
     }
-    
+
     // Summary
     std.debug.print("📊 Test Summary:\n", .{});
     std.debug.print("   ✅ Healthy: {d}/{d} registries\n", .{ healthy_count, config.registries.items.len });
     if (healthy_count > 0) {
         std.debug.print("   ⏱️  Average response time: {d}ms\n", .{total_response_time / healthy_count});
     }
-    
+
     if (healthy_count < config.registries.items.len) {
         std.debug.print("\n⚠️  Some registries are unhealthy. Check:\n", .{});
         std.debug.print("   • Network connectivity\n", .{});
@@ -312,19 +312,19 @@ fn testAllRegistries(allocator: std.mem.Allocator) !void {
 /// Show comprehensive registry health information
 fn showRegistryHealth(allocator: std.mem.Allocator) !void {
     std.debug.print("🏥 Registry Health Dashboard\n\n", .{});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Initialize registry manager
     var manager = registry_manager.RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Get health status
     const statuses = try manager.getRegistryStatus();
     defer allocator.free(statuses);
-    
+
     for (statuses, 0..) |status, i| {
         const status_emoji = switch (status.status) {
             .healthy => "✅",
@@ -332,29 +332,27 @@ fn showRegistryHealth(allocator: std.mem.Allocator) !void {
             .unhealthy => "❌",
             .unknown => "❓",
         };
-        
+
         std.debug.print("{d}. {s} {s}\n", .{ i + 1, status_emoji, status.name });
         std.debug.print("   Status: {s}\n", .{@tagName(status.status)});
         std.debug.print("   Response Time: {d}ms\n", .{status.response_time_ms});
         std.debug.print("   Uptime: {d:.1}%\n", .{status.uptime_percentage});
         std.debug.print("   Error Count: {d}\n", .{status.error_count});
-        
+
         if (status.last_checked > 0) {
-            std.debug.print("   Last Checked: {d}s ago\n", .{
-                @divTrunc(zion_root.timestamp() - status.last_checked, 1000)
-            });
+            std.debug.print("   Last Checked: {d}s ago\n", .{@divTrunc(zion_root.timestamp() - status.last_checked, 1000)});
         }
-        
+
         std.debug.print("\n", .{});
     }
-    
+
     // Health recommendations
     std.debug.print("💡 Health Recommendations:\n", .{});
     var unhealthy_count: u32 = 0;
     for (statuses) |status| {
         if (status.status != .healthy) unhealthy_count += 1;
     }
-    
+
     if (unhealthy_count == 0) {
         std.debug.print("   🎉 All registries are healthy!\n", .{});
     } else {
@@ -368,10 +366,10 @@ fn showRegistryHealth(allocator: std.mem.Allocator) !void {
 /// Show detailed information about a specific registry
 fn showRegistryInfo(allocator: std.mem.Allocator, name: []const u8) !void {
     std.debug.print("ℹ️  Registry Information: {s}\n\n", .{name});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Find the registry
     for (config.registries.items) |registry| {
         if (std.mem.eql(u8, registry.name, name)) {
@@ -382,23 +380,23 @@ fn showRegistryInfo(allocator: std.mem.Allocator, name: []const u8) !void {
             std.debug.print("   Priority: {d}\n", .{registry.priority});
             std.debug.print("   Timeout: {d}ms\n", .{registry.timeout_ms});
             std.debug.print("   Status: {s}\n", .{if (registry.enabled) "Enabled" else "Disabled"});
-            
+
             std.debug.print("\n🔐 Authentication:\n", .{});
             if (registry.auth_token != null) {
                 std.debug.print("   Token: ✅ Configured (hidden)\n", .{});
             } else {
                 std.debug.print("   Token: ❌ Not configured\n", .{});
             }
-            
+
             // Test the registry
             std.debug.print("\n🔍 Connectivity Test:\n", .{});
             _ = testRegistryConfig(allocator, registry) catch false;
-            
+
             // Show API endpoints
             std.debug.print("\n🌐 API Endpoints:\n", .{});
             const api_url = registry.getApiUrl(allocator) catch registry.base_url;
             defer if (!std.mem.eql(u8, api_url, registry.base_url)) allocator.free(api_url);
-            
+
             if (std.mem.eql(u8, registry.name, "github")) {
                 std.debug.print("   Search: {s}/search/repositories\n", .{api_url});
                 std.debug.print("   Releases: {s}/repos/{{owner}}/{{repo}}/releases\n", .{api_url});
@@ -411,11 +409,11 @@ fn showRegistryInfo(allocator: std.mem.Allocator, name: []const u8) !void {
                 std.debug.print("   Packages: {s}/packages/{{owner}}/{{repo}}\n", .{api_url});
                 std.debug.print("   Resolve: {s}/resolve/{{alias}}\n", .{api_url});
             }
-            
+
             return;
         }
     }
-    
+
     std.debug.print("❌ Registry '{s}' not found\n", .{name});
 }
 
@@ -425,9 +423,9 @@ fn handleAuthCommand(allocator: std.mem.Allocator, args: []const []const u8) !vo
         try showAuthHelp();
         return;
     }
-    
+
     const auth_cmd = args[0];
-    
+
     if (std.mem.eql(u8, auth_cmd, "list")) {
         try listAuthTokens(allocator);
     } else if (std.mem.eql(u8, auth_cmd, "set")) {
@@ -480,28 +478,28 @@ fn generateRegistryName(url: []const u8) []const u8 {
     if (std.mem.indexOf(u8, url, "://")) |proto_end| {
         start = proto_end + 3;
     }
-    
+
     const domain_end = std.mem.indexOfScalarPos(u8, url, start, '/') orelse url.len;
     const domain = url[start..domain_end];
-    
+
     // Remove 'www.' prefix if present
     if (std.mem.startsWith(u8, domain, "www.")) {
         return domain[4..];
     }
-    
+
     return domain;
 }
 
 fn testRegistryUrl(allocator: std.mem.Allocator, url: []const u8) !void {
     std.debug.print("🔍 Testing registry: {s}\n", .{url});
-    
+
     // Create a temporary registry config for testing
     const test_registry = enhanced_config.RegistryConfig{
         .name = "test",
         .base_url = url,
         .priority = 999,
     };
-    
+
     _ = testRegistryConfig(allocator, test_registry) catch {
         std.debug.print("❌ Registry test failed\n", .{});
         std.debug.print("💡 Check:\n", .{});
@@ -510,7 +508,7 @@ fn testRegistryUrl(allocator: std.mem.Allocator, url: []const u8) !void {
         std.debug.print("   • Network connectivity\n", .{});
         return;
     };
-    
+
     std.debug.print("✅ Registry test successful\n", .{});
 }
 
@@ -518,15 +516,15 @@ fn testRegistryConfig(allocator: std.mem.Allocator, registry: enhanced_config.Re
     const io = try zion_root.getIo();
     var client = registry_v2.RegistryClient.init(allocator, registry, io);
     defer client.deinit();
-    
+
     // Test health endpoint
     client.checkHealth() catch |err| {
         std.debug.print("❌ Health check failed: {}\n", .{err});
         return false;
     };
-    
+
     std.debug.print("✅ Health: OK ({d}ms)\n", .{client.health_metrics.response_time_ms});
-    
+
     // Test search functionality
     const test_results = client.searchPackages("test", .{ .per_page = 1 }) catch |err| {
         std.debug.print("⚠️  Search test failed: {}\n", .{err});
@@ -536,9 +534,9 @@ fn testRegistryConfig(allocator: std.mem.Allocator, registry: enhanced_config.Re
         for (test_results) |pkg| pkg.deinit(allocator);
         allocator.free(test_results);
     }
-    
+
     std.debug.print("✅ Search: OK ({d} results)\n", .{test_results.len});
-    
+
     // Test alias resolution (if supported)
     if (std.mem.indexOf(u8, registry.base_url, "api.github.com") == null) {
         const resolved = client.resolveAlias("test") catch null;
@@ -549,25 +547,25 @@ fn testRegistryConfig(allocator: std.mem.Allocator, registry: enhanced_config.Re
             std.debug.print("ℹ️  Aliases: Not supported\n", .{});
         }
     }
-    
+
     return true;
 }
 
 fn listAuthTokens(allocator: std.mem.Allocator) !void {
     std.debug.print("🔐 Authentication Status:\n\n", .{});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     var auth_count: u32 = 0;
-    
+
     for (config.registries.items) |registry| {
         const has_auth = registry.auth_token != null;
         if (has_auth) auth_count += 1;
-        
+
         const status_emoji = if (has_auth) "✅" else "❌";
         std.debug.print("{s} {s}: {s}\n", .{ status_emoji, registry.name, if (has_auth) "Token configured" else "No authentication" });
-        
+
         if (has_auth and registry.auth_token != null) {
             const token = registry.auth_token.?;
             if (token.len > 8) {
@@ -578,9 +576,9 @@ fn listAuthTokens(allocator: std.mem.Allocator) !void {
         }
         std.debug.print("\n", .{});
     }
-    
+
     std.debug.print("📊 Summary: {d}/{d} registries have authentication\n", .{ auth_count, config.registries.items.len });
-    
+
     if (auth_count == 0) {
         std.debug.print("\n💡 To add authentication:\n", .{});
         std.debug.print("   zion registry auth set <registry> <token>\n", .{});
@@ -589,12 +587,12 @@ fn listAuthTokens(allocator: std.mem.Allocator) !void {
 
 fn setAuthToken(allocator: std.mem.Allocator, registry_name: []const u8, token: []const u8) !void {
     _ = allocator;
-    
+
     std.debug.print("🔐 Setting authentication for {s}...\n", .{registry_name});
-    
+
     // In a real implementation, this would store the token securely
     std.debug.print("📝 To set this token permanently:\n\n", .{});
-    
+
     if (std.mem.eql(u8, registry_name, "github")) {
         std.debug.print("   export ZION_GITHUB_TOKEN=\"{s}\"\n", .{token});
         std.debug.print("   # or\n", .{});
@@ -602,34 +600,34 @@ fn setAuthToken(allocator: std.mem.Allocator, registry_name: []const u8, token: 
     } else {
         std.debug.print("   export ZION_REGISTRY_TOKEN_{s}=\"{s}\"\n", .{ registry_name, token });
     }
-    
+
     std.debug.print("\n   # Add to your shell profile for persistence\n", .{});
     std.debug.print("✅ Token configuration complete\n", .{});
 }
 
 fn removeAuthToken(allocator: std.mem.Allocator, registry_name: []const u8) !void {
     _ = allocator;
-    
+
     std.debug.print("🔐 Removing authentication for {s}...\n", .{registry_name});
-    
+
     std.debug.print("📝 To remove this token:\n\n", .{});
-    
+
     if (std.mem.eql(u8, registry_name, "github")) {
         std.debug.print("   unset ZION_GITHUB_TOKEN\n", .{});
         std.debug.print("   unset GITHUB_TOKEN\n", .{});
     } else {
         std.debug.print("   unset ZION_REGISTRY_TOKEN_{s}\n", .{registry_name});
     }
-    
+
     std.debug.print("\n✅ Token removal instructions provided\n", .{});
 }
 
 fn testAuthToken(allocator: std.mem.Allocator, registry_name: []const u8) !void {
     std.debug.print("🔍 Testing authentication for {s}...\n", .{registry_name});
-    
+
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Find the registry
     for (config.registries.items) |registry| {
         if (std.mem.eql(u8, registry.name, registry_name)) {
@@ -637,7 +635,7 @@ fn testAuthToken(allocator: std.mem.Allocator, registry_name: []const u8) !void 
                 std.debug.print("❌ No authentication token configured for {s}\n", .{registry_name});
                 return;
             }
-            
+
             // Test authenticated request
             const io = zion_root.getIo() catch {
                 std.debug.print("❌ Failed to get I/O context\n", .{});
@@ -645,38 +643,38 @@ fn testAuthToken(allocator: std.mem.Allocator, registry_name: []const u8) !void 
             };
             var client = registry_v2.RegistryClient.init(allocator, registry, io);
             defer client.deinit();
-            
+
             // Make an authenticated request (this would be registry-specific)
             client.checkHealth() catch |err| {
                 std.debug.print("❌ Authentication test failed: {}\n", .{err});
                 return;
             };
-            
+
             std.debug.print("✅ Authentication successful\n", .{});
             return;
         }
     }
-    
+
     std.debug.print("❌ Registry '{s}' not found\n", .{registry_name});
 }
 
 fn setRegistryPriority(allocator: std.mem.Allocator, registry_name: []const u8, priority: u32) !void {
     _ = allocator;
-    
+
     std.debug.print("⚡ Setting priority for {s} to {d}...\n", .{ registry_name, priority });
-    
+
     std.debug.print("📝 Note: Registry priorities are determined by environment variable order.\n", .{});
     std.debug.print("   Lower numbers = higher priority (0 = highest)\n", .{});
     std.debug.print("   Reorder your ZION_REGISTRIES to change priorities.\n", .{});
-    
+
     std.debug.print("✅ Priority information displayed\n", .{});
 }
 
 fn handleMirrorCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
     _ = allocator;
-    
+
     std.debug.print("🪞 Registry Mirroring (Enterprise Feature)\n\n", .{});
-    
+
     if (args.len == 0) {
         std.debug.print("COMMANDS:\n", .{});
         std.debug.print("  mirror setup <source> <target>   Set up mirroring\n", .{});
@@ -684,9 +682,9 @@ fn handleMirrorCommand(allocator: std.mem.Allocator, args: []const []const u8) !
         std.debug.print("  mirror status <name>             Show status\n", .{});
         return;
     }
-    
+
     const mirror_cmd = args[0];
-    
+
     if (std.mem.eql(u8, mirror_cmd, "setup")) {
         std.debug.print("🚧 Mirror setup not yet implemented\n", .{});
         std.debug.print("💡 Coming in a future release\n", .{});

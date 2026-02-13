@@ -159,12 +159,12 @@ fn extractRepoInfo(allocator: Allocator, url: []const u8) !RepoInfo {
 /// Show enhanced package information including versions and stats
 fn showEnhancedPackageInfo(allocator: Allocator, owner: []const u8, repo: []const u8, package_name: []const u8) !void {
     _ = package_name; // We might use this for more specific info later
-    
+
     const package_ref = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ owner, repo });
     defer allocator.free(package_ref);
-    
+
     std.debug.print("\n📋 Enhanced Package Information:\n", .{});
-    
+
     // Try to fetch available versions
     const versions = github.fetchPackageVersions(allocator, package_ref) catch |err| {
         std.debug.print("⚠️  Could not fetch version information: {}\n", .{err});
@@ -176,7 +176,7 @@ fn showEnhancedPackageInfo(allocator: Allocator, owner: []const u8, repo: []cons
         }
         allocator.free(versions);
     }
-    
+
     if (versions.len > 0) {
         std.debug.print("📦 Available Versions:\n", .{});
         const display_count = @min(versions.len, 5);
@@ -187,16 +187,16 @@ fn showEnhancedPackageInfo(allocator: Allocator, owner: []const u8, repo: []cons
         if (versions.len > 5) {
             std.debug.print("   ... and {d} more versions\n", .{versions.len - 5});
         }
-        
+
         std.debug.print("🔄 Latest Version: {s}\n", .{versions[0].version});
     } else {
         std.debug.print("❌ No versions found\n", .{});
     }
-    
+
     // Additional package information
     std.debug.print("📊 Package Stats:\n", .{});
     std.debug.print("   🔢 Total Versions: {d}\n", .{versions.len});
-    
+
     // Show example commands
     if (versions.len > 0) {
         std.debug.print("\n🛠️  Quick Commands:\n", .{});

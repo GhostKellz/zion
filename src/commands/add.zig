@@ -13,7 +13,7 @@ pub fn add(allocator: Allocator, package_ref: []const u8) !void {
     // Load config to check for aliases and shortcuts
     var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     // Check if this is an alias first
     if (config.expandAlias(package_ref)) |dependencies| {
         std.debug.print("📦 Expanding alias '{s}' to {d} dependencies:\n", .{ package_ref, dependencies.len });
@@ -21,34 +21,34 @@ pub fn add(allocator: Allocator, package_ref: []const u8) !void {
             std.debug.print("  • {s}\n", .{dep});
         }
         std.debug.print("\n", .{});
-        
+
         // Add each dependency in the alias
         for (dependencies) |dep| {
             try addSingleDependency(allocator, dep, &config);
         }
         return;
     }
-    
+
     // Resolve short names like "zcrypto" -> "ghostkellz/zcrypto"
     var resolved_package: []const u8 = package_ref;
     var should_free_resolved = false;
-    
+
     const slash_index = std.mem.indexOf(u8, package_ref, "/");
     if (slash_index == null) {
         // This is a short name, try multiple resolution methods
-        
+
         // 1. Try local config resolution first
         if (config.resolvePackageName(package_ref)) |local_resolved| {
             resolved_package = local_resolved;
             should_free_resolved = true;
             std.debug.print("🔍 Resolved '{s}' to '{s}' (local config)\n", .{ package_ref, resolved_package });
-        } 
+        }
         // 2. Try registry-based resolution
         else if (tryRegistryAliasResolution(allocator, package_ref, &config)) |registry_resolved| {
             resolved_package = registry_resolved;
             should_free_resolved = true;
             std.debug.print("🔍 Resolved '{s}' to '{s}' (registry)\n", .{ package_ref, resolved_package });
-        } 
+        }
         // 3. Fall back to error
         else {
             std.debug.print("❌ Cannot resolve '{s}'. Options:\n", .{package_ref});
@@ -59,52 +59,52 @@ pub fn add(allocator: Allocator, package_ref: []const u8) !void {
         }
     }
     defer if (should_free_resolved) allocator.free(resolved_package);
-    
+
     try addSingleDependency(allocator, resolved_package, &config);
 }
 
 /// Try registry alias resolution
 fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, config: *enhanced_config.ZionConfig) ?[]const u8 {
     const reg = registry.getPrimaryRegistry(allocator, config);
-    
+
     if (!reg.supportsAliases()) {
         return null;
     }
-    
+
     const alias_url = reg.getAliasUrl(short_name) catch return null;
     defer allocator.free(alias_url);
-    
+
     // Make HTTP request to resolve alias
     var client = std.http.Client{ .allocator = allocator };
     defer client.deinit(allocator);
-    
+
     var header_buffer: [16384]u8 = undefined;
     var req = client.open(.GET, std.Uri.parse(alias_url) catch return null, .{
         .server_header_buffer = &header_buffer,
     }) catch return null;
     defer req.deinit(allocator);
-    
+
     req.send() catch return null;
     req.finish() catch return null;
     req.wait() catch return null;
-    
+
     if (req.response.status != .ok) {
         return null;
     }
-    
+
     var output_buf = std.ArrayList(u8).empty;
     defer output_buf.deinit(allocator);
-    
+
     var read_buf: [4096]u8 = undefined;
     while (true) {
         const bytes_read = req.readAll(read_buf[0..]) catch return null;
         if (bytes_read == 0) break;
-    output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch return null;
+        output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch return null;
     }
-    
+
     const body = allocator.dupe(u8, output_buf.items) catch return null;
     defer allocator.free(body);
-    
+
     // Parse JSON response: {"short_name": "zcrypto", "full_name": "cktech/zcrypto", "resolved": true}
     const parsed = std.json.parseFromSlice(struct {
         short_name: []const u8,
@@ -112,11 +112,11 @@ fn tryRegistryAliasResolution(allocator: Allocator, short_name: []const u8, conf
         resolved: bool,
     }, allocator, body, .{}) catch return null;
     defer parsed.deinit(allocator);
-    
+
     if (parsed.value.resolved) {
         return allocator.dupe(u8, parsed.value.full_name) catch null;
     }
-    
+
     return null;
 }
 
@@ -154,11 +154,11 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // Step 1: Download and hash the package
     const progress = @import("../progress.zig");
     var spinner = progress.Spinner.init("Downloading and verifying package");
-    
+
     // Show spinner while downloading
     var download_result: downloader.DownloadResult = undefined;
     var download_error: ?anyerror = null;
-    
+
     // Simulate download with spinner (in real impl, this would be async)
     const download_iterations = 10;
     var i: u32 = 0;
@@ -166,13 +166,13 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         spinner.tick();
         std.time.sleep(100_000_000); // 100ms
     }
-    
+
     download_result = downloader.downloadAndHashPackage(allocator, package_ref) catch |err| {
         download_error = err;
         spinner.fail("Package download failed");
         return err;
     };
-    
+
     spinner.finish("Package downloaded and verified");
     defer {
         allocator.free(download_result.url);
@@ -296,24 +296,23 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     child.stderr_behavior = .Pipe;
 
     try child.spawn();
-    
+
     // Read stderr for error messages (must be done before wait)
     const stderr = if (child.stderr) |stderr_pipe| blk: {
         var output_buf = std.ArrayList(u8).empty;
         defer output_buf.deinit(allocator);
-        
+
         var read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
             if (bytes_read == 0) break;
             try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
         }
-        
+
         break :blk try allocator.dupe(u8, output_buf.items);
-    } else
-        try allocator.dupe(u8, "No error output available");
+    } else try allocator.dupe(u8, "No error output available");
     defer allocator.free(stderr);
-    
+
     const term = try child.wait();
 
     switch (term) {
@@ -444,7 +443,7 @@ fn injectAfterMarker(allocator: Allocator, content: []const u8, marker_pos: usiz
         std.debug.print("Error: Empty deps path in injectAfterMarker\n", .{});
         return error.InvalidDepsPath;
     }
-    
+
     // Find the end of the line with the marker
     const line_end = std.mem.indexOfScalarPos(u8, content, marker_pos, '\n') orelse content.len;
 
@@ -485,7 +484,7 @@ fn injectAtBestLocation(allocator: Allocator, content: []const u8, package_name:
         std.debug.print("Error: Empty deps path in injectAtBestLocation\n", .{});
         return error.InvalidDepsPath;
     }
-    
+
     // Look for a good insertion point - after the module creation but before exe creation
     const mod_creation = "const mod = b.addModule(";
     const exe_creation = "const exe = b.addExecutable(";

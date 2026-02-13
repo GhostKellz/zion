@@ -4,7 +4,6 @@ const Allocator = std.mem.Allocator;
 
 /// Project template functionality
 /// Creates new projects from predefined templates
-
 pub fn template(allocator: Allocator, args: []const []const u8) !void {
     if (args.len < 3) {
         try printTemplateHelp();
@@ -66,7 +65,7 @@ fn listTemplates() !void {
     std.debug.print("📋 Available Project Templates:\n\n", .{});
 
     const templates = getAvailableTemplates();
-    
+
     for (templates) |template| {
         std.debug.print("🔧 {s}\n", .{template.name});
         std.debug.print("   {s}\n", .{template.description});
@@ -81,7 +80,7 @@ fn listTemplates() !void {
 /// Show detailed template information
 fn showTemplateInfo(template_name: []const u8) !void {
     const templates = getAvailableTemplates();
-    
+
     for (templates) |template| {
         if (std.mem.eql(u8, template.name, template_name)) {
             std.debug.print("📖 Template: {s}\n", .{template.name});
@@ -109,7 +108,7 @@ fn showTemplateInfo(template_name: []const u8) !void {
 /// Create project from template
 fn createFromTemplate(allocator: Allocator, template_name: []const u8, project_name: []const u8) !void {
     const templates = getAvailableTemplates();
-    
+
     // Find template
     const template = for (templates) |tmpl| {
         if (std.mem.eql(u8, tmpl.name, template_name)) {
@@ -126,21 +125,21 @@ fn createFromTemplate(allocator: Allocator, template_name: []const u8, project_n
     // Create project directory
     const cwd = fs.cwd();
     try cwd.makeDir(project_name);
-    
+
     std.debug.print("📁 Created directory: {s}/\n", .{project_name});
 
     // Generate files based on template
     try generateTemplateFiles(allocator, template, project_name);
-    
+
     std.debug.print("✅ Project '{s}' created successfully!\n", .{project_name});
     std.debug.print("\n🎯 Next steps:\n", .{});
     std.debug.print("   cd {s}\n", .{project_name});
     std.debug.print("   zig build\n", .{});
-    
+
     if (template.dependencies.len > 0 and !std.mem.eql(u8, template.dependencies, "None")) {
         std.debug.print("   # Dependencies will be auto-installed on first build\n", .{});
     }
-    
+
     std.debug.print("\n💡 See {s}/README.md for detailed instructions\n", .{project_name});
 }
 
@@ -150,62 +149,63 @@ fn generateTemplateFiles(allocator: Allocator, template: TemplateInfo, project_n
 
     // Create subdirectories
     try cwd.makePath(try std.fmt.allocPrint(allocator, "{s}/src", .{project_name}));
-    
-    if (std.mem.indexOf(u8, template.name, "web") != null or 
-        std.mem.indexOf(u8, template.name, "game") != null) {
+
+    if (std.mem.indexOf(u8, template.name, "web") != null or
+        std.mem.indexOf(u8, template.name, "game") != null)
+    {
         try cwd.makePath(try std.fmt.allocPrint(allocator, "{s}/assets", .{project_name}));
     }
 
     // Generate main.zig based on template type
     const main_zig_content = try generateMainZig(allocator, template);
     defer allocator.free(main_zig_content);
-    
+
     const main_zig_path = try std.fmt.allocPrint(allocator, "{s}/src/main.zig", .{project_name});
     defer allocator.free(main_zig_path);
-    
+
     const main_file = try cwd.createFile(main_zig_path, .{});
     defer main_file.close();
     try main_file.writeAll(main_zig_content);
-    
+
     std.debug.print("📄 Generated: src/main.zig\n", .{});
 
     // Generate build.zig
     const build_zig_content = try generateBuildZig(allocator, template, project_name);
     defer allocator.free(build_zig_content);
-    
+
     const build_zig_path = try std.fmt.allocPrint(allocator, "{s}/build.zig", .{project_name});
     defer allocator.free(build_zig_path);
-    
+
     const build_file = try cwd.createFile(build_zig_path, .{});
     defer build_file.close();
     try build_file.writeAll(build_zig_content);
-    
+
     std.debug.print("📄 Generated: build.zig\n", .{});
 
     // Generate build.zig.zon
     const zon_content = try generateZonFile(allocator, template, project_name);
     defer allocator.free(zon_content);
-    
+
     const zon_path = try std.fmt.allocPrint(allocator, "{s}/build.zig.zon", .{project_name});
     defer allocator.free(zon_path);
-    
+
     const zon_file = try cwd.createFile(zon_path, .{});
     defer zon_file.close();
     try zon_file.writeAll(zon_content);
-    
+
     std.debug.print("📄 Generated: build.zig.zon\n", .{});
 
     // Generate README.md
     const readme_content = try generateReadme(allocator, template, project_name);
     defer allocator.free(readme_content);
-    
+
     const readme_path = try std.fmt.allocPrint(allocator, "{s}/README.md", .{project_name});
     defer allocator.free(readme_path);
-    
+
     const readme_file = try cwd.createFile(readme_path, .{});
     defer readme_file.close();
     try readme_file.writeAll(readme_content);
-    
+
     std.debug.print("📄 Generated: README.md\n", .{});
 }
 
@@ -515,18 +515,17 @@ fn generateReadme(allocator: Allocator, template: TemplateInfo, project_name: []
         \\
         \\MIT
         \\
-    , .{ project_name, template.description, template.dependencies, 
-         try formatFeatures(allocator, template.features) });
+    , .{ project_name, template.description, template.dependencies, try formatFeatures(allocator, template.features) });
 }
 
 /// Format features list for README
 fn formatFeatures(allocator: Allocator, features: []const []const u8) ![]const u8 {
     var result = std.ArrayList(u8).init(allocator);
-    
+
     for (features) |feature| {
         try result.writer().print("- {s}\n", .{feature});
     }
-    
+
     return result.toOwnedSlice();
 }
 
@@ -541,7 +540,7 @@ fn getAvailableTemplates() []const TemplateInfo {
             .structure = &[_][]const u8{
                 "src/main.zig      # CLI entry point with clap integration",
                 "build.zig         # Build configuration",
-                "build.zig.zon     # Package manifest", 
+                "build.zig.zon     # Package manifest",
                 "README.md         # Documentation",
             },
             .features = &[_][]const u8{

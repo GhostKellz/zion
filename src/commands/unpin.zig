@@ -23,7 +23,7 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
     }
 
     const package_name = args[2];
-    
+
     std.debug.print("🔓 Unpinning {s} to track latest...\n", .{package_name});
 
     // Check if build.zig.zon exists
@@ -38,24 +38,24 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
         }
         return err;
     };
-    
+
     // Load existing ZON file
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
     defer zon_file.deinit();
-    
+
     // Check if package exists in dependencies
     const existing_dep = zon_file.dependencies.getPtr(package_name) orelse {
         std.debug.print("Error: Package '{s}' not found in dependencies\n", .{package_name});
         std.debug.print("Add it first with: zion add <user/repo>\n", .{});
         return error.PackageNotFound;
     };
-    
+
     // Extract package reference from existing URL
     const package_ref = try extractPackageRefFromUrl(allocator, existing_dep.url);
     defer allocator.free(package_ref);
-    
+
     std.debug.print("🔍 Getting latest version for {s}...\n", .{package_ref});
-    
+
     // Get the latest version (fallback to main if no releases/tags)
     var latest_version = github.getLatestVersion(allocator, package_ref) catch |err| {
         switch (err) {
@@ -64,7 +64,7 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
                 // Generate main branch URL
                 const main_url = try github.generateTarballUrl(allocator, package_ref, "main");
                 defer allocator.free(main_url);
-                
+
                 return updateToMainBranch(allocator, &zon_file, zon_path, package_name, existing_dep, main_url);
             },
             else => {
@@ -74,60 +74,60 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
         }
     };
     defer latest_version.deinit(allocator);
-    
+
     std.debug.print("✅ Latest version: {s}\n", .{latest_version.version});
     std.debug.print("   URL: {s}\n", .{latest_version.url});
-    
+
     // Check if already using this version
     if (std.mem.eql(u8, existing_dep.url, latest_version.url)) {
         std.debug.print("📌 Package {s} is already tracking the latest version ({s})\n", .{ package_name, latest_version.version });
         return;
     }
-    
+
     // Download and hash the latest version
     std.debug.print("⬇️  Downloading latest version...\n", .{});
-    
+
     const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-latest.tar.gz", .{package_name});
     defer allocator.free(cache_path);
-    
+
     // Download the package
     try downloader.ensureCacheDir(allocator);
     try downloader.downloadWithCurlImproved(allocator, latest_version.url, cache_path);
-    
+
     // Calculate hash
     const new_hash = try downloader.calculateFileHash(allocator, cache_path);
     defer allocator.free(new_hash);
-    
+
     std.debug.print("🔐 Calculated hash: {s}\n", .{new_hash[0..16]});
-    
+
     // Update the dependency
     const old_url = existing_dep.url;
     const old_hash = existing_dep.hash;
-    
+
     existing_dep.url = try allocator.dupe(u8, latest_version.url);
     existing_dep.hash = try allocator.dupe(u8, new_hash);
-    
+
     // Clean up old strings
     allocator.free(old_url);
     allocator.free(old_hash);
-    
+
     // Save updated ZON file
     try zon_file.saveToFile(zon_path);
-    
+
     // Update lock file (remove pinned version info)
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
-    
+
     try lock_file.addPackage(package_name, latest_version.url, new_hash, null); // null version = unpinned
     try lock_file.saveToFile();
-    
+
     // Extract to deps directory
     const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
     defer allocator.free(deps_path);
-    
+
     std.debug.print("📁 Extracting to {s}...\n", .{deps_path});
     try extractTarball(allocator, cache_path, deps_path);
-    
+
     std.debug.print("🎉 Successfully unpinned {s} - now tracking latest ({s})\n", .{ package_name, latest_version.version });
     std.debug.print("   URL: {s}\n", .{latest_version.url});
     std.debug.print("   Hash: {s}\n", .{new_hash[0..16]});
@@ -135,64 +135,57 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
 }
 
 /// Update dependency to use main branch when no releases/tags are available
-fn updateToMainBranch(
-    allocator: Allocator,
-    zon_file: *ZonFile,
-    zon_path: []const u8,
-    package_name: []const u8,
-    existing_dep: *Dependency,
-    main_url: []const u8
-) !void {
+fn updateToMainBranch(allocator: Allocator, zon_file: *ZonFile, zon_path: []const u8, package_name: []const u8, existing_dep: *Dependency, main_url: []const u8) !void {
     // Check if already using main branch
     if (std.mem.eql(u8, existing_dep.url, main_url)) {
         std.debug.print("📌 Package {s} is already tracking main branch\n", .{package_name});
         return;
     }
-    
+
     // Download and hash main branch
     std.debug.print("⬇️  Downloading main branch...\n", .{});
-    
+
     const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-main.tar.gz", .{package_name});
     defer allocator.free(cache_path);
-    
+
     // Download the package
     try downloader.ensureCacheDir(allocator);
     try downloader.downloadWithCurlImproved(allocator, main_url, cache_path);
-    
+
     // Calculate hash
     const new_hash = try downloader.calculateFileHash(allocator, cache_path);
     defer allocator.free(new_hash);
-    
+
     std.debug.print("🔐 Calculated hash: {s}\n", .{new_hash[0..16]});
-    
+
     // Update the dependency
     const old_url = existing_dep.url;
     const old_hash = existing_dep.hash;
-    
+
     existing_dep.url = try allocator.dupe(u8, main_url);
     existing_dep.hash = try allocator.dupe(u8, new_hash);
-    
+
     // Clean up old strings
     allocator.free(old_url);
     allocator.free(old_hash);
-    
+
     // Save updated ZON file
     try zon_file.saveToFile(zon_path);
-    
+
     // Update lock file
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
-    
+
     try lock_file.addPackage(package_name, main_url, new_hash, null); // null version = unpinned
     try lock_file.saveToFile();
-    
+
     // Extract to deps directory
     const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
     defer allocator.free(deps_path);
-    
+
     std.debug.print("📁 Extracting to {s}...\n", .{deps_path});
     try extractTarball(allocator, cache_path, deps_path);
-    
+
     std.debug.print("🎉 Successfully unpinned {s} - now tracking main branch\n", .{package_name});
     std.debug.print("   URL: {s}\n", .{main_url});
     std.debug.print("   Hash: {s}\n", .{new_hash[0..16]});
@@ -204,18 +197,18 @@ fn extractPackageRefFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
     // https://github.com/user/repo/archive/refs/heads/main.tar.gz
     // https://github.com/user/repo/archive/refs/tags/v1.0.0.tar.gz
     const github_prefix = "https://github.com/";
-    
+
     if (!std.mem.startsWith(u8, url, github_prefix)) {
         return error.UnsupportedUrl;
     }
-    
+
     const after_prefix = url[github_prefix.len..];
-    
+
     // Find the end of user/repo part
     var parts = std.mem.splitScalar(u8, after_prefix, '/');
     const user = parts.next() orelse return error.InvalidGitHubUrl;
     const repo = parts.next() orelse return error.InvalidGitHubUrl;
-    
+
     return std.fmt.allocPrint(allocator, "{s}/{s}", .{ user, repo });
 }
 

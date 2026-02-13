@@ -12,11 +12,11 @@ pub fn verify(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("\nVerifies the authenticity and integrity of a package using digital signatures.\n", .{});
         return;
     }
-    
+
     const package_file = args[2];
-    const signature_file = args[3]; 
+    const signature_file = args[3];
     const keystore_file = if (args.len > 4) args[4] else "~/.zion/trusted_keys.json";
-    
+
     std.debug.print("🔐 Verifying package signature...\n", .{});
     std.debug.print("  Package: {s}\n", .{package_file});
     std.debug.print("  Signature: {s}\n", .{signature_file});
@@ -39,16 +39,16 @@ pub fn verify(allocator: Allocator, args: []const [:0]const u8) !void {
         return;
     };
     defer allocator.free(signature_data);
-    
-    // Load trusted keys  
+
+    // Load trusted keys
     var key_store = signature_verification.TrustedKeyStore.init(allocator);
     defer key_store.deinit();
     std.debug.print("🔑 Using empty keystore for demo\n", .{});
-    
+
     // Enhanced verification with GPG integration
     const is_valid = gpg_keyring.verifyPackageWithGPG(allocator, package_data, signature_data) catch |err| {
         std.debug.print("❌ Enhanced signature verification failed: {}\n", .{err});
-        
+
         // Try basic verification as fallback
         std.debug.print("🔄 Trying basic signature verification...\n", .{});
         const basic_valid = signature_verification.verifyPackage(allocator, package_data, signature_data, &key_store) catch false;
@@ -60,7 +60,7 @@ pub fn verify(allocator: Allocator, args: []const [:0]const u8) !void {
             std.process.exit(1);
         }
     };
-    
+
     if (is_valid) {
         std.debug.print("✅ Package signature is valid and trusted\n", .{});
         std.debug.print("🔒 Package integrity verified with enhanced GPG support\n", .{});

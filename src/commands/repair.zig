@@ -25,23 +25,23 @@ pub fn repair(allocator: Allocator) !void {
         }
         return err;
     };
-    
+
     // Load existing ZON file
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
     defer zon_file.deinit();
-    
+
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
-    
+
     // Ensure cache directory exists
     try downloader.ensureCacheDir(allocator);
-    
+
     std.debug.print("📋 Found {d} dependencies to check\n", .{zon_file.dependencies.count()});
-    
+
     var repaired_count: usize = 0;
     var error_count: usize = 0;
     var verified_count: usize = 0;
-    
+
     var repaired_packages: std.ArrayList([]const u8) = .empty;
     defer {
         for (repaired_packages.items) |pkg_name| {
@@ -57,19 +57,19 @@ pub fn repair(allocator: Allocator) !void {
         }
         failed_packages.deinit(allocator);
     }
-    
+
     // Process each dependency
     var it = zon_file.dependencies.iterator();
     while (it.next()) |entry| {
         const package_name = entry.key_ptr.*;
         const dep = entry.value_ptr;
-        
+
         std.debug.print("\n🔍 Checking {s}...\n", .{package_name});
-        
+
         // Generate cache path
         const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{package_name});
         defer allocator.free(cache_path);
-        
+
         // Check if file exists in cache
         const cached_exists = blk: {
             cwd.access(io, cache_path, .{}) catch |err| {
@@ -81,10 +81,10 @@ pub fn repair(allocator: Allocator) !void {
             };
             break :blk true;
         };
-        
+
         var needs_download = false;
         var hash_mismatch = false;
-        
+
         if (cached_exists) {
             // Verify hash
             const computed_hash = downloader.calculateFileHash(allocator, cache_path) catch |err| {
@@ -93,7 +93,7 @@ pub fn repair(allocator: Allocator) !void {
                 continue;
             };
             defer allocator.free(computed_hash);
-            
+
             if (std.mem.eql(u8, dep.hash, computed_hash)) {
                 std.debug.print("  ✅ Hash verified: {s}\n", .{computed_hash[0..16]});
                 verified_count += 1;
@@ -109,10 +109,10 @@ pub fn repair(allocator: Allocator) !void {
             std.debug.print("  📥 Not cached, needs download\n", .{});
             needs_download = true;
         }
-        
+
         if (needs_download) {
             std.debug.print("  ⬇️  Re-downloading from {s}...\n", .{dep.url});
-            
+
             // Download the package
             if (downloader.downloadWithCurlImproved(allocator, dep.url, cache_path)) {
                 // Recalculate hash
@@ -123,17 +123,17 @@ pub fn repair(allocator: Allocator) !void {
                     continue;
                 };
                 defer allocator.free(new_hash);
-                
+
                 if (hash_mismatch) {
                     std.debug.print("  🔧 Updating hash in manifest...\n", .{});
-                    
+
                     // Update the hash in the ZON file
                     allocator.free(dep.hash);
                     dep.hash = try allocator.dupe(u8, new_hash);
-                    
+
                     // Update lock file
                     try lock_file.addPackage(package_name, dep.url, new_hash, null);
-                    
+
                     std.debug.print("  ✅ Hash updated: {s}\n", .{new_hash[0..16]});
                     try repaired_packages.append(allocator, try allocator.dupe(u8, package_name));
                     repaired_count += 1;
@@ -150,18 +150,17 @@ pub fn repair(allocator: Allocator) !void {
                         error_count += 1;
                     }
                 }
-                
+
                 // Extract to deps directory
                 const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
                 defer allocator.free(deps_path);
-                
+
                 std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
                 if (extractTarball(allocator, cache_path, deps_path)) {
                     std.debug.print("  ✅ Extracted successfully\n", .{});
                 } else |err| {
                     std.debug.print("  ⚠️  Extraction warning: {}\n", .{err});
                 }
-                
             } else |err| {
                 std.debug.print("  ❌ Download failed: {}\n", .{err});
                 try failed_packages.append(allocator, try allocator.dupe(u8, package_name));
@@ -169,32 +168,32 @@ pub fn repair(allocator: Allocator) !void {
             }
         }
     }
-    
+
     // Save updated files if repairs were made
     if (repaired_count > 0) {
         try zon_file.saveToFile(zon_path);
         try lock_file.saveToFile();
         std.debug.print("\n✅ Updated build.zig.zon and zion.lock\n", .{});
     }
-    
+
     // Print summary
     std.debug.print("\n📊 Repair Summary:\n", .{});
     std.debug.print("   ✅ Verified: {d} packages\n", .{verified_count});
-    
+
     if (repaired_count > 0) {
         std.debug.print("   🔧 Repaired: {d} packages\n", .{repaired_count});
         for (repaired_packages.items) |pkg_name| {
             std.debug.print("      - {s}\n", .{pkg_name});
         }
     }
-    
+
     if (error_count > 0) {
         std.debug.print("   ❌ Failed: {d} packages\n", .{error_count});
         for (failed_packages.items) |pkg_name| {
             std.debug.print("      - {s}\n", .{pkg_name});
         }
     }
-    
+
     if (error_count == 0 and repaired_count == 0) {
         std.debug.print("🎉 All dependencies are healthy! No repairs needed.\n", .{});
     } else if (error_count == 0) {

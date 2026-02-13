@@ -9,7 +9,7 @@ pub const RegistryType = enum {
     zepplin,
     zigistry,
     custom,
-    
+
     pub fn fromUrl(url: []const u8) RegistryType {
         if (std.mem.indexOf(u8, url, "api.github.com") != null) {
             return .github;
@@ -27,7 +27,7 @@ pub const RegistryClient = struct {
     base_url: []const u8,
     registry_type: RegistryType,
     timeout_sec: u32,
-    
+
     pub fn init(allocator: Allocator, base_url: []const u8, timeout_sec: u32) RegistryClient {
         return RegistryClient{
             .allocator = allocator,
@@ -36,7 +36,7 @@ pub const RegistryClient = struct {
             .timeout_sec = timeout_sec,
         };
     }
-    
+
     /// Build API URL for releases endpoint
     pub fn getReleasesUrl(self: *const RegistryClient, owner: []const u8, repo: []const u8) ![]const u8 {
         return switch (self.registry_type) {
@@ -46,8 +46,8 @@ pub const RegistryClient = struct {
             .custom => try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}/releases", .{ self.base_url, owner, repo }), // Default to GitHub format
         };
     }
-    
-    /// Build API URL for tags endpoint  
+
+    /// Build API URL for tags endpoint
     pub fn getTagsUrl(self: *const RegistryClient, owner: []const u8, repo: []const u8) ![]const u8 {
         return switch (self.registry_type) {
             .github => try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}/tags", .{ self.base_url, owner, repo }),
@@ -56,7 +56,7 @@ pub const RegistryClient = struct {
             .custom => try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}/tags", .{ self.base_url, owner, repo }),
         };
     }
-    
+
     /// Build API URL for search endpoint
     pub fn getSearchUrl(self: *const RegistryClient, query: []const u8) ![]const u8 {
         return switch (self.registry_type) {
@@ -66,12 +66,12 @@ pub const RegistryClient = struct {
             .custom => try std.fmt.allocPrint(self.allocator, "{s}/search/repositories?q={s}+language:zig", .{ self.base_url, query }),
         };
     }
-    
+
     /// Check if registry supports alias resolution
     pub fn supportsAliases(self: *const RegistryClient) bool {
         return self.registry_type == .zepplin;
     }
-    
+
     /// Get alias resolution URL (Zepplin-specific)
     pub fn getAliasUrl(self: *const RegistryClient, short_name: []const u8) ![]const u8 {
         if (!self.supportsAliases()) return error.AliasNotSupported;
@@ -88,10 +88,10 @@ pub fn getPrimaryRegistry(allocator: Allocator, config: *const ZionConfig) Regis
 /// Get fallback registry clients
 pub fn getFallbackRegistries(allocator: Allocator, config: *const ZionConfig) ![]RegistryClient {
     var registries: std.ArrayList(RegistryClient) = .{};
-    
+
     for (config.fallback_registries.items) |registry_url| {
         try registries.append(allocator, RegistryClient.init(allocator, registry_url, config.registry_timeout_sec));
     }
-    
+
     return try registries.toOwnedSlice(allocator);
 }

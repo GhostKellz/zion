@@ -34,33 +34,15 @@ fn printArray(prefix: []const u8, array: []const json.Value) !void {
     if (printed) std.debug.print("\n", .{});
 }
 
-
 const json = std.json;
 
 const Usage = struct {
     pub fn header() []const u8 {
-        return "GhostSpec integration commands\n"
-            ++ "Usage:\n"
-            ++ "  zion ghostspec <subcommand> [options]\n"
-            ++ "\n";
+        return "GhostSpec integration commands\n" ++ "Usage:\n" ++ "  zion ghostspec <subcommand> [options]\n" ++ "\n";
     }
 
     pub fn summary() []const u8 {
-        return "Subcommands:\n"
-            ++ "  bootstrap      Install GhostSpec, wire build graph, and scaffold defaults\n"
-            ++ "  install        Add GhostSpec dependency to the current project\n"
-            ++ "  update         Bump GhostSpec dependency to the latest compatible version\n"
-            ++ "  uninstall      Remove GhostSpec and clean generated assets\n"
-            ++ "  wire           Inject GhostSpec build steps (supports --workspace)\n"
-            ++ "  scaffold       Create sample GhostSpec suites and fixtures\n"
-            ++ "  run            Execute GhostSpec suites (accepts filters, seeds, budgets)\n"
-            ++ "  fuzz           Run focused property fuzzing workflows\n"
-            ++ "  bench          Execute GhostSpec benchmarks and capture metrics\n"
-            ++ "  report         Generate or open rich reports from the last run\n"
-            ++ "  ci             Manage CI-friendly GhostSpec workflows and templates\n"
-            ++ "  info           Display compatibility matrix and documentation links\n"
-            ++ "  docs           Open GhostSpec documentation in the browser/terminal\n"
-            ++ "\n";
+        return "Subcommands:\n" ++ "  bootstrap      Install GhostSpec, wire build graph, and scaffold defaults\n" ++ "  install        Add GhostSpec dependency to the current project\n" ++ "  update         Bump GhostSpec dependency to the latest compatible version\n" ++ "  uninstall      Remove GhostSpec and clean generated assets\n" ++ "  wire           Inject GhostSpec build steps (supports --workspace)\n" ++ "  scaffold       Create sample GhostSpec suites and fixtures\n" ++ "  run            Execute GhostSpec suites (accepts filters, seeds, budgets)\n" ++ "  fuzz           Run focused property fuzzing workflows\n" ++ "  bench          Execute GhostSpec benchmarks and capture metrics\n" ++ "  report         Generate or open rich reports from the last run\n" ++ "  ci             Manage CI-friendly GhostSpec workflows and templates\n" ++ "  info           Display compatibility matrix and documentation links\n" ++ "  docs           Open GhostSpec documentation in the browser/terminal\n" ++ "\n";
     }
 };
 
@@ -359,7 +341,7 @@ fn handleInfo(ctx: CommandContext) !void {
                             else => {},
                         };
                         if (profile_obj.get("fail_fast")) |ff_val| switch (ff_val) {
-                            .bool => |flag| std.debug.print("      fail_fast: {s}\n", .{ if (flag) "true" else "false" }),
+                            .bool => |flag| std.debug.print("      fail_fast: {s}\n", .{if (flag) "true" else "false"}),
                             else => {},
                         };
                     },
@@ -417,7 +399,7 @@ fn dispatch(ctx: CommandContext, subcommand: []const u8) !void {
     } else if (std.mem.eql(u8, subcommand, "help")) {
         printHelp();
     } else {
-        std.debug.print("❌ Unknown ghostspec subcommand: '{s}'\n\n", .{ subcommand });
+        std.debug.print("❌ Unknown ghostspec subcommand: '{s}'\n\n", .{subcommand});
         printHelp();
     }
 }

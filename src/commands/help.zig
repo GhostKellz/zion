@@ -101,6 +101,27 @@ pub fn help(allocator: std.mem.Allocator) !void {
         \\    zion registry add https://my-reg.com       # Add custom registry
         \\    zion registry health                       # Check registry health
         \\
+        \\ZIGISTRY EXAMPLES:
+        \\    zion zigistry search json           # Search Zigistry packages
+        \\    zion zigistry trending              # Show trending packages
+        \\    zion zigistry info zig-clap         # Package details
+        \\    zion add zig-clap --registry zigistry  # Add from Zigistry
+        \\    zion search http --registry zigistry   # Search Zigistry only
+        \\
+        \\COMMAND ALIASES:
+        \\    s -> search          i -> info         a -> add
+        \\    r -> remove          u -> update       l -> list
+        \\    c -> check           b -> build        t -> test
+        \\    h -> help            v -> version      f -> fetch
+        \\    gs -> ghostspec      si -> interface   reg -> registry
+        \\    kr -> keyring        tui -> interface
+        \\
+        \\ENVIRONMENT VARIABLES:
+        \\    NO_COLOR=1           Disable colored output (accessibility)
+        \\    ZION_REGISTRY_URL    Custom registry URL
+        \\    ZION_REGISTRY_TOKEN  Registry authentication token
+        \\    ZIGISTRY_TOKEN       Zigistry authentication token
+        \\
         \\For more information, see the documentation at:
         \\https://github.com/ghostkellz/zion
         \\

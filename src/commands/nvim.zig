@@ -8,9 +8,9 @@ pub fn nvim(allocator: Allocator, args: []const [:0]const u8) !void {
         printNvimHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "setup")) {
         return setupNvimIntegration(allocator);
     } else if (std.mem.eql(u8, subcommand, "install")) {
@@ -24,10 +24,10 @@ pub fn nvim(allocator: Allocator, args: []const [:0]const u8) !void {
 /// Setup Neovim integration
 fn setupNvimIntegration(allocator: Allocator) !void {
     std.debug.print("🚀 Setting up Neovim integration for zion...\n", .{});
-    
+
     // Create Neovim plugin
     try nvim_integration.createNvimPlugin(allocator);
-    
+
     std.debug.print("\n🎯 Next steps:\n", .{});
     std.debug.print("1. Add to your Neovim config (init.lua):\n", .{});
     std.debug.print("   require('zion').setup({{ keymaps = true }})\n", .{});

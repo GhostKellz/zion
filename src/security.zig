@@ -215,7 +215,7 @@ pub fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, pa
     valid: bool,
     message: []const u8,
     signer: []const u8,
-    
+
     pub fn deinit(self: @This()) void {
         _ = self;
         // Messages are static strings, no need to free
@@ -224,7 +224,7 @@ pub fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, pa
     _ = allocator;
     _ = package_path;
     _ = package_name;
-    
+
     // For v0.7.0, return a mock verification result
     return .{
         .valid = true,

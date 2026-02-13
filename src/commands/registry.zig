@@ -7,9 +7,9 @@ pub fn registryCommand(allocator: std.mem.Allocator, args: []const []const u8) !
         try showRegistryHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "list")) {
         try listRegistries(allocator);
     } else if (std.mem.eql(u8, subcommand, "add")) {
@@ -65,12 +65,12 @@ fn showRegistryHelp() !void {
 fn listRegistries(allocator: std.mem.Allocator) !void {
     var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     std.debug.print("🔧 Registry Configuration:\n\n", .{});
-    
+
     const primary_url = config.registry_url orelse "https://api.github.com";
     std.debug.print("📍 Primary: {s}\n", .{primary_url});
-    
+
     if (config.fallback_registries.items.len > 0) {
         std.debug.print("🔄 Fallbacks:\n", .{});
         for (config.fallback_registries.items) |fallback| {
@@ -79,7 +79,7 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
     } else {
         std.debug.print("🔄 Fallbacks: None configured\n", .{});
     }
-    
+
     std.debug.print("\n💡 Use environment variables to configure:\n", .{});
     std.debug.print("   export ZION_REGISTRY_URL=https://your-registry.com\n", .{});
 }
@@ -99,9 +99,9 @@ fn removeRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
 
 fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
     std.debug.print("🧪 Testing registry: {s}\n", .{url});
-    
+
     const reg = registry.RegistryClient.init(allocator, url, 10);
-    
+
     // Test basic connectivity by trying to fetch a well-known endpoint
     const test_url = switch (reg.registry_type) {
         .github => try std.fmt.allocPrint(allocator, "{s}/rate_limit", .{url}),
@@ -110,11 +110,11 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
         .custom => try std.fmt.allocPrint(allocator, "{s}/", .{url}),
     };
     defer allocator.free(test_url);
-    
+
     // Make HTTP request
     var client = std.http.Client{ .allocator = allocator };
     defer client.deinit(allocator);
-    
+
     var header_buffer: [4096]u8 = undefined;
     var req = client.open(.GET, std.Uri.parse(test_url) catch {
         std.debug.print("❌ Invalid URL format\n", .{});
@@ -126,7 +126,7 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
         return;
     };
     defer req.deinit(allocator);
-    
+
     req.send() catch {
         std.debug.print("❌ Request failed\n", .{});
         return;
@@ -139,10 +139,10 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
         std.debug.print("❌ Request wait failed\n", .{});
         return;
     };
-    
+
     std.debug.print("✅ Registry responding (Status: {})\n", .{req.response.status});
     std.debug.print("🔧 Registry type: {}\n", .{reg.registry_type});
-    
+
     if (reg.supportsAliases()) {
         std.debug.print("🏷️  Supports package aliases\n", .{});
     }
@@ -151,13 +151,13 @@ fn testRegistry(allocator: std.mem.Allocator, url: []const u8) !void {
 fn testAllRegistries(allocator: std.mem.Allocator) !void {
     var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     std.debug.print("🧪 Testing all configured registries...\n\n", .{});
-    
+
     // Test primary registry
     const primary_url = config.registry_url orelse "https://api.github.com";
     try testRegistry(allocator, primary_url);
-    
+
     // Test fallback registries
     for (config.fallback_registries.items) |fallback| {
         std.debug.print("\n", .{});

@@ -7,15 +7,15 @@ const ZionConfig = @import("../registry_config.zig").ZionConfig;
 
 test "UnifiedRegistryManager: initialization and cleanup" {
     const allocator = testing.allocator;
-    
+
     // Create test config
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     // Initialize registry manager
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // Verify initialization
     try testing.expect(manager.registries.items.len >= 0);
     try testing.expect(manager.circuit_breakers.count() >= 0);
@@ -23,60 +23,60 @@ test "UnifiedRegistryManager: initialization and cleanup" {
 
 test "UnifiedRegistryManager: connection pooling" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // Test connection pool operations
     const pool = manager.connection_pool;
-    
+
     // Acquire multiple connections
     var connections = std.ArrayList(*http_client.HttpClient).init(allocator);
     defer connections.deinit(allocator);
-    
+
     for (0..5) |_| {
         const conn = try pool.acquire();
         try connections.append(allocator, conn);
     }
-    
+
     // Release connections
     for (connections.items) |conn| {
         pool.release(conn);
     }
-    
+
     // Verify pool state
     try testing.expect(pool.available.items.len > 0);
 }
 
 test "UnifiedRegistryManager: circuit breaker functionality" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // Test circuit breaker behavior
     if (manager.registries.items.len > 0) {
         const registry = &manager.registries.items[0];
         const registry_id = registry.getId();
-        
+
         if (manager.circuit_breakers.get(registry_id)) |breaker| {
             // Test normal operation
             try testing.expect(breaker.canExecute());
-            
+
             // Simulate failures
             for (0..5) |_| {
                 breaker.recordFailure();
             }
-            
+
             // Circuit should be open
             try testing.expect(!breaker.canExecute());
-            
+
             // Test recovery
             breaker.recordSuccess();
             try testing.expect(breaker.canExecute());
@@ -86,15 +86,15 @@ test "UnifiedRegistryManager: circuit breaker functionality" {
 
 test "UnifiedRegistryManager: async cache operations" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     const cache = manager.cache;
-    
+
     // Test package caching
     const test_package = UnifiedRegistryManager.Package{
         .name = try allocator.dupe(u8, "test-package"),
@@ -112,10 +112,10 @@ test "UnifiedRegistryManager: async cache operations" {
         .maintenance_status = null,
     };
     defer test_package.deinit(allocator);
-    
+
     // Put package in cache
     try cache.put("test-key", test_package, 60);
-    
+
     // Retrieve from cache
     const cached = try cache.get("test-key");
     try testing.expect(cached != null);
@@ -123,11 +123,11 @@ test "UnifiedRegistryManager: async cache operations" {
         defer pkg.deinit(allocator);
         try testing.expectEqualStrings(pkg.name, "test-package");
     }
-    
+
     // Test search results caching
     var search_results = [_]UnifiedRegistryManager.Package{test_package};
     try cache.putSearchResults("search-key", &search_results, 60);
-    
+
     const cached_search = try cache.getSearchResults("search-key");
     try testing.expect(cached_search != null);
     if (cached_search) |results| {
@@ -143,21 +143,21 @@ test "UnifiedRegistryManager: async cache operations" {
 
 test "UnifiedRegistryManager: registry health tracking" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     if (manager.registries.items.len > 0) {
         const registry = &manager.registries.items[0];
         const initial_health = registry.health_score;
-        
+
         // Simulate successful operations
         manager.updateRegistryHealth(registry.getId(), true, 100);
         try testing.expect(registry.health_score >= initial_health);
-        
+
         // Simulate failures
         for (0..3) |_| {
             manager.updateRegistryHealth(registry.getId(), false, 5000);
@@ -169,13 +169,13 @@ test "UnifiedRegistryManager: registry health tracking" {
 
 test "UnifiedRegistryManager: package resolution with mocked response" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // This would require mocking HTTP responses
     // For now, we test the structure is correct
     const result = try manager.resolvePackage("test/package");
@@ -187,13 +187,13 @@ test "UnifiedRegistryManager: package resolution with mocked response" {
 
 test "UnifiedRegistryManager: parallel search operations" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // Test parallel search
     const results = try manager.searchPackages("test", 10);
     defer {
@@ -202,7 +202,7 @@ test "UnifiedRegistryManager: parallel search operations" {
         }
         allocator.free(results);
     }
-    
+
     // Verify results are properly deduplicated and sorted
     for (results, 0..) |pkg, i| {
         if (i > 0) {
@@ -216,23 +216,23 @@ test "UnifiedRegistryManager: parallel search operations" {
 
 test "UnifiedRegistryManager: download with retry logic" {
     const allocator = testing.allocator;
-    
+
     var config = ZionConfig.init(allocator);
     defer config.deinit();
-    
+
     const manager = try UnifiedRegistryManager.init(allocator, &config);
     defer manager.deinit();
-    
+
     // Test download with a mock URL
     const test_url = "https://example.com/test-package.tar.gz";
     const dest_path = "test-download.tar.gz";
-    
+
     // This would fail in real test but demonstrates the retry logic structure
     manager.downloadPackage(test_url, dest_path) catch |err| {
         // Expected to fail without real URL
         try testing.expect(err == error.DownloadFailed or err == error.UnknownHost);
     };
-    
+
     // Clean up test file if it exists
     std.fs.cwd().deleteFile(dest_path) catch {};
 }
@@ -252,7 +252,7 @@ const Package = struct {
     star_count: ?u32,
     download_count: ?u64,
     maintenance_status: ?[]const u8,
-    
+
     pub fn deinit(self: Package, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
         allocator.free(self.full_name);
@@ -264,7 +264,7 @@ const Package = struct {
         allocator.free(self.registry_name);
         if (self.maintenance_status) |status| allocator.free(status);
     }
-    
+
     pub fn clone(self: Package, allocator: std.mem.Allocator) !Package {
         return Package{
             .name = try allocator.dupe(u8, self.name),

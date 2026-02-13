@@ -10,9 +10,9 @@ pub fn keyring(allocator: Allocator, args: []const [:0]const u8) !void {
         printUsage();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "list")) {
         try listKeys(allocator);
     } else if (std.mem.eql(u8, subcommand, "trust")) {
@@ -51,29 +51,29 @@ fn printUsage() void {
 
 fn listKeys(allocator: Allocator) !void {
     std.debug.print("🔍 Loading GPG keyrings...\n", .{});
-    
+
     var gpg_ring = gpg_keyring.GPGKeyring.initializeComplete(allocator) catch |err| {
         std.debug.print("❌ Failed to initialize keyring: {}\n", .{err});
         return;
     };
     defer gpg_ring.deinit();
-    
+
     std.debug.print("\n📋 Available Keys:\n", .{});
     std.debug.print("==================\n", .{});
-    
+
     const fingerprints = gpg_ring.getTrustedFingerprints();
     defer allocator.free(fingerprints);
-    
+
     if (fingerprints.len == 0) {
         std.debug.print("🔍 No trusted fingerprints found.\n", .{});
         std.debug.print("💡 Try running 'gpg --list-keys' to see your available keys.\n", .{});
         return;
     }
-    
+
     for (fingerprints, 0..) |fp, i| {
         std.debug.print("{d:2}. {s}\n", .{ i + 1, fp });
     }
-    
+
     std.debug.print("\n✅ Total: {} trusted fingerprints\n", .{fingerprints.len});
     std.debug.print("🏠 System keyrings: {}\n", .{gpg_ring.system_keyrings.items.len});
 }
@@ -116,13 +116,11 @@ fn trustFingerprint(allocator: Allocator, fingerprint: []const u8) !void {
     };
 
     // Simple JSON format for trusted keys - get current timestamp
-    var tv: std.posix.timeval = undefined;
-    std.posix.gettimeofday(&tv, null);
+    var tv: std.c.timeval = undefined;
+    _ = std.c.gettimeofday(&tv, null);
     const timestamp: i64 = tv.sec;
 
-    const trusted_entry = try std.fmt.allocPrint(allocator,
-        "{{\"fingerprint\": \"{s}\", \"trusted\": true, \"added\": \"{d}\"}}\n",
-        .{ fingerprint, timestamp });
+    const trusted_entry = try std.fmt.allocPrint(allocator, "{{\"fingerprint\": \"{s}\", \"trusted\": true, \"added\": \"{d}\"}}\n", .{ fingerprint, timestamp });
     defer allocator.free(trusted_entry);
 
     // Read existing content if file exists, then append new entry
@@ -173,12 +171,7 @@ fn verifyArchKeyrings(allocator: Allocator) !void {
 
         // Try to load keys from this keyring using spawn API
         var child = std.process.spawn(io, .{
-            .argv = &[_][]const u8{
-                "gpg",
-                "--list-keys",
-                "--keyring", keyring_path,
-                "--with-colons"
-            },
+            .argv = &[_][]const u8{ "gpg", "--list-keys", "--keyring", keyring_path, "--with-colons" },
             .stdin = .ignore,
             .stdout = .pipe,
             .stderr = .pipe,
@@ -316,7 +309,7 @@ fn showKeyringsStatus(allocator: Allocator) !void {
 
     // Check system keyrings
     try verifyArchKeyrings(allocator);
-    
+
     // Initialize full keyring and show summary
     std.debug.print("\n🔄 Loading complete keyring...\n", .{});
     var gpg_ring = gpg_keyring.GPGKeyring.initializeComplete(allocator) catch |err| {
@@ -324,7 +317,7 @@ fn showKeyringsStatus(allocator: Allocator) !void {
         return;
     };
     defer gpg_ring.deinit();
-    
+
     std.debug.print("\n✅ Keyring Status Summary:\n", .{});
     std.debug.print("   Trusted fingerprints: {}\n", .{gpg_ring.trusted_fingerprints.count()});
     std.debug.print("   System keyrings: {}\n", .{gpg_ring.system_keyrings.items.len});
@@ -365,19 +358,16 @@ fn refreshKeyrings(allocator: Allocator) !void {
             std.debug.print("⚠️  GPG refresh terminated abnormally\n", .{});
         },
     }
-    
+
     // Re-initialize keyrings
     std.debug.print("🔄 Reloading keyring configuration...\n", .{});
-    
+
     var gpg_ring = gpg_keyring.GPGKeyring.initializeComplete(allocator) catch |err| {
         std.debug.print("❌ Failed to reload keyrings: {}\n", .{err});
         return;
     };
     defer gpg_ring.deinit();
-    
+
     std.debug.print("✅ Keyrings refreshed successfully!\n", .{});
-    std.debug.print("📊 Status: {} trusted fingerprints, {} system keyrings\n", .{ 
-        gpg_ring.trusted_fingerprints.count(), 
-        gpg_ring.system_keyrings.items.len 
-    });
+    std.debug.print("📊 Status: {} trusted fingerprints, {} system keyrings\n", .{ gpg_ring.trusted_fingerprints.count(), gpg_ring.system_keyrings.items.len });
 }

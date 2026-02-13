@@ -11,7 +11,7 @@ const zion_root = @import("root.zig");
 pub const NvimIntegration = struct {
     allocator: Allocator,
     config: ZionConfig,
-    
+
     pub fn init(allocator: Allocator) !NvimIntegration {
         const config = try ZionConfig.load(allocator);
         return NvimIntegration{
@@ -19,11 +19,11 @@ pub const NvimIntegration = struct {
             .config = config,
         };
     }
-    
+
     pub fn deinit(self: *NvimIntegration) void {
         self.config.deinit();
     }
-    
+
     /// Handle Neovim RPC calls
     pub fn handleRpcCall(self: *NvimIntegration, method: []const u8, params: json.Value) !json.Value {
         if (std.mem.eql(u8, method, "add_dependency")) {
@@ -46,52 +46,52 @@ pub const NvimIntegration = struct {
             return json.Value{ .object = json.ObjectMap.init(self.allocator) };
         }
     }
-    
+
     /// Add dependency from Neovim
     fn addDependencyRpc(self: *NvimIntegration, params: json.Value) !json.Value {
         const package_name = params.object.get("package") orelse return self.errorResponse("Missing package parameter");
-        
+
         // Resolve package name using config
         const resolved_name = if (self.config.resolvePackageName(package_name.string)) |resolved|
             resolved
         else
             try self.allocator.dupe(u8, package_name.string);
         defer self.allocator.free(resolved_name);
-        
+
         // Execute zion add command
         const result = try self.executeZionCommand(&[_][]const u8{ "add", resolved_name });
         defer self.allocator.free(result.output);
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("success", json.Value{ .bool = result.success });
         try response.put("output", json.Value{ .string = result.output });
-        
+
         if (result.success) {
             try response.put("message", json.Value{ .string = "Dependency added successfully" });
         }
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// Remove dependency from Neovim
     fn removeDependencyRpc(self: *NvimIntegration, params: json.Value) !json.Value {
         const package_name = params.object.get("package") orelse return self.errorResponse("Missing package parameter");
-        
+
         const result = try self.executeZionCommand(&[_][]const u8{ "remove", package_name.string });
         defer self.allocator.free(result.output);
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("success", json.Value{ .bool = result.success });
         try response.put("output", json.Value{ .string = result.output });
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// List project dependencies for Neovim
     fn listDependenciesRpc(self: *NvimIntegration) !json.Value {
         const result = try self.executeZionCommand(&[_][]const u8{ "list", "--json" });
         defer self.allocator.free(result.output);
-        
+
         if (result.success) {
             // Parse the JSON output from zion list
             var parsed = try json.parseFromSlice(json.Value, self.allocator, result.output, .{});
@@ -101,16 +101,16 @@ pub const NvimIntegration = struct {
             return self.errorResponse(result.output);
         }
     }
-    
+
     /// Check project health for Neovim
     fn checkProjectRpc(self: *NvimIntegration) !json.Value {
         const result = try self.executeZionCommand(&[_][]const u8{"check"});
         defer self.allocator.free(result.output);
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("success", json.Value{ .bool = result.success });
         try response.put("output", json.Value{ .string = result.output });
-        
+
         // Parse health status (simplified)
         const health_status = if (std.mem.indexOf(u8, result.output, "HEALTHY") != null)
             "healthy"
@@ -118,150 +118,150 @@ pub const NvimIntegration = struct {
             "warnings"
         else
             "errors";
-            
+
         try response.put("status", json.Value{ .string = health_status });
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// Search packages for Neovim
     fn searchPackagesRpc(self: *NvimIntegration, params: json.Value) !json.Value {
         const query = params.object.get("query") orelse return self.errorResponse("Missing query parameter");
-        
+
         // For now, return mock search results
         // In a full implementation, this would search GitHub or a package registry
         var results = json.Array.init(self.allocator);
-        
+
         // Mock some results based on common Zig packages
         const mock_packages = [_]struct { name: []const u8, description: []const u8 }{
             .{ .name = "mitchellh/libxev", .description = "Cross-platform async I/O library" },
             .{ .name = "ziglang/zig", .description = "Zig programming language" },
             .{ .name = "ghostkellz/zcrypto", .description = "Cryptography library for Zig" },
         };
-        
+
         for (mock_packages) |pkg| {
-            if (std.mem.indexOf(u8, pkg.name, query.string) != null or 
-                std.mem.indexOf(u8, pkg.description, query.string) != null) {
-                
+            if (std.mem.indexOf(u8, pkg.name, query.string) != null or
+                std.mem.indexOf(u8, pkg.description, query.string) != null)
+            {
                 var pkg_obj = json.ObjectMap.init(self.allocator);
                 try pkg_obj.put("name", json.Value{ .string = pkg.name });
                 try pkg_obj.put("description", json.Value{ .string = pkg.description });
                 try results.append(json.Value{ .object = pkg_obj });
             }
         }
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("results", json.Value{ .array = results });
         try response.put("count", json.Value{ .integer = @intCast(results.items.len) });
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// Get zion configuration for Neovim
     fn getConfigRpc(self: *NvimIntegration) !json.Value {
         var config_obj = json.ObjectMap.init(self.allocator);
-        
+
         if (self.config.github_username) |username| {
             try config_obj.put("github_username", json.Value{ .string = username });
         }
-        
+
         var orgs_array = json.Array.init(self.allocator);
         for (self.config.github_orgs.items) |org| {
             try orgs_array.append(json.Value{ .string = org });
         }
         try config_obj.put("github_orgs", json.Value{ .array = orgs_array });
-        
+
         try config_obj.put("auto_add_to_build", json.Value{ .bool = self.config.auto_add_to_build });
         try config_obj.put("neovim_integration", json.Value{ .bool = self.config.neovim_integration });
-        
+
         return json.Value{ .object = config_obj };
     }
-    
+
     /// Update all dependencies
     fn updateDependenciesRpc(self: *NvimIntegration) !json.Value {
         const result = try self.executeZionCommand(&[_][]const u8{"update"});
         defer self.allocator.free(result.output);
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("success", json.Value{ .bool = result.success });
         try response.put("output", json.Value{ .string = result.output });
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// Switch Zig version from Neovim
     fn switchZigVersionRpc(self: *NvimIntegration, params: json.Value) !json.Value {
         const version = params.object.get("version") orelse return self.errorResponse("Missing version parameter");
-        
+
         const result = try self.executeZionCommand(&[_][]const u8{ "zig", "use", version.string });
         defer self.allocator.free(result.output);
-        
+
         var response = json.ObjectMap.init(self.allocator);
         try response.put("success", json.Value{ .bool = result.success });
         try response.put("output", json.Value{ .string = result.output });
-        
+
         return json.Value{ .object = response };
     }
-    
+
     /// Execute a zion command and return the result
     fn executeZionCommand(self: *NvimIntegration, args: []const []const u8) !CommandResult {
         var cmd_args: std.ArrayList([]const u8) = .{};
         defer cmd_args.deinit(self.allocator);
-        
+
         try cmd_args.append(self.allocator, "zion");
         for (args) |arg| {
             try cmd_args.append(self.allocator, arg);
         }
-        
+
         var child = std.process.Child.init(cmd_args.items, self.allocator);
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
-        
+
         try child.spawn();
-        
+
         var stdout_output_buf: std.ArrayList(u8) = .{};
         defer stdout_output_buf.deinit(self.allocator);
-        
+
         var stdout_read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try child.stdout.?.readAll(stdout_read_buf[0..]);
             if (bytes_read == 0) break;
             try stdout_output_buf.appendSlice(stdout_read_buf[0..bytes_read]);
         }
-        
+
         const stdout = try self.allocator.dupe(u8, stdout_output_buf.items);
-        
+
         var stderr_output_buf: std.ArrayList(u8) = .{};
         defer stderr_output_buf.deinit(self.allocator);
-        
+
         var stderr_read_buf: [4096]u8 = undefined;
         while (true) {
             const bytes_read = try child.stderr.?.readAll(stderr_read_buf[0..]);
             if (bytes_read == 0) break;
             try stderr_output_buf.appendSlice(stderr_read_buf[0..bytes_read]);
         }
-        
+
         const stderr = try self.allocator.dupe(u8, stderr_output_buf.items);
         defer self.allocator.free(stderr);
-        
+
         const term = try child.wait();
-        
+
         const success = switch (term) {
             .Exited => |code| code == 0,
             else => false,
         };
-        
+
         const output = if (success) stdout else blk: {
             self.allocator.free(stdout);
             break :blk try self.allocator.dupe(u8, stderr);
         };
-        
+
         return CommandResult{
             .success = success,
             .output = output,
         };
     }
-    
+
     /// Create an error response
     fn errorResponse(self: *NvimIntegration, message: []const u8) !json.Value {
         var response = json.ObjectMap.init(self.allocator);
@@ -510,7 +510,7 @@ pub fn createNvimPlugin(allocator: Allocator) !void {
         \\return M
         \\
     ;
-    
+
     // Create the plugin directory
     const home_dir = zion_root.getEnv("HOME") orelse return error.NoHomeDir;
     const plugin_dir = try std.fmt.allocPrint(allocator, "{s}/.config/nvim/lua/zion", .{home_dir});
@@ -527,7 +527,7 @@ pub fn createNvimPlugin(allocator: Allocator) !void {
     const file = try cwd.createFile(io, plugin_path, .{});
     defer file.close(io);
     try file.writeStreamingAll(io, plugin_content);
-    
+
     std.debug.print("✅ Created Neovim plugin: {s}\n", .{plugin_path});
     std.debug.print("\n💡 Add this to your Neovim config:\n", .{});
     std.debug.print("   require('zion').setup({{ keymaps = true }})\n", .{});

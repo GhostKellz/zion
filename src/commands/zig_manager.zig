@@ -13,9 +13,9 @@ pub fn zig_manager(allocator: Allocator, args: []const [:0]const u8) !void {
         printZigHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "list")) {
         return listVersions(allocator, args[3..]);
     } else if (std.mem.eql(u8, subcommand, "install")) {
@@ -40,7 +40,7 @@ pub fn zig_manager(allocator: Allocator, args: []const [:0]const u8) !void {
 fn listVersions(allocator: Allocator, args: []const [:0]const u8) !void {
     var show_remote = false;
     var show_prerelease = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--remote") or std.mem.eql(u8, arg, "-r")) {
             show_remote = true;
@@ -48,11 +48,11 @@ fn listVersions(allocator: Allocator, args: []const [:0]const u8) !void {
             show_prerelease = true;
         }
     }
-    
+
     // Show installed versions
     std.debug.print("🔧 Installed Zig Versions:\n", .{});
     try listInstalledVersions(allocator);
-    
+
     if (show_remote) {
         std.debug.print("\n🌐 Available Remote Versions:\n", .{});
         try listRemoteVersions(allocator, show_prerelease);
@@ -71,16 +71,16 @@ fn installVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("  zion zig install master\n", .{});
         return;
     }
-    
+
     const version = args[0];
     std.debug.print("📦 Installing Zig {s}...\n", .{version});
-    
+
     // Create zion zig directory
     try ensureZigDir(allocator);
-    
+
     // Download and install
     try downloadAndInstallZig(allocator, version);
-    
+
     std.debug.print("✅ Zig {s} installed successfully!\n", .{version});
     std.debug.print("💡 Use 'zion zig use {s}' to activate this version\n", .{version});
 }
@@ -94,9 +94,9 @@ fn useVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("  zion zig use system    # Use system Zig\n", .{});
         return;
     }
-    
+
     const version = args[0];
-    
+
     // Handle special "system" version
     if (std.mem.eql(u8, version, "system")) {
         const io = try zion_root.getIo();
@@ -117,7 +117,7 @@ fn useVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("📁 Path: {s}\n", .{system_zig});
         return;
     }
-    
+
     // Check if managed version is installed
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
@@ -134,12 +134,12 @@ fn useVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         }
         return err;
     };
-    
+
     // Update managed version
     try setActiveVersion(allocator, version);
-    
+
     std.debug.print("✅ Now using managed Zig {s}\n", .{version});
-    
+
     // Verify the switch worked
     try verifyZigVersion(allocator, version);
 }
@@ -162,7 +162,7 @@ fn showCurrent(allocator: Allocator) !void {
     } else {
         std.debug.print("🖥️  System Zig: Not found\n", .{});
     }
-    
+
     // Check managed Zig
     const current = getCurrentVersion(allocator) catch |err| {
         if (err == error.FileNotFound) {
@@ -177,14 +177,14 @@ fn showCurrent(allocator: Allocator) !void {
         return err;
     };
     defer allocator.free(current);
-    
+
     std.debug.print("🦎 Managed Zig: {s} (active)\n", .{current});
-    
+
     const zig_exe = getActiveZigPath(allocator) catch return;
     defer allocator.free(zig_exe);
-    
+
     std.debug.print("📁 Active Path: {s}\n", .{zig_exe});
-    
+
     // Show detailed version info for active Zig
     std.debug.print("📊 Active Version Details:\n", .{});
     try showZigVersionDetails(allocator);
@@ -196,7 +196,7 @@ fn removeVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("❌ Usage: zion zig remove <version>\n", .{});
         return;
     }
-    
+
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
 
@@ -268,13 +268,13 @@ fn setDefault(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("❌ Usage: zion zig default <version>\n", .{});
         return;
     }
-    
+
     const version = args[0];
     try setActiveVersion(allocator, version);
-    
+
     // Also update shell profile
     try updateShellProfile(allocator, version);
-    
+
     std.debug.print("✅ Set Zig {s} as default\n", .{version});
     std.debug.print("💡 Restart your shell or run 'source ~/.bashrc' to apply changes\n", .{});
 }
@@ -422,9 +422,9 @@ fn listInstalledVersions(allocator: Allocator) !void {
 
 fn listRemoteVersions(allocator: Allocator, show_prerelease: bool) !void {
     _ = allocator;
-    
+
     std.debug.print("  📡 Available Zig versions for x86_64-linux:\n", .{});
-    
+
     // Stable releases
     const stable_versions = [_][]const u8{
         "0.14.1",
@@ -432,19 +432,19 @@ fn listRemoteVersions(allocator: Allocator, show_prerelease: bool) !void {
         "0.12.1",
         "0.11.0",
     };
-    
+
     std.debug.print("\n  🟢 Stable Releases:\n", .{});
     for (stable_versions) |version| {
         std.debug.print("    {s}\n", .{version});
     }
-    
+
     if (show_prerelease) {
         const dev_versions = [_][]const u8{
             "0.15.0-dev.936+fc2c1883b",
             "0.15.0-dev.1000+abc123def", // Example
             "master", // Latest development
         };
-        
+
         std.debug.print("\n  🟡 Development Releases:\n", .{});
         for (dev_versions) |version| {
             std.debug.print("    {s}\n", .{version});
@@ -585,11 +585,11 @@ fn detectSystemZig(allocator: Allocator, io: Io) ![]const u8 {
 
     // Common system Zig installation paths
     const system_paths = [_][]const u8{
-        "/usr/bin/zig",           // Standard Linux package manager
-        "/usr/local/bin/zig",     // Manual system install
-        "/opt/zig/bin/zig",       // Alternative location
-        "/bin/zig",               // Some distributions
-        "/snap/bin/zig",          // Snap packages
+        "/usr/bin/zig", // Standard Linux package manager
+        "/usr/local/bin/zig", // Manual system install
+        "/opt/zig/bin/zig", // Alternative location
+        "/bin/zig", // Some distributions
+        "/snap/bin/zig", // Snap packages
     };
 
     for (system_paths) |path| {
@@ -705,7 +705,7 @@ fn getFilenameFromUrl(url: []const u8) []const u8 {
     while (i > 0) {
         i -= 1;
         if (url[i] == '/') {
-            return url[i + 1..];
+            return url[i + 1 ..];
         }
     }
     return url; // Fallback if no '/' found

@@ -7,7 +7,7 @@ pub const ZigLibsIntegration = struct {
     packages: std.ArrayList(ZigLibsPackage),
     tools: std.ArrayList(ZigLibsTool),
     base_url: []const u8 = "https://github.com/ziglibs/repository",
-    
+
     pub const ZigLibsPackage = struct {
         name: []const u8,
         description: ?[]const u8,
@@ -16,7 +16,7 @@ pub const ZigLibsIntegration = struct {
         category: Category,
         documentation: ?[]const u8,
         author: ?[]const u8,
-        
+
         pub const Category = enum {
             algorithms,
             async_io,
@@ -39,7 +39,7 @@ pub const ZigLibsIntegration = struct {
             text,
             utility,
             web,
-            
+
             pub fn getIcon(self: Category) []const u8 {
                 return switch (self) {
                     .algorithms => "🧮",
@@ -65,7 +65,7 @@ pub const ZigLibsIntegration = struct {
                     .web => "🌍",
                 };
             }
-            
+
             pub fn getDisplayName(self: Category) []const u8 {
                 return switch (self) {
                     .algorithms => "Algorithms",
@@ -92,34 +92,28 @@ pub const ZigLibsIntegration = struct {
                 };
             }
         };
-        
+
         pub fn getGitHubUrl(self: *const ZigLibsPackage) []const u8 {
             return self.repository;
         }
-        
+
         pub fn getZigFetchCommand(self: *const ZigLibsPackage, allocator: Allocator) ![]const u8 {
             // Extract owner/repo from GitHub URL
             if (std.mem.indexOf(u8, self.repository, "github.com/")) |start| {
-                const repo_part = self.repository[start + 11..]; // Skip "github.com/"
-                return std.fmt.allocPrint(allocator, 
-                    "zig fetch --save https://github.com/{s}/archive/refs/heads/main.tar.gz",
-                    .{repo_part}
-                );
+                const repo_part = self.repository[start + 11 ..]; // Skip "github.com/"
+                return std.fmt.allocPrint(allocator, "zig fetch --save https://github.com/{s}/archive/refs/heads/main.tar.gz", .{repo_part});
             }
-            return std.fmt.allocPrint(allocator, 
-                "zig fetch --save {s}/archive/refs/heads/main.tar.gz",
-                .{self.repository}
-            );
+            return std.fmt.allocPrint(allocator, "zig fetch --save {s}/archive/refs/heads/main.tar.gz", .{self.repository});
         }
     };
-    
+
     pub const ZigLibsTool = struct {
         name: []const u8,
         description: ?[]const u8,
         repository: []const u8,
         category: ToolCategory,
         installation_method: InstallationMethod,
-        
+
         pub const ToolCategory = enum {
             build_tools,
             code_generation,
@@ -129,7 +123,7 @@ pub const ZigLibsIntegration = struct {
             package_management,
             testing,
             utilities,
-            
+
             pub fn getIcon(self: ToolCategory) []const u8 {
                 return switch (self) {
                     .build_tools => "🔨",
@@ -143,7 +137,7 @@ pub const ZigLibsIntegration = struct {
                 };
             }
         };
-        
+
         pub const InstallationMethod = enum {
             zig_build,
             zig_fetch,
@@ -151,19 +145,19 @@ pub const ZigLibsIntegration = struct {
             source_compile,
         };
     };
-    
+
     pub fn init(allocator: Allocator) !ZigLibsIntegration {
         var integration = ZigLibsIntegration{
             .allocator = allocator,
             .packages = .{},
             .tools = .{},
         };
-        
+
         try integration.initializeCommonPackages();
         try integration.initializeCommonTools();
         return integration;
     }
-    
+
     pub fn deinit(self: *ZigLibsIntegration) void {
         for (self.packages.items) |*pkg| {
             self.allocator.free(pkg.name);
@@ -174,7 +168,7 @@ pub const ZigLibsIntegration = struct {
             if (pkg.author) |author| self.allocator.free(author);
         }
         self.packages.deinit(self.allocator);
-        
+
         for (self.tools.items) |*tool| {
             self.allocator.free(tool.name);
             if (tool.description) |desc| self.allocator.free(desc);
@@ -182,7 +176,7 @@ pub const ZigLibsIntegration = struct {
         }
         self.tools.deinit(self.allocator);
     }
-    
+
     fn initializeCommonPackages(self: *ZigLibsIntegration) !void {
         // Common ZigLibs packages from https://github.com/ziglibs/repository/tree/main/packages
         const package_definitions = [_]struct {
@@ -361,13 +355,13 @@ pub const ZigLibsIntegration = struct {
                 .category = .testing,
             },
         };
-        
+
         for (package_definitions) |pkg_def| {
             const name = try self.allocator.dupe(u8, pkg_def.name);
             const description = try self.allocator.dupe(u8, pkg_def.description);
             const repository = try self.allocator.dupe(u8, pkg_def.repo);
             const author = if (pkg_def.author) |a| try self.allocator.dupe(u8, a) else null;
-            
+
             const package = ZigLibsPackage{
                 .name = name,
                 .description = description,
@@ -377,11 +371,11 @@ pub const ZigLibsIntegration = struct {
                 .documentation = null,
                 .author = author,
             };
-            
+
             try self.packages.append(self.allocator, package);
         }
     }
-    
+
     fn initializeCommonTools(self: *ZigLibsIntegration) !void {
         // Common ZigLibs tools from https://github.com/ziglibs/repository/tree/main/tools
         const tool_definitions = [_]struct {
@@ -448,12 +442,12 @@ pub const ZigLibsIntegration = struct {
                 .install_method = .binary_download,
             },
         };
-        
+
         for (tool_definitions) |tool_def| {
             const name = try self.allocator.dupe(u8, tool_def.name);
             const description = try self.allocator.dupe(u8, tool_def.description);
             const repository = try self.allocator.dupe(u8, tool_def.repo);
-            
+
             const tool = ZigLibsTool{
                 .name = name,
                 .description = description,
@@ -461,35 +455,35 @@ pub const ZigLibsIntegration = struct {
                 .category = tool_def.category,
                 .installation_method = tool_def.install_method,
             };
-            
+
             try self.tools.append(self.allocator, tool);
         }
     }
-    
+
     pub fn getPackagesByCategory(self: *const ZigLibsIntegration, category: ZigLibsPackage.Category) std.ArrayList(*const ZigLibsPackage) {
         var result = std.ArrayList(*const ZigLibsPackage).empty;
-        
+
         for (self.packages.items) |*pkg| {
             if (pkg.category == category) {
                 result.append(self.allocator, pkg) catch break;
             }
         }
-        
+
         return result;
     }
-    
+
     pub fn getToolsByCategory(self: *const ZigLibsIntegration, category: ZigLibsTool.ToolCategory) std.ArrayList(*const ZigLibsTool) {
         var result = std.ArrayList(*const ZigLibsTool).empty;
-        
+
         for (self.tools.items) |*tool| {
             if (tool.category == category) {
                 result.append(self.allocator, tool) catch break;
             }
         }
-        
+
         return result;
     }
-    
+
     pub fn findPackage(self: *const ZigLibsIntegration, name: []const u8) ?*const ZigLibsPackage {
         for (self.packages.items) |*pkg| {
             if (std.mem.eql(u8, pkg.name, name)) {
@@ -498,7 +492,7 @@ pub const ZigLibsIntegration = struct {
         }
         return null;
     }
-    
+
     pub fn findTool(self: *const ZigLibsIntegration, name: []const u8) ?*const ZigLibsTool {
         for (self.tools.items) |*tool| {
             if (std.mem.eql(u8, tool.name, name)) {
@@ -507,17 +501,17 @@ pub const ZigLibsIntegration = struct {
         }
         return null;
     }
-    
+
     pub fn searchPackages(self: *const ZigLibsIntegration, query: []const u8, allocator: Allocator) !std.ArrayList(*const ZigLibsPackage) {
         var results = std.ArrayList(*const ZigLibsPackage).empty;
-        
+
         for (self.packages.items) |*pkg| {
             // Search in name
             if (std.mem.indexOf(u8, pkg.name, query) != null) {
                 try results.append(allocator, pkg);
                 continue;
             }
-            
+
             // Search in description
             if (pkg.description) |desc| {
                 if (std.mem.indexOf(u8, desc, query) != null) {
@@ -526,23 +520,23 @@ pub const ZigLibsIntegration = struct {
                 }
             }
         }
-        
+
         return results;
     }
-    
+
     pub fn generateBulkFetchScript(self: *const ZigLibsIntegration, package_names: []const []const u8, allocator: Allocator) ![]const u8 {
         var script = std.ArrayList(u8).empty;
         try script.appendSlice(allocator, "#!/bin/bash\n");
         try script.appendSlice(allocator, "# ZigLibs Package Installation Script\n");
         try script.appendSlice(allocator, "# Generated by Zion Package Manager\n\n");
-        
+
         try script.appendSlice(allocator, "echo \"🦎 Installing ZigLibs packages...\"\n\n");
-        
+
         for (package_names) |pkg_name| {
             if (self.findPackage(pkg_name)) |pkg| {
                 const fetch_cmd = try pkg.getZigFetchCommand(allocator);
                 defer allocator.free(fetch_cmd);
-                
+
                 try script.writer().print("echo \"📦 Fetching {s}...\"\n", .{pkg_name});
                 try script.writer().print("{s}\n", .{fetch_cmd});
                 try script.appendSlice(allocator, "if [ $? -eq 0 ]; then\n");
@@ -552,9 +546,9 @@ pub const ZigLibsIntegration = struct {
                 try script.appendSlice(allocator, "fi\n\n");
             }
         }
-        
+
         try script.appendSlice(allocator, "echo \"🎉 ZigLibs package installation complete!\"\n");
-        
+
         return script.toOwnedSlice(allocator);
     }
 };

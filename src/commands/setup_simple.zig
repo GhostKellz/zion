@@ -9,9 +9,9 @@ pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
         printSetupHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "all")) {
         return setupAll(allocator);
     } else if (std.mem.eql(u8, subcommand, "verify")) {
@@ -32,14 +32,14 @@ fn setupAll(allocator: Allocator) !void {
 fn verifySetup(allocator: Allocator) !void {
     _ = allocator;
     std.debug.print("Verifying Zion setup...\n", .{});
-    
+
     std.debug.print("Zig: ", .{});
     if (checkCommand("zig")) {
         std.debug.print("Found\n", .{});
     } else {
         std.debug.print("Not found\n", .{});
     }
-    
+
     std.debug.print("Zion: ", .{});
     if (checkCommand("zion")) {
         std.debug.print("Found\n", .{});

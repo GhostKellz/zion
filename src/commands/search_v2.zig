@@ -36,28 +36,28 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         printSearchHelp();
         return;
     }
-    
+
     if (args.len < 3) {
         printSearchHelp();
         return;
     }
 
     const search_term = args[2];
-    
+
     // Parse search options
     var options = SearchOptions{};
     try parseSearchOptions(&options, args[3..], allocator);
     defer options.deinit(allocator);
-    
+
     // Load configuration
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Initialize registry manager
     var manager = registry_manager.RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Show search header
     std.debug.print("🔍 Searching for packages matching '{s}'", .{search_term});
     if (options.filters.categories.len > 0) {
@@ -71,18 +71,18 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         std.debug.print(" (registry: {s})", .{registry});
     }
     std.debug.print("\n\n", .{});
-    
+
     // Perform search
     const search_results = if (options.specific_registry) |registry_name|
         try searchSpecificRegistry(allocator, &manager, search_term, registry_name, options.filters)
     else
         try manager.searchPackages(search_term, options.filters);
-    
+
     defer {
         for (search_results) |pkg| pkg.deinit(allocator);
         allocator.free(search_results);
     }
-    
+
     // Display results
     if (search_results.len == 0) {
         std.debug.print("❌ No packages found matching '{s}'\n", .{search_term});
@@ -93,12 +93,12 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         std.debug.print("  • Search in a different registry\n", .{});
         return;
     }
-    
+
     std.debug.print("✅ Found {d} packages:\n\n", .{search_results.len});
-    
+
     // Group results by registry if from multiple sources
     var current_registry: []const u8 = "";
-    
+
     for (search_results, 0..) |pkg, i| {
         // Show registry header if changed
         if (!std.mem.eql(u8, current_registry, pkg.registry_name)) {
@@ -106,14 +106,14 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
             std.debug.print("\n🌐 From {s}:\n", .{pkg.registry_name});
             std.debug.print("{s}\n\n", .{"-" ** 60});
         }
-        
+
         // Package header
         std.debug.print("{d}. 📦 {s}", .{ i + 1, pkg.full_name });
         if (pkg.version.len > 0 and !std.mem.eql(u8, pkg.version, "latest")) {
             std.debug.print(" (v{s})", .{pkg.version});
         }
         std.debug.print("\n", .{});
-        
+
         // Description
         if (pkg.description) |desc| {
             // Wrap long descriptions
@@ -124,36 +124,36 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
                 std.debug.print("   {s}\n", .{desc});
             }
         }
-        
+
         // Metadata line
         std.debug.print("   ", .{});
-        
+
         // Stars
         if (pkg.stars > 0) {
             std.debug.print("⭐ {d} ", .{pkg.stars});
         }
-        
+
         // Downloads
         if (pkg.download_count > 0) {
             std.debug.print("📥 {s} ", .{formatCount(pkg.download_count)});
         }
-        
+
         // License
         if (pkg.license) |license| {
             std.debug.print("📜 {s} ", .{license});
         }
-        
+
         // Author
         if (pkg.author) |author| {
             std.debug.print("👤 {s} ", .{author});
         }
-        
+
         // Last updated
         if (pkg.last_updated.len > 0) {
             std.debug.print("🕐 {s}", .{formatDate(pkg.last_updated)});
         }
         std.debug.print("\n", .{});
-        
+
         // Categories/Topics
         if (pkg.categories.len > 0) {
             std.debug.print("   🏷️  ", .{});
@@ -163,7 +163,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
             }
             std.debug.print("\n", .{});
         }
-        
+
         // Zig version compatibility
         if (pkg.zig_version_min != null or pkg.zig_version_max != null) {
             std.debug.print("   🔧 Zig ", .{});
@@ -176,24 +176,24 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
             }
             std.debug.print("\n", .{});
         }
-        
+
         // Homepage/Repository
         if (pkg.homepage) |homepage| {
             std.debug.print("   🏠 {s}\n", .{homepage});
         } else if (pkg.repository_url) |repo_url| {
             std.debug.print("   📂 {s}\n", .{repo_url});
         }
-        
+
         // Installation command
         std.debug.print("   💻 zion add {s}\n", .{pkg.full_name});
-        
+
         std.debug.print("\n", .{});
     }
-    
+
     // Show registry health status
     const registry_statuses = try manager.getRegistryStatus();
     defer allocator.free(registry_statuses);
-    
+
     std.debug.print("\n📊 Registry Status:\n", .{});
     for (registry_statuses) |status| {
         const status_emoji = switch (status.status) {
@@ -209,7 +209,7 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
             status.response_time_ms,
         });
     }
-    
+
     // Search tips
     std.debug.print("\n💡 Search Tips:\n", .{});
     std.debug.print("   • Use 'zion info <package>' for detailed information\n", .{});
@@ -222,13 +222,13 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
 const SearchOptions = struct {
     filters: registry_v2.SearchFilters = .{},
     specific_registry: ?[]const u8 = null,
-    
+
     // Track what was allocated vs default literals
     allocated_license: bool = false,
     allocated_zig_version: bool = false,
     allocated_registry: bool = false,
     allocated_categories: bool = false,
-    
+
     fn deinit(self: *SearchOptions, allocator: Allocator) void {
         // Only free language if it was changed from default
         if (self.filters.language) |lang| {
@@ -236,7 +236,7 @@ const SearchOptions = struct {
                 allocator.free(lang);
             }
         }
-        
+
         if (self.allocated_license and self.filters.license != null) {
             allocator.free(self.filters.license.?);
         }
@@ -246,7 +246,7 @@ const SearchOptions = struct {
         if (self.allocated_registry and self.specific_registry != null) {
             allocator.free(self.specific_registry.?);
         }
-        
+
         if (self.allocated_categories) {
             for (self.filters.categories) |cat| {
                 allocator.free(cat);
@@ -304,7 +304,7 @@ fn searchSpecificRegistry(
             return try client.searchPackages(term, filters);
         }
     }
-    
+
     std.debug.print("⚠️  Registry '{s}' not found or not enabled\n", .{registry_name});
     return allocator.alloc(registry_v2.Package, 0);
 }
@@ -334,20 +334,20 @@ fn formatDate(iso_date: []const u8) []const u8 {
 pub fn interactiveSearch(allocator: Allocator) !void {
     std.debug.print("🔍 Zion Interactive Package Search\n", .{});
     std.debug.print("Type 'help' for search tips, 'exit' to quit\n\n", .{});
-    
+
     const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
     const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
-    
+
     while (true) {
         try stdout.writeAll("search> ");
-        
+
         var buf: [1024]u8 = undefined;
         const bytes_read = try stdin.readAll(&buf);
         if (bytes_read == 0) break; // EOF
-        
+
         const input = buf[0..bytes_read];
         const trimmed = std.mem.trim(u8, input, " \t\r\n");
-        
+
         if (std.mem.eql(u8, trimmed, "exit") or std.mem.eql(u8, trimmed, "quit")) {
             break;
         } else if (std.mem.eql(u8, trimmed, "help")) {
@@ -356,21 +356,21 @@ pub fn interactiveSearch(allocator: Allocator) !void {
             // Parse the search command
             var args = std.ArrayList([]const u8).init(allocator);
             defer args.deinit(allocator);
-            
+
             try args.append(allocator, "zion");
             try args.append(allocator, "search");
-            
+
             var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
             while (it.next()) |token| {
                 try args.append(allocator, token);
             }
-            
+
             search(allocator, args.items) catch |err| {
                 std.debug.print("❌ Search error: {}\n", .{err});
             };
         }
     }
-    
+
     std.debug.print("\n👋 Happy coding with Zion!\n", .{});
 }
 

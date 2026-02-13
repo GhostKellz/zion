@@ -12,7 +12,7 @@ pub const GPGKeyring = struct {
     user_keyring_path: []const u8,
     system_keyrings: std.ArrayList([]const u8),
     trusted_fingerprints: std.StringHashMap(bool),
-    
+
     pub fn init(allocator: Allocator) GPGKeyring {
         return GPGKeyring{
             .allocator = allocator,
@@ -21,24 +21,24 @@ pub const GPGKeyring = struct {
             .trusted_fingerprints = std.StringHashMap(bool).init(allocator),
         };
     }
-    
+
     pub fn deinit(self: *GPGKeyring) void {
         for (self.system_keyrings.items) |keyring_path| {
             self.allocator.free(keyring_path);
         }
         self.system_keyrings.deinit(self.allocator);
-        
+
         var fingerprint_iter = self.trusted_fingerprints.iterator();
         while (fingerprint_iter.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
         }
         self.trusted_fingerprints.deinit();
-        
+
         if (self.user_keyring_path.len > 0) {
             self.allocator.free(self.user_keyring_path);
         }
     }
-    
+
     /// Load GPG keys from user keyring
     pub fn loadUserKeys(self: *GPGKeyring) !void {
         // Get user's GPG directory
@@ -88,7 +88,7 @@ pub const GPGKeyring = struct {
 
         try self.parseGPGOutput(stdout_list.items);
     }
-    
+
     /// Load system keyrings (like Arch Linux keyring)
     pub fn loadSystemKeyrings(self: *GPGKeyring) !void {
         const io = try zion_root.getIo();
@@ -120,7 +120,7 @@ pub const GPGKeyring = struct {
             try self.loadKeysFromKeyring(keyring_path);
         }
     }
-    
+
     /// Load keys from a specific keyring file
     fn loadKeysFromKeyring(self: *GPGKeyring, keyring_path: []const u8) !void {
         const io = try zion_root.getIo();
@@ -128,7 +128,8 @@ pub const GPGKeyring = struct {
         const argv = [_][]const u8{
             "gpg",
             "--list-keys",
-            "--keyring", keyring_path,
+            "--keyring",
+            keyring_path,
             "--with-colons",
             "--fingerprint",
         };
@@ -167,52 +168,50 @@ pub const GPGKeyring = struct {
 
         try self.parseGPGOutput(stdout_list.items);
     }
-    
+
     /// Parse GPG --with-colons output format
     fn parseGPGOutput(self: *GPGKeyring, output: []const u8) !void {
         var lines = std.mem.splitSequence(u8, output, "\n");
         var current_fingerprint: ?[]const u8 = null;
-        
+
         while (lines.next()) |line| {
             if (line.len == 0) continue;
-            
+
             var fields = std.mem.splitSequence(u8, line, ":");
             const record_type = fields.next() orelse continue;
-            
+
             if (std.mem.eql(u8, record_type, "pub")) {
                 // Public key record: pub:validity:length:algorithm:keyid:creation:expiration:::::::::
                 _ = fields.next(); // validity
                 _ = fields.next(); // length
                 _ = fields.next(); // algorithm
                 const keyid = fields.next() orelse continue;
-                
+
                 std.debug.print("📋 Found public key: {s}\n", .{keyid});
-                
             } else if (std.mem.eql(u8, record_type, "fpr")) {
                 // Fingerprint record: fpr:::::::::fingerprint:
                 for (0..9) |_| _ = fields.next(); // Skip to fingerprint field
                 const fingerprint = fields.next() orelse continue;
-                
+
                 std.debug.print("🔑 Fingerprint: {s}\n", .{fingerprint});
-                
+
                 // Store fingerprint as trusted
                 const owned_fingerprint = try self.allocator.dupe(u8, fingerprint);
                 try self.trusted_fingerprints.put(owned_fingerprint, true);
                 current_fingerprint = owned_fingerprint;
-                
             } else if (std.mem.eql(u8, record_type, "uid")) {
                 // User ID record: uid:validity:::::::::userid:
                 for (0..9) |_| _ = fields.next(); // Skip to userid field
                 const userid = fields.next() orelse continue;
-                
+
                 if (current_fingerprint) |fp| {
-                    const short_fp = if (fp.len > 8) fp[fp.len - 8..] else fp;
+                    const short_fp = if (fp.len > 8) fp[fp.len - 8 ..] else fp;
                     std.debug.print("👤 User ID for {s}: {s}\n", .{ short_fp, userid });
                 }
             }
         }
     }
-    
+
     /// Verify a signature using GPG
     pub fn verifySignature(self: *GPGKeyring, signed_data: []const u8, signature_data: []const u8) !bool {
         const io = try zion_root.getIo();
@@ -289,12 +288,12 @@ pub const GPGKeyring = struct {
             },
         }
     }
-    
+
     /// Check if a fingerprint is trusted
     pub fn isFingerprintTrusted(self: *const GPGKeyring, fingerprint: []const u8) bool {
         return self.trusted_fingerprints.contains(fingerprint);
     }
-    
+
     /// Get list of trusted fingerprints
     pub fn getTrustedFingerprints(self: *const GPGKeyring) []const []const u8 {
         var fingerprints: std.ArrayListUnmanaged([]const u8) = .empty;
@@ -307,28 +306,28 @@ pub const GPGKeyring = struct {
 
         return fingerprints.toOwnedSlice(self.allocator) catch &[_][]const u8{};
     }
-    
+
     /// Initialize GPG keyring with both user and system keys
     pub fn initializeComplete(allocator: Allocator) !GPGKeyring {
         var keyring = GPGKeyring.init(allocator);
-        
+
         std.debug.print("🚀 Initializing GPG keyring integration...\n", .{});
-        
+
         // Load user keys
         keyring.loadUserKeys() catch |err| {
             std.debug.print("⚠️  Failed to load user GPG keys: {}\n", .{err});
         };
-        
+
         // Load system keyrings
         keyring.loadSystemKeyrings() catch |err| {
             std.debug.print("⚠️  Failed to load system keyrings: {}\n", .{err});
         };
-        
+
         const fingerprint_count = keyring.trusted_fingerprints.count();
         const keyring_count = keyring.system_keyrings.items.len;
-        
+
         std.debug.print("✅ GPG integration complete: {} trusted fingerprints, {} system keyrings\n", .{ fingerprint_count, keyring_count });
-        
+
         return keyring;
     }
 };
@@ -338,22 +337,22 @@ pub fn verifyPackageWithGPG(allocator: Allocator, package_data: []const u8, sign
     // First try built-in signature verification
     var key_store = signature_verification.TrustedKeyStore.init(allocator);
     defer key_store.deinit();
-    
+
     const builtin_result = signature_verification.verifyPackage(allocator, package_data, signature_data, &key_store) catch false;
-    
+
     if (builtin_result) {
         std.debug.print("✅ Package verified using built-in signature verification\n", .{});
         return true;
     }
-    
+
     // Fall back to GPG verification
     std.debug.print("🔄 Falling back to GPG verification...\n", .{});
-    
+
     var gpg_keyring = GPGKeyring.initializeComplete(allocator) catch |err| {
         std.debug.print("❌ Failed to initialize GPG keyring: {}\n", .{err});
         return false;
     };
     defer gpg_keyring.deinit();
-    
+
     return gpg_keyring.verifySignature(package_data, signature_data);
 }

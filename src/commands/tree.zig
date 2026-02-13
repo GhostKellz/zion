@@ -11,7 +11,7 @@ pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
     var max_depth: ?u32 = null;
     var show_duplicates = false;
     var show_versions = true;
-    
+
     // Parse arguments
     var i: usize = 2; // Skip "zion" and "tree"
     while (i < args.len) {
@@ -35,7 +35,7 @@ pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
         }
         i += 1;
     }
-    
+
     // Load project info
     const zon_path = "build.zig.zon";
     const io = try zion_root.getIo();
@@ -48,39 +48,39 @@ pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
         }
         return err;
     };
-    
+
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
     defer zon_file.deinit();
-    
+
     std.debug.print("📦 {s} v{s}\n", .{ zon_file.name, zon_file.version });
-    
+
     if (zon_file.dependencies.count() == 0) {
         std.debug.print("└── (no dependencies)\n", .{});
         return;
     }
-    
+
     // Track visited packages to detect duplicates
     var visited = std.StringHashMap(u32).init(allocator);
     defer visited.deinit();
-    
+
     // Display dependency tree
     var it = zon_file.dependencies.iterator();
     var dep_count: usize = 0;
     const total_deps = zon_file.dependencies.count();
-    
+
     while (it.next()) |entry| {
         dep_count += 1;
         const is_last = dep_count == total_deps;
         const prefix = if (is_last) "└── " else "├── ";
         const next_prefix = if (is_last) "    " else "│   ";
-        
+
         try printDependency(allocator, entry.key_ptr.*, entry.value_ptr.*, prefix, next_prefix, 0, max_depth, show_duplicates, show_versions, &visited);
     }
-    
+
     // Show statistics
     std.debug.print("\n📊 Statistics:\n", .{});
     std.debug.print("   Direct dependencies: {d}\n", .{zon_file.dependencies.count()});
-    
+
     if (show_duplicates and visited.count() > 0) {
         var duplicate_count: u32 = 0;
         var duplicate_it = visited.iterator();
@@ -111,37 +111,37 @@ fn printDependency(
     // Track visits for duplicate detection
     const visit_count = visited.get(name) orelse 0;
     try visited.put(try allocator.dupe(u8, name), visit_count + 1);
-    
+
     // Extract version from URL if possible
     var version_info: []const u8 = "";
     if (show_versions) {
         version_info = extractVersionFromUrl(allocator, dep.url) catch "";
     }
     defer if (version_info.len > 0) allocator.free(version_info);
-    
+
     // Print the dependency
     std.debug.print("{s}{s}", .{ prefix, name });
-    
+
     if (show_versions and version_info.len > 0) {
         std.debug.print(" v{s}", .{version_info});
     }
-    
+
     if (show_duplicates and visit_count > 0) {
         std.debug.print(" (duplicate #{d})", .{visit_count + 1});
     }
-    
+
     // Show hash (truncated)
     if (dep.hash.len >= 16) {
         std.debug.print(" [{s}...]", .{dep.hash[0..16]});
     }
-    
+
     std.debug.print("\n", .{});
-    
+
     // Check if we should recurse deeper
     if (max_depth) |depth| {
         if (current_depth >= depth) return;
     }
-    
+
     // For now, we don't recurse into sub-dependencies since we'd need to
     // download and parse their build.zig.zon files
     // This could be a future enhancement
@@ -153,7 +153,7 @@ fn extractVersionFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
     // Look for version patterns in GitHub URLs
     // https://github.com/user/repo/archive/refs/tags/v1.0.0.tar.gz
     // https://github.com/user/repo/archive/refs/heads/main.tar.gz
-    
+
     if (std.mem.indexOf(u8, url, "/tags/")) |tags_pos| {
         const version_start = tags_pos + 6; // "/tags/".len
         if (std.mem.indexOfPos(u8, url, version_start, ".tar.gz")) |version_end| {
@@ -165,7 +165,7 @@ fn extractVersionFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
             return allocator.dupe(u8, version);
         }
     }
-    
+
     if (std.mem.indexOf(u8, url, "/heads/")) |heads_pos| {
         const branch_start = heads_pos + 7; // "/heads/".len
         if (std.mem.indexOfPos(u8, url, branch_start, ".tar.gz")) |branch_end| {
@@ -173,6 +173,6 @@ fn extractVersionFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
             return std.fmt.allocPrint(allocator, "branch-{s}", .{branch});
         }
     }
-    
+
     return allocator.dupe(u8, "unknown");
 }

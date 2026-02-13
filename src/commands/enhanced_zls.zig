@@ -16,9 +16,9 @@ pub fn enhanced_zls(allocator: Allocator, args: [][:0]u8) !void {
         try showEnhancedZlsHelp();
         return;
     }
-    
+
     const subcommand = args[0];
-    
+
     if (std.mem.eql(u8, subcommand, "doctor")) {
         try zlsDoctor(allocator);
     } else if (std.mem.eql(u8, subcommand, "config")) {
@@ -113,26 +113,26 @@ fn zlsDoctor(allocator: Allocator) !void {
         cwd.access(io, "src", .{}) catch break :blk false;
         break :blk true;
     };
-    
+
     if (has_build_zig) {
         print("  ✅ build.zig found\n", .{});
     } else {
         print("  ❌ build.zig missing\n", .{});
         try issues.append(try allocator.dupe(u8, "Missing build.zig"));
     }
-    
+
     if (has_build_zon) {
         print("  ✅ build.zig.zon found\n", .{});
     } else {
         print("  ⚠️ build.zig.zon missing (optional)\n", .{});
     }
-    
+
     if (has_src_dir) {
         print("  ✅ src/ directory found\n", .{});
     } else {
         print("  ⚠️ src/ directory missing\n", .{});
     }
-    
+
     // Check ZLS configuration
     print("\n⚙️ ZLS Configuration:\n", .{});
 
@@ -141,7 +141,7 @@ fn zlsDoctor(allocator: Allocator) !void {
         break :blk true;
     };
     const has_global_config = checkGlobalZlsConfig(allocator);
-    
+
     if (has_zls_json) {
         print("  ✅ Project zls.json found\n", .{});
         try validateZlsConfig(allocator, "zls.json");
@@ -151,14 +151,14 @@ fn zlsDoctor(allocator: Allocator) !void {
         print("  ⚠️ No ZLS config found\n", .{});
         try issues.append(try allocator.dupe(u8, "Missing ZLS configuration"));
     }
-    
+
     // Check dependencies
     print("\n📦 Dependencies:\n", .{});
     try checkDependencyHealth(allocator, &issues);
-    
+
     // Summary
     print("\n📈 Health Summary:\n", .{});
-    
+
     if (issues.items.len == 0) {
         print("✅ All checks passed! ZLS is ready for optimal development.\n", .{});
     } else {
@@ -166,7 +166,7 @@ fn zlsDoctor(allocator: Allocator) !void {
         for (issues.items, 0..) |issue, i| {
             print("  {}. {s}\n", .{ i + 1, issue });
         }
-        
+
         print("\n💡 Suggestions:\n", .{});
         print("  • Run 'zion zls config --generate' to create optimal configuration\n", .{});
         print("  • Run 'zion zls setup <editor>' for editor-specific setup\n", .{});
@@ -176,13 +176,13 @@ fn zlsDoctor(allocator: Allocator) !void {
 
 fn zlsConfig(allocator: Allocator, args: [][:0]u8) !void {
     var generate = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--generate")) {
             generate = true;
         }
     }
-    
+
     if (generate) {
         try generateOptimalZlsConfig(allocator);
     } else {
@@ -192,13 +192,13 @@ fn zlsConfig(allocator: Allocator, args: [][:0]u8) !void {
 
 fn zlsDeps(allocator: Allocator, args: [][:0]u8) !void {
     var watch_mode = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--watch")) {
             watch_mode = true;
         }
     }
-    
+
     if (watch_mode) {
         try startDependencyWatcher(allocator);
     } else {
@@ -254,29 +254,29 @@ fn zlsCompletions(allocator: Allocator) !void {
 
 fn zlsAnalyze(allocator: Allocator) !void {
     print("🔍 Analyzing project for ZLS optimization...\n\n", .{});
-    
+
     // Analyze import statements
     print("📝 Import Analysis:\n", .{});
     const import_analysis = try analyzeImports(allocator);
     defer import_analysis.deinit(allocator);
-    
+
     print("  Total imports: {}\n", .{import_analysis.total_imports});
     print("  Unused imports: {}\n", .{import_analysis.unused_imports});
     print("  Circular dependencies: {}\n", .{import_analysis.circular_deps});
-    
+
     if (import_analysis.unused_imports > 0) {
         print("  ⚠️ Consider running 'zion zls imports --optimize'\n", .{});
     }
-    
+
     // Analyze dependency health
     print("\n📦 Dependency Analysis:\n", .{});
     const dep_analysis = try analyzeDependencies(allocator);
     defer dep_analysis.deinit(allocator);
-    
+
     print("  Total dependencies: {}\n", .{dep_analysis.total_deps});
     print("  Outdated dependencies: {}\n", .{dep_analysis.outdated_deps});
     print("  Security issues: {}\n", .{dep_analysis.security_issues});
-    
+
     // Performance recommendations
     print("\n🚀 Performance Recommendations:\n", .{});
     const recommendations = try generatePerformanceRecommendations(allocator, import_analysis, dep_analysis);
@@ -284,7 +284,7 @@ fn zlsAnalyze(allocator: Allocator) !void {
         for (recommendations) |rec| allocator.free(rec);
         allocator.free(recommendations);
     }
-    
+
     for (recommendations, 0..) |rec, i| {
         print("  {}. {s}\n", .{ i + 1, rec });
     }
@@ -292,13 +292,13 @@ fn zlsAnalyze(allocator: Allocator) !void {
 
 fn zlsImports(allocator: Allocator, args: [][:0]u8) !void {
     var optimize = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--optimize")) {
             optimize = true;
         }
     }
-    
+
     if (optimize) {
         try optimizeImports(allocator);
     } else {
@@ -312,9 +312,9 @@ fn zlsSetup(allocator: Allocator, args: [][:0]u8) !void {
         print("Supported editors: neovim, vscode, emacs, helix\n", .{});
         return;
     }
-    
+
     const editor = args[0];
-    
+
     if (std.mem.eql(u8, editor, "neovim")) {
         try setupNeovim(allocator);
     } else if (std.mem.eql(u8, editor, "vscode")) {
@@ -334,7 +334,7 @@ const ImportAnalysis = struct {
     total_imports: u32,
     unused_imports: u32,
     circular_deps: u32,
-    
+
     fn deinit(self: ImportAnalysis, allocator: Allocator) void {
         _ = self;
         _ = allocator;
@@ -345,7 +345,7 @@ const DependencyAnalysis = struct {
     total_deps: u32,
     outdated_deps: u32,
     security_issues: u32,
-    
+
     fn deinit(self: DependencyAnalysis, allocator: Allocator) void {
         _ = self;
         _ = allocator;
@@ -462,22 +462,22 @@ fn startDependencyWatcher(allocator: Allocator) !void {
     print("👁️ Starting real-time dependency monitoring...\n", .{});
     print("💡 This would monitor build.zig.zon for changes and update ZLS\n", .{});
     print("💡 Press Ctrl+C to stop monitoring\n\n", .{});
-    
+
     // In a real implementation, this would:
     // 1. Watch build.zig.zon for changes
     // 2. Re-analyze dependencies when changed
     // 3. Send updates to ZLS via LSP protocol
     // 4. Show real-time dependency health in editor
-    
+
     _ = allocator;
-    
+
     // Mock monitoring loop
     var i: u32 = 0;
     while (i < 10) : (i += 1) {
         std.time.sleep(1_000_000_000); // 1 second
         print("📊 Monitoring... ({}s)\n", .{i + 1});
     }
-    
+
     print("\n✅ Monitoring stopped\n", .{});
 }
 
@@ -513,7 +513,7 @@ fn showDependencyStatus(allocator: Allocator) !void {
             // Extract URL
             if (std.mem.indexOf(u8, line, "https://")) |start| {
                 if (std.mem.indexOf(u8, line[start..], "\"")) |end| {
-                    const url = line[start..start + end];
+                    const url = line[start .. start + end];
                     print("  {}. ✅ {s}\n", .{ dep_count, url });
                 }
             }
@@ -539,24 +539,24 @@ fn generateCompletionData(allocator: Allocator, packages: []const Package) ![]co
         for (completion_list.items) |item| allocator.free(item);
         completion_list.deinit(allocator);
     }
-    
+
     for (packages) |pkg| {
-        const entry = try std.fmt.allocPrint(allocator, 
+        const entry = try std.fmt.allocPrint(allocator,
             \\  "{s}": {{
             \\    "kind": "package",
             \\    "detail": "{s}",
             \\    "documentation": "{s}"
             \\  }}
         , .{ pkg.name, pkg.version, pkg.description orelse "No description" });
-        
+
         try completion_list.append(allocator, entry);
     }
-    
+
     // Join all entries
     const joined = try std.mem.join(allocator, ",\n", completion_list.items);
     defer allocator.free(joined);
-    
-    return try std.fmt.allocPrint(allocator, 
+
+    return try std.fmt.allocPrint(allocator,
         \\{{
         \\  "completions": {{
         \\{s}
@@ -587,70 +587,66 @@ fn analyzeDependencies(allocator: Allocator) !DependencyAnalysis {
 
 fn generatePerformanceRecommendations(allocator: Allocator, import_analysis: ImportAnalysis, dep_analysis: DependencyAnalysis) ![][]const u8 {
     var recommendations = std.ArrayList([]const u8).init(allocator);
-    
+
     if (import_analysis.unused_imports > 0) {
-        try recommendations.append(try std.fmt.allocPrint(allocator, 
-            "Remove {} unused imports to improve compilation speed", .{import_analysis.unused_imports}));
+        try recommendations.append(try std.fmt.allocPrint(allocator, "Remove {} unused imports to improve compilation speed", .{import_analysis.unused_imports}));
     }
-    
+
     if (dep_analysis.outdated_deps > 0) {
-        try recommendations.append(try std.fmt.allocPrint(allocator, 
-            "Update {} outdated dependencies for better performance and security", .{dep_analysis.outdated_deps}));
+        try recommendations.append(try std.fmt.allocPrint(allocator, "Update {} outdated dependencies for better performance and security", .{dep_analysis.outdated_deps}));
     }
-    
+
     if (import_analysis.total_imports > 20) {
-        try recommendations.append(try allocator.dupe(u8, 
-            "Consider organizing imports into modules for better maintainability"));
+        try recommendations.append(try allocator.dupe(u8, "Consider organizing imports into modules for better maintainability"));
     }
-    
-    try recommendations.append(try allocator.dupe(u8, 
-        "Enable ZLS inlay hints for better code understanding"));
-    
+
+    try recommendations.append(try allocator.dupe(u8, "Enable ZLS inlay hints for better code understanding"));
+
     return recommendations.toOwnedSlice();
 }
 
 fn optimizeImports(allocator: Allocator) !void {
     print("🔄 Optimizing import statements...\n\n", .{});
-    
+
     // Would analyze and optimize imports in .zig files
     _ = allocator;
-    
+
     print("✅ Optimized 15 import statements\n", .{});
     print("✅ Removed 2 unused imports\n", .{});
     print("✅ Organized imports by category\n", .{});
-    
+
     print("\n💡 Import optimization complete!\n", .{});
 }
 
 fn analyzeImportUsage(allocator: Allocator) !void {
     print("🔍 Analyzing import usage...\n\n", .{});
-    
+
     // Would analyze import usage patterns
     _ = allocator;
-    
+
     print("📊 Import Statistics:\n", .{});
     print("  Total imports: 15\n", .{});
     print("  Unused imports: 2\n", .{});
     print("  Standard library: 8\n", .{});
     print("  Dependencies: 5\n", .{});
-    
+
     print("\n⚠️ Unused imports found:\n", .{});
     print("  • std.testing (src/main.zig:3)\n", .{});
     print("  • std.json (src/utils.zig:7)\n", .{});
-    
+
     print("\n💡 Run 'zion zls imports --optimize' to fix\n", .{});
 }
 
 fn setupNeovim(allocator: Allocator) !void {
     print("🌙 Setting up ZLS for Neovim...\n\n", .{});
-    
+
     _ = allocator;
-    
+
     print("📝 Neovim ZLS Setup Instructions:\n\n", .{});
-    
+
     print("1. Install a Neovim LSP plugin (nvim-lspconfig recommended):\n", .{});
     print("   Plug 'neovim/nvim-lspconfig'\n\n", .{});
-    
+
     print("2. Add ZLS configuration to your init.lua:\n", .{});
     print(
         \\   require('lspconfig').zls.setup{{
@@ -664,27 +660,27 @@ fn setupNeovim(allocator: Allocator) !void {
         \\   }}
         \\
     , .{});
-    
+
     print("\n3. Install Mason for automatic ZLS management (optional):\n", .{});
     print("   :MasonInstall zls\n\n", .{});
-    
+
     print("✅ Neovim setup instructions complete!\n", .{});
     print("💡 Restart Neovim and open a .zig file to test ZLS\n", .{});
 }
 
 fn setupVSCode(allocator: Allocator) !void {
     print("💻 Setting up ZLS for Visual Studio Code...\n\n", .{});
-    
+
     _ = allocator;
-    
+
     print("📝 VSCode ZLS Setup Instructions:\n\n", .{});
-    
+
     print("1. Install the Zig Language extension:\n", .{});
     print("   - Open VSCode\n", .{});
     print("   - Go to Extensions (Ctrl+Shift+X)\n", .{});
     print("   - Search for 'Zig Language'\n", .{});
     print("   - Install by 'ziglang'\n\n", .{});
-    
+
     print("2. Configure ZLS path in settings.json (if needed):\n", .{});
     print(
         \\   {{
@@ -694,22 +690,22 @@ fn setupVSCode(allocator: Allocator) !void {
         \\   }}
         \\
     , .{});
-    
+
     print("\n✅ VSCode setup instructions complete!\n", .{});
     print("💡 Restart VSCode and open a .zig file to test ZLS\n", .{});
 }
 
 fn setupEmacs(allocator: Allocator) !void {
     print("🦄 Setting up ZLS for Emacs...\n\n", .{});
-    
+
     _ = allocator;
-    
+
     print("📝 Emacs ZLS Setup Instructions:\n\n", .{});
-    
+
     print("1. Install lsp-mode and zig-mode:\n", .{});
     print("   (package-install 'lsp-mode)\n", .{});
     print("   (package-install 'zig-mode)\n\n", .{});
-    
+
     print("2. Add to your Emacs configuration:\n", .{});
     print(
         \\   (require 'lsp-mode)
@@ -725,20 +721,20 @@ fn setupEmacs(allocator: Allocator) !void {
         \\                       :server-id 'zls)))
         \\
     , .{});
-    
+
     print("\n✅ Emacs setup instructions complete!\n", .{});
     print("💡 Restart Emacs and open a .zig file to test ZLS\n", .{});
 }
 
 fn setupHelix(allocator: Allocator) !void {
     print("🌀 Setting up ZLS for Helix...\n\n", .{});
-    
+
     _ = allocator;
-    
+
     print("📝 Helix ZLS Setup Instructions:\n\n", .{});
-    
+
     print("1. Helix has built-in Zig and ZLS support!\n\n", .{});
-    
+
     print("2. Ensure ZLS is in your PATH, then create/edit ~/.config/helix/languages.toml:\n", .{});
     print(
         \\   [[language]]
@@ -747,7 +743,7 @@ fn setupHelix(allocator: Allocator) !void {
         \\   auto-format = true
         \\
     , .{});
-    
+
     print("\n3. Optional: Configure ZLS-specific settings:\n", .{});
     print(
         \\   [[language]]
@@ -759,7 +755,7 @@ fn setupHelix(allocator: Allocator) !void {
         \\   enable_ast_check_diagnostics = true
         \\
     , .{});
-    
+
     print("\n✅ Helix setup instructions complete!\n", .{});
     print("💡 Restart Helix and open a .zig file to test ZLS\n", .{});
 }

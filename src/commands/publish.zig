@@ -17,21 +17,21 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
     var options = PublishOptions{};
     try parsePublishOptions(&options, args, allocator);
     defer options.deinit(allocator);
-    
+
     // Load configuration
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Initialize registry manager
     var manager = registry_manager.RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Determine target registry
     const target_registry = options.registry orelse getDefaultPublishRegistry(&config);
-    
+
     std.debug.print("📦 Publishing package to registry: {s}\n", .{target_registry});
-    
+
     // Find registry client
     var target_client: ?*registry_v2.RegistryClient = null;
     for (manager.clients.items) |*client| {
@@ -40,7 +40,7 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
             break;
         }
     }
-    
+
     if (target_client == null) {
         std.debug.print("❌ Registry '{s}' not found or not configured\n", .{target_registry});
         std.debug.print("💡 Available registries:\n", .{});
@@ -49,9 +49,9 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
         }
         return;
     }
-    
+
     const client = target_client.?;
-    
+
     // Check authentication
     if (client.config.auth_token == null) {
         std.debug.print("❌ Authentication required for publishing to {s}\n", .{target_registry});
@@ -59,43 +59,43 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
         std.debug.print("   zion registry auth set {s} <your-token>\n", .{target_registry});
         return;
     }
-    
+
     // Validate project structure
     std.debug.print("🔍 Validating project structure...\n", .{});
     try validateProjectForPublishing();
-    
+
     // Read package metadata
     std.debug.print("📖 Reading package metadata...\n", .{});
     const metadata = try readPackageMetadata(allocator);
     defer metadata.deinit(allocator);
-    
+
     // Validate package metadata
     try validatePackageMetadata(metadata);
-    
+
     // Check if package already exists
     std.debug.print("🔍 Checking if package already exists...\n", .{});
     const existing_package = checkExistingPackage(client, metadata) catch null;
     if (existing_package) |pkg| {
         defer pkg.deinit(allocator);
-        
+
         if (!options.force) {
             std.debug.print("❌ Package {s} version {s} already exists\n", .{ metadata.name, metadata.version });
             std.debug.print("💡 Use --force to overwrite or increment the version\n", .{});
             return;
         }
-        
+
         std.debug.print("⚠️  Overwriting existing package version\n", .{});
     }
-    
+
     // Build package
     std.debug.print("🔨 Building package...\n", .{});
     const package_path = try buildPackageForPublish(allocator, metadata, options);
     defer allocator.free(package_path);
-    
+
     // Verify package integrity
     std.debug.print("🔐 Verifying package integrity...\n", .{});
     try verifyPackageIntegrity(allocator, package_path, metadata);
-    
+
     // Sign package if requested
     var signature: ?security.PackageSignature = null;
     if (options.sign) {
@@ -103,7 +103,7 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
         signature = try signPackage(allocator, package_path, metadata);
     }
     defer if (signature) |*sig| sig.deinit(allocator);
-    
+
     if (options.dry_run) {
         std.debug.print("🔍 Dry run complete. Package ready for publishing:\n", .{});
         std.debug.print("   Package: {s}\n", .{package_path});
@@ -114,16 +114,16 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
         }
         return;
     }
-    
+
     // Upload package
     std.debug.print("📤 Uploading package...\n", .{});
     const upload_result = try uploadPackage(allocator, client, package_path, metadata, signature);
     defer upload_result.deinit(allocator);
-    
+
     // Update local registry cache
     std.debug.print("🔄 Updating local cache...\n", .{});
     try updateLocalCache(allocator, metadata, target_registry);
-    
+
     // Success!
     std.debug.print("\n✅ Package published successfully!\n", .{});
     std.debug.print("   📦 Package: {s} v{s}\n", .{ metadata.name, metadata.version });
@@ -132,10 +132,10 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
         std.debug.print("   🔗 URL: {s}\n", .{url});
     }
     std.debug.print("   ⏱️  Upload time: {d}ms\n", .{upload_result.upload_time_ms});
-    
+
     std.debug.print("\n💡 To install this package:\n", .{});
     std.debug.print("   zion add {s}\n", .{metadata.name});
-    
+
     // Suggest documentation updates
     if (upload_result.first_publish) {
         std.debug.print("\n📋 Next steps:\n", .{});
@@ -155,7 +155,7 @@ const PublishOptions = struct {
     dry_run: bool = false,
     include_dev_deps: bool = false,
     compression_level: u8 = 6,
-    
+
     fn deinit(self: *PublishOptions, allocator: Allocator) void {
         if (self.registry) |registry| allocator.free(registry);
         if (self.tag) |tag| allocator.free(tag);
@@ -178,13 +178,13 @@ const PackageMetadata = struct {
     zig_version_max: ?[]const u8,
     dependencies: []const Dependency,
     dev_dependencies: []const Dependency,
-    
+
     const Dependency = struct {
         name: []const u8,
         version: []const u8,
         registry: ?[]const u8,
     };
-    
+
     fn deinit(self: PackageMetadata, allocator: Allocator) void {
         allocator.free(self.name);
         allocator.free(self.version);
@@ -193,23 +193,23 @@ const PackageMetadata = struct {
         if (self.license) |license| allocator.free(license);
         if (self.homepage) |homepage| allocator.free(homepage);
         if (self.repository) |repository| allocator.free(repository);
-        
+
         for (self.keywords) |keyword| allocator.free(keyword);
         if (self.keywords.len > 0) allocator.free(self.keywords);
-        
+
         for (self.categories) |category| allocator.free(category);
         if (self.categories.len > 0) allocator.free(self.categories);
-        
+
         if (self.zig_version_min) |ver| allocator.free(ver);
         if (self.zig_version_max) |ver| allocator.free(ver);
-        
+
         for (self.dependencies) |dep| {
             allocator.free(dep.name);
             allocator.free(dep.version);
             if (dep.registry) |registry| allocator.free(registry);
         }
         if (self.dependencies.len > 0) allocator.free(self.dependencies);
-        
+
         for (self.dev_dependencies) |dep| {
             allocator.free(dep.name);
             allocator.free(dep.version);
@@ -227,7 +227,7 @@ const UploadResult = struct {
     package_size: u64,
     first_publish: bool,
     registry_response: []const u8,
-    
+
     fn deinit(self: UploadResult, allocator: Allocator) void {
         if (self.package_url) |url| allocator.free(url);
         allocator.free(self.registry_response);
@@ -239,7 +239,7 @@ fn parsePublishOptions(options: *PublishOptions, args: []const []const u8, alloc
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
-        
+
         if (std.mem.eql(u8, arg, "--registry")) {
             if (i + 1 < args.len) {
                 options.registry = try allocator.dupe(u8, args[i + 1]);
@@ -310,7 +310,7 @@ fn validateProjectForPublishing() !void {
             try missing_docs.append(std.heap.page_allocator, file);
         };
     }
-    
+
     if (missing_docs.items.len > 0) {
         std.debug.print("⚠️  Recommended files missing:\n", .{});
         for (missing_docs.items) |file| {
@@ -360,13 +360,13 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
             license = try allocator.dupe(u8, license_type);
         }
     } else |_| {}
-    
+
     // Parse dependencies from ZON file
     var dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
     var dev_dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
-    
+
     // In a real implementation, would parse the ZON file structure
-    
+
     return PackageMetadata{
         .name = name,
         .version = version,
@@ -390,35 +390,35 @@ fn validatePackageMetadata(metadata: PackageMetadata) !void {
         std.debug.print("❌ Package name is required\n", .{});
         return error.InvalidMetadata;
     }
-    
+
     if (metadata.version.len == 0) {
         std.debug.print("❌ Package version is required\n", .{});
         return error.InvalidMetadata;
     }
-    
+
     // Validate version format (basic semver check)
     if (!isValidVersion(metadata.version)) {
         std.debug.print("❌ Invalid version format: {s}\n", .{metadata.version});
         std.debug.print("💡 Use semantic versioning (e.g., 1.0.0)\n", .{});
         return error.InvalidMetadata;
     }
-    
+
     // Validate name format
     if (!isValidPackageName(metadata.name)) {
         std.debug.print("❌ Invalid package name: {s}\n", .{metadata.name});
         std.debug.print("💡 Package names should contain only letters, numbers, hyphens, and underscores\n", .{});
         return error.InvalidMetadata;
     }
-    
+
     // Warn about missing recommended fields
     if (metadata.description == null) {
         std.debug.print("⚠️  No description provided\n", .{});
     }
-    
+
     if (metadata.license == null) {
         std.debug.print("⚠️  No license specified\n", .{});
     }
-    
+
     if (metadata.author == null) {
         std.debug.print("⚠️  No author specified\n", .{});
     }
@@ -430,7 +430,7 @@ fn checkExistingPackage(client: *registry_v2.RegistryClient, metadata: PackageMe
     var parts = std.mem.splitScalar(u8, metadata.name, '/');
     const owner = parts.next() orelse metadata.name;
     const repo = parts.next() orelse metadata.name;
-    
+
     return client.fetchPackageMetadata(owner, repo) catch null;
 }
 
@@ -500,7 +500,7 @@ fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, optio
         cwd.access(io, file, .{}) catch continue;
         try tar_args.append(allocator, file);
     }
-    
+
     std.debug.print("   Creating package archive...\n", .{});
     var tar_child = try std.process.spawn(io, .{
         .argv = tar_args.items,
@@ -566,10 +566,10 @@ fn verifyPackageIntegrity(allocator: Allocator, package_path: []const u8, metada
 fn signPackage(allocator: Allocator, package_path: []const u8, metadata: PackageMetadata) !security.PackageSignature {
     var security_manager = security.SecurityManager.init(allocator, "/tmp/zion-keys");
     defer security_manager.deinit();
-    
+
     // Generate or load signing key
     const keypair = try security_manager.generateKeyPair();
-    
+
     // Sign the package
     return try security_manager.signPackage(package_path, keypair.private_key, metadata.name);
 }
@@ -601,7 +601,7 @@ fn uploadPackage(
 
     var form_data: std.ArrayList(u8) = .empty;
     defer form_data.deinit(allocator);
-    
+
     // Add metadata
     try form_data.appendSlice(allocator, "--");
     try form_data.appendSlice(allocator, boundary);
@@ -609,7 +609,7 @@ fn uploadPackage(
     try form_data.appendSlice(allocator, "Content-Type: application/json\r\n\r\n");
     try form_data.appendSlice(allocator, metadata_json);
     try form_data.appendSlice(allocator, "\r\n");
-    
+
     // Add package file
     try form_data.appendSlice(allocator, "--");
     try form_data.appendSlice(allocator, boundary);
@@ -619,23 +619,23 @@ fn uploadPackage(
     try form_data.appendSlice(allocator, "\r\n--");
     try form_data.appendSlice(allocator, boundary);
     try form_data.appendSlice(allocator, "--\r\n");
-    
+
     // Get API URL for package upload
     const api_url = try client.config.getApiUrl(allocator);
     defer allocator.free(api_url);
-    
+
     const upload_url = try std.fmt.allocPrint(allocator, "{s}/packages", .{api_url});
     defer allocator.free(upload_url);
-    
+
     // Make upload request (simplified - real implementation would use HTTP client)
     const response = try client.makeRequest("POST", upload_url, form_data.items);
     defer allocator.free(response);
-    
+
     const end_time = zion_root.milliTimestamp();
-    
+
     // Parse response
     const parsed_response = try parseUploadResponse(allocator, response);
-    
+
     return UploadResult{
         .success = true,
         .package_url = parsed_response.package_url,
@@ -651,7 +651,7 @@ fn updateLocalCache(allocator: Allocator, metadata: PackageMetadata, registry: [
     _ = allocator;
     _ = metadata;
     _ = registry;
-    
+
     // In a real implementation, would update local package cache
     std.debug.print("   Local cache updated\n", .{});
 }
@@ -661,21 +661,21 @@ fn extractDescriptionFromReadme(allocator: Allocator, content: []const u8) ?[]co
     // Find first paragraph after title
     var lines = std.mem.splitSequence(u8, content, "\n");
     var found_title = false;
-    
+
     while (lines.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
-        
+
         if (trimmed.len == 0) continue;
         if (std.mem.startsWith(u8, trimmed, "#")) {
             found_title = true;
             continue;
         }
-        
+
         if (found_title and !std.mem.startsWith(u8, trimmed, "!") and !std.mem.startsWith(u8, trimmed, "[")) {
             return allocator.dupe(u8, trimmed) catch null;
         }
     }
-    
+
     return null;
 }
 
@@ -687,13 +687,13 @@ fn detectLicenseType(content: []const u8) ?[]const u8 {
         .{ .indicator = "BSD 3-Clause", .license = "BSD-3-Clause" },
         .{ .indicator = "ISC License", .license = "ISC" },
     };
-    
+
     for (license_indicators) |item| {
         if (std.mem.indexOf(u8, content, item.indicator) != null) {
             return item.license;
         }
     }
-    
+
     return null;
 }
 
@@ -701,26 +701,26 @@ fn isValidVersion(version: []const u8) bool {
     // Basic semver validation
     var parts = std.mem.splitSequence(u8, version, ".");
     var count: u8 = 0;
-    
+
     while (parts.next()) |part| {
         count += 1;
         if (count > 3) return false;
-        
+
         _ = std.fmt.parseInt(u32, part, 10) catch return false;
     }
-    
+
     return count >= 2; // At least major.minor
 }
 
 fn isValidPackageName(name: []const u8) bool {
     if (name.len == 0) return false;
-    
+
     for (name) |c| {
         if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '_' and c != '/') {
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -749,7 +749,7 @@ const UploadResponse = struct {
 fn parseUploadResponse(allocator: Allocator, response: []const u8) !UploadResponse {
     // Simplified response parsing
     _ = response;
-    
+
     return UploadResponse{
         .package_url = try allocator.dupe(u8, "https://example.com/packages/test"),
         .first_publish = true,

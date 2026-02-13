@@ -5,7 +5,7 @@ pub const LogLevel = enum(u8) {
     info = 1,
     warn = 2,
     err = 3,
-    
+
     pub fn fromString(level_str: []const u8) LogLevel {
         if (std.mem.eql(u8, level_str, "debug")) return .debug;
         if (std.mem.eql(u8, level_str, "info")) return .info;

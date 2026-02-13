@@ -18,7 +18,7 @@ pub fn add(allocator: Allocator, package_ref: []const u8, options: AddOptions) !
     // Load enhanced configuration
     var config = try enhanced_config.ZionConfig.load(allocator);
     defer config.deinit();
-    
+
     // Check if this is an alias first
     if (config.expandAlias(package_ref)) |dependencies| {
         std.debug.print("📦 Expanding alias '{s}' to {d} dependencies:\n", .{ package_ref, dependencies.len });
@@ -26,14 +26,14 @@ pub fn add(allocator: Allocator, package_ref: []const u8, options: AddOptions) !
             std.debug.print("  • {s}\n", .{dep});
         }
         std.debug.print("\n", .{});
-        
+
         // Add each dependency in the alias
         for (dependencies) |dep| {
             try addSingleDependency(allocator, dep, &config, options);
         }
         return;
     }
-    
+
     // Single package add
     try addSingleDependency(allocator, package_ref, &config, options);
 }
@@ -43,23 +43,23 @@ pub const AddOptions = struct {
     // Version constraints
     version: ?[]const u8 = null,
     version_range: ?[]const u8 = null,
-    
+
     // Development dependencies
     dev_only: bool = false,
-    
+
     // Build integration
     auto_integrate: bool = true,
-    
+
     // Registry options
     prefer_registry: ?[]const u8 = null,
-    
+
     // Security options
     verify_signatures: bool = false,
     require_license: ?[]const u8 = null,
-    
+
     // Update behavior
     update_if_exists: bool = false,
-    
+
     // Dry run
     dry_run: bool = false,
 };
@@ -67,16 +67,16 @@ pub const AddOptions = struct {
 /// Add a single dependency with enhanced v0.7.0 features
 fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *enhanced_config.ZionConfig, options: AddOptions) !void {
     std.debug.print("🔍 Resolving package: {s}\n", .{package_ref});
-    
+
     // Initialize registry manager
     var manager = registry_manager.RegistryManager.init(allocator, config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Resolve package across registries
     const package = try manager.resolvePackage(package_ref, options.version) orelse {
         std.debug.print("❌ Package not found: {s}\n", .{package_ref});
-        
+
         // Suggest similar packages
         std.debug.print("🔍 Searching for similar packages...\n", .{});
         const search_results = try manager.searchPackages(package_ref, .{
@@ -86,7 +86,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             for (search_results) |pkg| pkg.deinit(allocator);
             allocator.free(search_results);
         }
-        
+
         if (search_results.len > 0) {
             std.debug.print("\n💡 Did you mean:\n", .{});
             for (search_results) |pkg| {
@@ -99,7 +99,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         return error.PackageNotFound;
     };
     defer package.deinit(allocator);
-    
+
     // Display package information
     std.debug.print("\n📦 Found package: {s}\n", .{package.full_name});
     std.debug.print("   Version: {s}\n", .{package.version});
@@ -121,7 +121,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         }
         std.debug.print("\n", .{});
     }
-    
+
     // Check license compatibility
     if (options.require_license) |required_license| {
         if (package.license == null or !isLicenseCompatible(package.license.?, required_license)) {
@@ -132,16 +132,16 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             return error.LicenseIncompatible;
         }
     }
-    
+
     // Analyze dependencies
     std.debug.print("\n🔍 Analyzing dependencies...\n", .{});
     var dep_analysis = try manager.analyzeDependencies(package.full_name);
     defer dep_analysis.deinit();
-    
+
     if (dep_analysis.total_dependencies > 0) {
         std.debug.print("   Total dependencies: {d}\n", .{dep_analysis.total_dependencies});
     }
-    
+
     if (dep_analysis.conflicts.items.len > 0) {
         std.debug.print("\n⚠️  Dependency conflicts detected:\n", .{});
         for (dep_analysis.conflicts.items) |conflict| {
@@ -151,17 +151,17 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             }
             std.debug.print("\n", .{});
         }
-        
+
         if (!options.update_if_exists) {
             return error.DependencyConflict;
         }
     }
-    
+
     if (options.dry_run) {
         std.debug.print("\n🔍 Dry run complete. No changes made.\n", .{});
         return;
     }
-    
+
     // Check if build.zig.zon exists
     const zon_path = "build.zig.zon";
     const io = try zion_root.getIo();
@@ -174,7 +174,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         }
         return err;
     };
-    
+
     // Get download information
     const download_info = try manager.getPackageDownload(package.full_name, package.version);
     defer {
@@ -182,59 +182,59 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         if (download_info.sha256_hash) |hash| allocator.free(hash);
         allocator.free(download_info.registry_name);
     }
-    
+
     // Download with parallel downloader for performance
     std.debug.print("\n📥 Downloading from {s}...\n", .{download_info.registry_name});
-    
+
     const download_result = if (config.concurrent_downloads > 1)
         try parallel_downloader.downloadSingleWithProgress(allocator, download_info.url, package.full_name)
     else
         try downloader.downloadAndHashPackage(allocator, package.full_name);
-    
+
     defer {
         allocator.free(download_result.url);
         allocator.free(download_result.hash);
         allocator.free(download_result.cache_path);
     }
-    
+
     // Verify signatures if requested
     if (options.verify_signatures) {
         std.debug.print("🔐 Verifying package signatures...\n", .{});
         const verification_result = try security.verifyPackageSignature(allocator, download_result.cache_path, package.full_name);
         defer verification_result.deinit();
-        
+
         if (!verification_result.valid) {
             std.debug.print("❌ Signature verification failed: {s}\n", .{verification_result.message});
             return error.SignatureVerificationFailed;
         }
         std.debug.print("✅ Signature verified by: {s}\n", .{verification_result.signer});
     }
-    
+
     // Extract the package
     const package_name = package.name;
     try ensureDepsDir(options.dev_only);
-    
+
     const deps_path = if (options.dev_only)
         try std.fmt.allocPrint(allocator, ".zion/dev-deps/{s}", .{package_name})
     else
         try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
     defer allocator.free(deps_path);
-    
+
     std.debug.print("📦 Extracting package to {s}...\n", .{deps_path});
     try extractTarball(allocator, download_result.cache_path, deps_path);
-    
+
     // Update build.zig.zon
     std.debug.print("📝 Updating build.zig.zon...\n", .{});
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
     defer zon_file.deinit();
-    
+
     // Add dependency with metadata
     if (options.dev_only) {
         try zon_file.addDevDependency(package_name, download_result.url, download_result.hash);
     } else {
         try zon_file.addDependency(package_name, download_result.url, download_result.hash);
     }
-    
+
     // Add metadata comments
     const metadata = try std.fmt.allocPrint(allocator,
         \\// {s} v{s} from {s}
@@ -248,23 +248,23 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         zion_root.timestamp(),
     });
     defer allocator.free(metadata);
-    
+
     try zon_file.addComment(package_name, metadata);
     try zon_file.saveToFile(zon_path);
-    
+
     // Update lock file with enhanced information
     std.debug.print("🔒 Updating lock file...\n", .{});
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
-    
+
     // Convert dependencies to the expected format
     var dep_names: std.ArrayList([]const u8) = .{};
     defer dep_names.deinit(allocator);
-    
+
     for (package.dependencies) |dep| {
         try dep_names.append(allocator, try allocator.dupe(u8, dep.name));
     }
-    
+
     try lock_file.addPackageWithMetadata(
         package_name,
         download_result.url,
@@ -279,7 +279,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         },
     );
     try lock_file.saveToFile();
-    
+
     // Auto-integrate into build.zig if requested
     if (options.auto_integrate) {
         std.debug.print("🔧 Updating build.zig...\n", .{});
@@ -289,7 +289,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             try printEnhancedBuildInstructions(package_name, deps_path, options.dev_only);
         };
     }
-    
+
     // Success summary
     std.debug.print("\n✅ Successfully added {s} v{s}\n", .{ package.full_name, package.version });
     std.debug.print("   📦 Package location: {s}\n", .{deps_path});
@@ -300,9 +300,9 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     if (package.repository_url) |repo_url| {
         std.debug.print("   📂 Repository: {s}\n", .{repo_url});
     }
-    
+
     std.debug.print("\n🚀 Run 'zig build' to verify the integration.\n", .{});
-    
+
     // Show update notification if package has newer version
     // This would check against the registry in a real implementation
 }
@@ -310,39 +310,39 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
 /// Add multiple packages with parallel processing
 pub fn addMultiple(allocator: Allocator, packages: []const []const u8, options: AddOptions) !void {
     std.debug.print("📦 Adding {d} packages...\n\n", .{packages.len});
-    
+
     var success_count: usize = 0;
     var error_count: usize = 0;
     var errors: std.ArrayList(struct { package: []const u8, err: anyerror }) = .{};
     defer errors.deinit(allocator);
-    
+
     // Process packages
     for (packages, 0..) |package_ref, i| {
         std.debug.print("[{d}/{d}] Processing {s}...\n", .{ i + 1, packages.len, package_ref });
-        
+
         add(allocator, package_ref, options) catch |err| {
             error_count += 1;
             try errors.append(allocator, .{ .package = package_ref, .err = err });
             std.debug.print("❌ Failed to add {s}: {}\n\n", .{ package_ref, err });
             continue;
         };
-        
+
         success_count += 1;
         std.debug.print("\n", .{});
     }
-    
+
     // Summary
     std.debug.print("\n📊 Summary:\n", .{});
     std.debug.print("   ✅ Successful: {d}\n", .{success_count});
     std.debug.print("   ❌ Failed: {d}\n", .{error_count});
-    
+
     if (errors.items.len > 0) {
         std.debug.print("\n❌ Failed packages:\n", .{});
         for (errors.items) |item| {
             std.debug.print("   • {s}: {}\n", .{ item.package, item.err });
         }
     }
-    
+
     if (success_count > 0) {
         std.debug.print("\n🚀 Run 'zig build' to verify all integrations.\n", .{});
     }
@@ -358,14 +358,15 @@ fn isLicenseCompatible(package_license: []const u8, required_license: []const u8
         .{ "BSD-3-Clause", "MIT" },
         .{ "ISC", "MIT" },
     };
-    
+
     for (compatible_pairs) |pair| {
         if ((std.mem.eql(u8, package_license, pair[0]) and std.mem.eql(u8, required_license, pair[1])) or
-            (std.mem.eql(u8, package_license, pair[1]) and std.mem.eql(u8, required_license, pair[0]))) {
+            (std.mem.eql(u8, package_license, pair[1]) and std.mem.eql(u8, required_license, pair[0])))
+        {
             return true;
         }
     }
-    
+
     return std.mem.eql(u8, package_license, required_license);
 }
 
@@ -466,14 +467,14 @@ fn printEnhancedBuildInstructions(package_name: []const u8, deps_path: []const u
         std.debug.print("To use this dependency in your project:\n", .{});
     }
     std.debug.print("\n", .{});
-    
+
     std.debug.print("// In your build.zig, add:\n", .{});
     std.debug.print("const {s} = b.dependency(\"{s}\", .{{\n", .{ package_name, package_name });
     std.debug.print("    .target = target,\n", .{});
     std.debug.print("    .optimize = optimize,\n", .{});
     std.debug.print("}});\n", .{});
     std.debug.print("\n", .{});
-    
+
     if (dev_only) {
         std.debug.print("// For test targets:\n", .{});
         std.debug.print("const test_step = b.step(\"test\", \"Run tests\");\n", .{});
@@ -483,8 +484,7 @@ fn printEnhancedBuildInstructions(package_name: []const u8, deps_path: []const u
         std.debug.print("exe.root_module.addImport(\"{s}\", {s}.module(\"{s}\"));\n", .{ package_name, package_name, package_name });
     }
     std.debug.print("\n", .{});
-    
+
     std.debug.print("// Then in your Zig code:\n", .{});
     std.debug.print("const {s} = @import(\"{s}\");\n", .{ package_name, package_name });
 }
-

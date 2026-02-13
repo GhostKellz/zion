@@ -257,7 +257,7 @@ fn printEnhancedTableList(allocator: Allocator, zon_file: *ZonFile, lock_file: *
                 locked_pkg.version orelse "unknown"
             else
                 "unknown";
-            
+
             std.debug.print("{s:<20} {s:<10} {s:<30} {s:<12} {s}\n", .{
                 pkg_name[0..@min(pkg_name.len, 19)],
                 status,

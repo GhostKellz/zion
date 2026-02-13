@@ -2,6 +2,7 @@ const std = @import("std");
 const zsync = @import("zsync");
 const http_client = @import("http_client.zig");
 const Allocator = std.mem.Allocator;
+const zion_root = @import("root.zig");
 
 /// Request batcher for reducing API calls by grouping similar requests
 pub const RequestBatcher = struct {
@@ -11,9 +12,9 @@ pub const RequestBatcher = struct {
     batches: std.HashMap([]const u8, *RequestBatch),
     config: BatchConfig,
     stats: BatchStats,
-    
+
     const Self = @This();
-    
+
     pub fn init(allocator: Allocator, runtime: *zsync.Runtime, client: *http_client.HttpClient, config: BatchConfig) !*Self {
         const batcher = try allocator.create(Self);
         batcher.* = .{
@@ -24,10 +25,10 @@ pub const RequestBatcher = struct {
             .config = config,
             .stats = BatchStats.init(),
         };
-        
+
         return batcher;
     }
-    
+
     pub fn deinit(self: *Self) void {
         // Clean up batches
         var iterator = self.batches.iterator();
@@ -37,36 +38,36 @@ pub const RequestBatcher = struct {
             self.allocator.destroy(entry.value_ptr.*);
         }
         self.batches.deinit(allocator);
-        
+
         self.allocator.destroy(self);
     }
-    
+
     /// Add a request to the appropriate batch
     pub fn addRequest(self: *Self, request: BatchableRequest) !*zsync.Future(BatchedResult) {
         const batch_key = try self.getBatchKey(request);
-        
+
         // Get or create batch
         var batch = self.batches.get(batch_key) orelse blk: {
             const new_batch = try self.allocator.create(RequestBatch);
             new_batch.* = RequestBatch.init(self.allocator, batch_key, self.config);
-            
+
             const owned_key = try self.allocator.dupe(u8, batch_key);
             try self.batches.put(owned_key, new_batch);
-            
+
             break :blk new_batch;
         };
-        
+
         // Add request to batch
         const future = try batch.addRequest(request);
-        
+
         // Check if batch should be executed
         if (batch.shouldExecute()) {
             try self.executeBatch(batch);
         }
-        
+
         return future;
     }
-    
+
     /// Force execution of all pending batches
     pub fn flushAll(self: *Self) !void {
         var iterator = self.batches.iterator();
@@ -77,17 +78,17 @@ pub const RequestBatcher = struct {
             }
         }
     }
-    
+
     /// Execute a batch of requests
     fn executeBatch(self: *Self, batch: *RequestBatch) !void {
-        const start_time = std.time.milliTimestamp();
-        
+        const start_time = zion_root.milliTimestamp();
+
         // Update stats
         self.stats.batches_executed += 1;
         self.stats.total_requests += batch.requests.items.len;
-        
+
         std.log.debug("🔄 Executing batch '{s}' with {d} requests", .{ batch.key, batch.requests.items.len });
-        
+
         // Execute batch based on type
         switch (batch.batch_type) {
             .Search => try self.executeBatchSearch(batch),
@@ -95,43 +96,44 @@ pub const RequestBatcher = struct {
             .Download => try self.executeBatchDownload(batch),
             .Registry => try self.executeBatchRegistry(batch),
         }
-        
-        const duration = std.time.milliTimestamp() - start_time;
+
+        const duration = zion_root.milliTimestamp() - start_time;
         self.stats.total_time_ms += @intCast(duration);
-        
+
         // Calculate API call reduction
         const potential_calls = batch.requests.items.len;
         const actual_calls = @as(u32, 1); // Batched into single call
-        const reduction = if (potential_calls > 0) 
+        const reduction = if (potential_calls > 0)
             @as(f64, @floatFromInt(potential_calls - actual_calls)) / @as(f64, @floatFromInt(potential_calls))
-        else 0.0;
-        
+        else
+            0.0;
+
         self.stats.api_calls_saved += potential_calls - actual_calls;
-        
+
         std.log.debug("✅ Batch executed in {d}ms ({d}% API call reduction)", .{ duration, @as(u32, @intFromFloat(reduction * 100)) });
     }
-    
+
     /// Execute a batch of search requests
     fn executeBatchSearch(self: *Self, batch: *RequestBatch) !void {
         // Combine all search queries into a single request
         var combined_query: std.ArrayList([]const u8) = .{};
         defer combined_query.deinit(self.allocator);
-        
+
         for (batch.requests.items) |request| {
             try combined_query.append(self.allocator, request.search_query orelse "");
         }
-        
+
         // Create batch search URL
         const query_param = try std.mem.join(self.allocator, " OR ", combined_query.items);
         defer self.allocator.free(query_param);
-        
+
         const url = try std.fmt.allocPrint(self.allocator, "/api/search?q={s}&limit={d}", .{ query_param, batch.requests.items.len * 10 });
         defer self.allocator.free(url);
-        
+
         // Execute batch request
         const response = try self.http_client.get(url);
         defer response.deinit(self.allocator);
-        
+
         // Parse and distribute results
         if (response.isSuccess() and response.body != null) {
             // Parse JSON response for search results
@@ -151,36 +153,36 @@ pub const RequestBatcher = struct {
                     .from_cache = false,
                     .batch_size = @intCast(batch.requests.items.len),
                 };
-                
+
                 request.future.complete(result);
             }
         }
-        
+
         // Clear batch
         batch.clear();
     }
-    
+
     /// Execute a batch of package info requests
     fn executeBatchPackageInfo(self: *Self, batch: *RequestBatch) !void {
         // Combine all package names into a single request
         var package_names: std.ArrayList([]const u8) = .{};
         defer package_names.deinit(self.allocator);
-        
+
         for (batch.requests.items) |request| {
             try package_names.append(self.allocator, request.package_name orelse "");
         }
-        
+
         // Create batch package info URL
         const packages_param = try std.mem.join(self.allocator, ",", package_names.items);
         defer self.allocator.free(packages_param);
-        
+
         const url = try std.fmt.allocPrint(self.allocator, "/api/packages?names={s}", .{packages_param});
         defer self.allocator.free(url);
-        
+
         // Execute batch request
         const response = try self.http_client.get(url);
         defer response.deinit(self.allocator);
-        
+
         // Parse and distribute results
         if (response.isSuccess() and response.body != null) {
             // Parse JSON response for package info
@@ -200,50 +202,50 @@ pub const RequestBatcher = struct {
                     .from_cache = false,
                     .batch_size = @intCast(batch.requests.items.len),
                 };
-                
+
                 request.future.complete(result);
             }
         }
-        
+
         // Clear batch
         batch.clear();
     }
-    
+
     /// Execute a batch of download requests
     fn executeBatchDownload(self: *Self, batch: *RequestBatch) !void {
         // Downloads are typically executed individually for security/integrity
         // But we can still batch the metadata requests
-        
+
         var download_futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
         defer download_futures.deinit(self.allocator);
-        
+
         // Start parallel downloads
         for (batch.requests.items) |request| {
             const future = try self.downloadSingleAsync(request);
             try download_futures.append(self.allocator, future);
         }
-        
+
         // Wait for all downloads to complete
         for (download_futures.items, 0..) |future, i| {
             const result = try future.await();
             future.deinit(allocator);
-            
+
             // Complete the original request
             batch.requests.items[i].future.complete(result);
         }
-        
+
         // Clear batch
         batch.clear();
     }
-    
+
     /// Execute a batch of registry requests
     fn executeBatchRegistry(self: *Self, batch: *RequestBatch) !void {
         // Registry health checks can be batched
         const url = "/api/health";
-        
+
         const response = try self.http_client.get(url);
         defer response.deinit(self.allocator);
-        
+
         // Distribute results to all requests
         for (batch.requests.items) |request| {
             const result = BatchedResult{
@@ -253,20 +255,20 @@ pub const RequestBatcher = struct {
                 .from_cache = false,
                 .batch_size = @intCast(batch.requests.items.len),
             };
-            
+
             request.future.complete(result);
         }
-        
+
         // Clear batch
         batch.clear();
     }
-    
+
     /// Download a single file asynchronously
     fn downloadSingleAsync(self: *Self, request: BatchableRequest) !*zsync.Future(BatchedResult) {
         const Task = struct {
             batcher: *RequestBatcher,
             url: []const u8,
-            
+
             fn run(task: @This()) BatchedResult {
                 const response = task.batcher.http_client.get(task.url) catch |err| {
                     return BatchedResult{
@@ -278,7 +280,7 @@ pub const RequestBatcher = struct {
                     };
                 };
                 defer response.deinit(task.batcher.allocator);
-                
+
                 return BatchedResult{
                     .success = response.isSuccess(),
                     .data = response.body,
@@ -288,15 +290,15 @@ pub const RequestBatcher = struct {
                 };
             }
         };
-        
+
         const task = Task{
             .batcher = self,
             .url = request.download_url orelse "",
         };
-        
+
         return try zsync.spawn(self.runtime, task, Task.run);
     }
-    
+
     /// Generate batch key for grouping requests
     fn getBatchKey(self: *Self, request: BatchableRequest) ![]const u8 {
         _ = self;
@@ -307,17 +309,17 @@ pub const RequestBatcher = struct {
             .Registry => try std.fmt.allocPrint(self.allocator, "registry:{s}", .{request.registry_name orelse "default"}),
         };
     }
-    
+
     /// Get batch statistics
     pub fn getStats(self: *const Self) BatchStats {
         return self.stats;
     }
-    
+
     /// Reset batch statistics
     pub fn resetStats(self: *Self) void {
         self.stats = BatchStats.init();
     }
-    
+
     /// Parse search results JSON and distribute to individual futures
     fn parseAndDistributeSearchResults(self: *Self, batch: *RequestBatch, json_body: []const u8) !void {
         // Basic JSON structure expected: {"packages": [{"name": "...", "version": "...", ...}, ...]}
@@ -337,10 +339,11 @@ pub const RequestBatcher = struct {
             return;
         };
         defer parsed.deinit(allocator);
-        
+
         // Extract packages array
-        const packages_array = if (parsed.value.object.get("packages")) |packages| 
-            packages.array else {
+        const packages_array = if (parsed.value.object.get("packages")) |packages|
+            packages.array
+        else {
             // No packages array found, distribute raw data
             for (batch.requests.items) |request| {
                 const result = BatchedResult{
@@ -354,7 +357,7 @@ pub const RequestBatcher = struct {
             }
             return;
         };
-        
+
         // Distribute search results to matching requests
         for (batch.requests.items) |request| {
             // For search requests, return all results for now
@@ -369,7 +372,7 @@ pub const RequestBatcher = struct {
             request.future.complete(result);
         }
     }
-    
+
     /// Parse package info JSON and distribute to individual futures
     fn parseAndDistributePackageInfo(self: *Self, batch: *RequestBatch, json_body: []const u8) !void {
         // Basic JSON structure expected: {"packages": {"pkg1": {...}, "pkg2": {...}, ...}}
@@ -380,18 +383,19 @@ pub const RequestBatcher = struct {
             return;
         };
         defer parsed.deinit(allocator);
-        
+
         // Extract packages object
-        const packages_obj = if (parsed.value.object.get("packages")) |packages| 
-            packages.object else {
+        const packages_obj = if (parsed.value.object.get("packages")) |packages|
+            packages.object
+        else {
             self.handleBatchError(batch, "Invalid JSON structure");
             return;
         };
-        
+
         // Distribute package info to matching requests
         for (batch.requests.items) |request| {
             const package_name = request.package_name orelse "";
-            
+
             if (packages_obj.get(package_name)) |package_info| {
                 // Found specific package info
                 const package_json = std.json.stringifyAlloc(self.allocator, package_info, .{}) catch {
@@ -406,7 +410,7 @@ pub const RequestBatcher = struct {
                     continue;
                 };
                 defer self.allocator.free(package_json);
-                
+
                 const result = BatchedResult{
                     .success = true,
                     .data = try self.allocator.dupe(u8, package_json),
@@ -428,7 +432,7 @@ pub const RequestBatcher = struct {
             }
         }
     }
-    
+
     /// Handle batch errors by distributing error results to all requests
     fn handleBatchError(self: *Self, batch: *RequestBatch, error_message: []const u8) void {
         for (batch.requests.items) |request| {
@@ -458,7 +462,7 @@ pub const BatchStats = struct {
     total_requests: u32,
     api_calls_saved: u32,
     total_time_ms: u64,
-    
+
     fn init() BatchStats {
         return BatchStats{
             .batches_executed = 0,
@@ -467,13 +471,13 @@ pub const BatchStats = struct {
             .total_time_ms = 0,
         };
     }
-    
+
     /// Get API call reduction percentage
     pub fn getReductionPercentage(self: *const BatchStats) f64 {
         if (self.total_requests == 0) return 0.0;
         return @as(f64, @floatFromInt(self.api_calls_saved)) / @as(f64, @floatFromInt(self.total_requests)) * 100.0;
     }
-    
+
     /// Get average batch size
     pub fn getAverageBatchSize(self: *const BatchStats) f64 {
         if (self.batches_executed == 0) return 0.0;
@@ -497,7 +501,7 @@ pub const BatchableRequest = struct {
     package_name: ?[]const u8 = null,
     download_url: ?[]const u8 = null,
     future: *Future(BatchedResult),
-    
+
     pub fn createSearchRequest(allocator: Allocator, registry: []const u8, query: []const u8) !BatchableRequest {
         return BatchableRequest{
             .request_type = .Search,
@@ -506,7 +510,7 @@ pub const BatchableRequest = struct {
             .future = try Future(BatchedResult).init(allocator),
         };
     }
-    
+
     pub fn createPackageInfoRequest(allocator: Allocator, registry: []const u8, package_name: []const u8) !BatchableRequest {
         return BatchableRequest{
             .request_type = .PackageInfo,
@@ -515,7 +519,7 @@ pub const BatchableRequest = struct {
             .future = try Future(BatchedResult).init(allocator),
         };
     }
-    
+
     pub fn createDownloadRequest(allocator: Allocator, registry: []const u8, url: []const u8) !BatchableRequest {
         return BatchableRequest{
             .request_type = .Download,
@@ -524,7 +528,7 @@ pub const BatchableRequest = struct {
             .future = try Future(BatchedResult).init(allocator),
         };
     }
-    
+
     pub fn deinit(self: *BatchableRequest, allocator: Allocator) void {
         if (self.registry_name) |name| allocator.free(name);
         if (self.search_query) |query| allocator.free(query);
@@ -551,7 +555,7 @@ const RequestBatch = struct {
     requests: std.ArrayList(BatchableRequest),
     created_at: i64,
     config: BatchConfig,
-    
+
     fn init(allocator: Allocator, key: []const u8, config: BatchConfig) RequestBatch {
         // Determine batch type from key
         const batch_type = if (std.mem.startsWith(u8, key, "search:"))
@@ -562,55 +566,55 @@ const RequestBatch = struct {
             RequestType.Download
         else
             RequestType.Registry;
-        
+
         return RequestBatch{
             .allocator = allocator,
             .key = key,
             .batch_type = batch_type,
             .requests = .{},
-            .created_at = std.time.milliTimestamp(),
+            .created_at = zion_root.milliTimestamp(),
             .config = config,
         };
     }
-    
+
     fn deinit(self: *RequestBatch) void {
         for (self.requests.items) |*request| {
             request.deinit(self.allocator);
         }
         self.requests.deinit(self.allocator);
     }
-    
+
     fn addRequest(self: *RequestBatch, request: BatchableRequest) !*zsync.Future(BatchedResult) {
         try self.requests.append(allocator, request);
         return request.future;
     }
-    
+
     fn shouldExecute(self: *const RequestBatch) bool {
         // Execute if batch is full
         if (self.requests.items.len >= self.config.max_batch_size) {
             return true;
         }
-        
+
         // Execute if batch has been waiting too long
-        const now = std.time.milliTimestamp();
+        const now = zion_root.milliTimestamp();
         const wait_time = now - self.created_at;
         if (wait_time >= self.config.max_wait_time_ms) {
             return true;
         }
-        
+
         return false;
     }
-    
+
     fn hasPendingRequests(self: *const RequestBatch) bool {
         return self.requests.items.len > 0;
     }
-    
+
     fn clear(self: *RequestBatch) void {
         for (self.requests.items) |*request| {
             request.deinit(self.allocator);
         }
         self.requests.clearRetainingCapacity();
-        self.created_at = std.time.milliTimestamp();
+        self.created_at = zion_root.milliTimestamp();
     }
 };
 
@@ -622,7 +626,7 @@ const Future = struct {
     completed: bool,
     mutex: std.Thread.Mutex,
     condition: std.Thread.Condition,
-    
+
     fn init(allocator: Allocator, comptime T: type) !*Future(T) {
         const future = try allocator.create(Future(T));
         future.* = Future(T){
@@ -635,28 +639,28 @@ const Future = struct {
         };
         return future;
     }
-    
+
     fn deinit(self: *Future(T)) void {
         self.allocator.destroy(self);
     }
-    
+
     fn complete(self: *Future(T), result: T) void {
         self.mutex.lock();
         defer self.mutex.unlock();
-        
+
         self.result = result;
         self.completed = true;
         self.condition.broadcast();
     }
-    
+
     fn await(self: *Future(T)) T {
         self.mutex.lock();
         defer self.mutex.unlock();
-        
+
         while (!self.completed) {
             self.condition.wait(&self.mutex);
         }
-        
+
         return self.result.?;
     }
 };
@@ -670,23 +674,23 @@ pub fn batchedSearch(
 ) ![]BatchedResult {
     var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
     defer futures.deinit(allocator);
-    
+
     // Submit all search requests
     for (queries) |query| {
         const request = try BatchableRequest.createSearchRequest(allocator, registry, query);
         const future = try batcher.addRequest(request);
         try futures.append(allocator, future);
     }
-    
+
     // Force flush to ensure execution
     try batcher.flushAll();
-    
+
     // Collect results
     var results = try allocator.alloc(BatchedResult, futures.items.len);
     for (futures.items, 0..) |future, i| {
         results[i] = try future.await();
     }
-    
+
     return results;
 }
 
@@ -699,22 +703,22 @@ pub fn batchedPackageInfo(
 ) ![]BatchedResult {
     var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
     defer futures.deinit(allocator);
-    
+
     // Submit all package info requests
     for (package_names) |name| {
         const request = try BatchableRequest.createPackageInfoRequest(allocator, registry, name);
         const future = try batcher.addRequest(request);
         try futures.append(allocator, future);
     }
-    
+
     // Force flush to ensure execution
     try batcher.flushAll();
-    
+
     // Collect results
     var results = try allocator.alloc(BatchedResult, futures.items.len);
     for (futures.items, 0..) |future, i| {
         results[i] = try future.await();
     }
-    
+
     return results;
 }

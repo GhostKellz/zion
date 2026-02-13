@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
-const Mutex = std.Thread.Mutex;
 const fs = std.fs;
 const Dir = std.Io.Dir;
 const Io = std.Io;
@@ -52,20 +51,20 @@ pub const ConnectionPool = struct {
     allocator: Allocator,
     max_connections: u8,
     active_connections: u8,
-    mutex: Mutex,
+    mutex: std.c.pthread_mutex_t,
 
     pub fn init(allocator: Allocator, max_connections: u8) ConnectionPool {
         return ConnectionPool{
             .allocator = allocator,
             .max_connections = max_connections,
             .active_connections = 0,
-            .mutex = Mutex{},
+            .mutex = std.c.PTHREAD_MUTEX_INITIALIZER,
         };
     }
 
     pub fn acquire(self: *ConnectionPool) bool {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         if (self.active_connections < self.max_connections) {
             self.active_connections += 1;
@@ -75,8 +74,8 @@ pub const ConnectionPool = struct {
     }
 
     pub fn release(self: *ConnectionPool) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         if (self.active_connections > 0) {
             self.active_connections -= 1;
@@ -90,7 +89,7 @@ pub const SmartCache = struct {
     config: CacheConfig,
     cache_dir: []const u8,
     metrics: Metrics,
-    mutex: Mutex,
+    mutex: std.c.pthread_mutex_t,
 
     pub fn init(allocator: Allocator, config: CacheConfig, cache_dir: []const u8) SmartCache {
         return SmartCache{
@@ -98,7 +97,7 @@ pub const SmartCache = struct {
             .config = config,
             .cache_dir = cache_dir,
             .metrics = Metrics{},
-            .mutex = Mutex{},
+            .mutex = std.c.PTHREAD_MUTEX_INITIALIZER,
         };
     }
 
@@ -132,8 +131,8 @@ pub const SmartCache = struct {
 
     /// Get cached content if available
     pub fn getCached(self: *SmartCache, url: []const u8) ?[]const u8 {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         if (!self.isCached(url)) {
             self.metrics.cache_misses += 1;
@@ -163,8 +162,8 @@ pub const SmartCache = struct {
 
     /// Store content in cache with optional compression
     pub fn store(self: *SmartCache, url: []const u8, content: []const u8) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -232,7 +231,7 @@ pub const ParallelDownloader = struct {
     connection_pool: ConnectionPool,
     job_queue: std.ArrayList(DownloadJob),
     workers: []Thread,
-    mutex: Mutex,
+    mutex: std.c.pthread_mutex_t,
     running: bool,
 
     pub fn init(allocator: Allocator, cache: *SmartCache, max_workers: u8) !ParallelDownloader {
@@ -242,7 +241,7 @@ pub const ParallelDownloader = struct {
             .connection_pool = ConnectionPool.init(allocator, max_workers),
             .job_queue = .{},
             .workers = try allocator.alloc(Thread, max_workers),
-            .mutex = Mutex{},
+            .mutex = std.c.PTHREAD_MUTEX_INITIALIZER,
             .running = false,
         };
     }
@@ -255,10 +254,10 @@ pub const ParallelDownloader = struct {
 
     /// Add a download job to the queue
     pub fn addJob(self: *ParallelDownloader, job: DownloadJob) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
-        try self.job_queue.append(job);
+        try self.job_queue.append(self.allocator, job);
     }
 
     /// Start worker threads
@@ -285,8 +284,8 @@ pub const ParallelDownloader = struct {
 
         while (self.running) {
             const job = blk: {
-                self.mutex.lock();
-                defer self.mutex.unlock();
+                _ = std.c.pthread_mutex_lock(&self.mutex);
+                defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
                 if (self.job_queue.items.len == 0) break :blk null;
                 break :blk self.job_queue.orderedRemove(0);
@@ -349,10 +348,10 @@ pub const ParallelDownloader = struct {
 
         self.cache.store(job.url, content) catch {};
 
-        self.cache.mutex.lock();
+        _ = std.c.pthread_mutex_lock(&self.cache.mutex);
         self.cache.metrics.successful_downloads += 1;
         self.cache.metrics.bytes_downloaded += content.len;
-        self.cache.mutex.unlock();
+        _ = std.c.pthread_mutex_unlock(&self.cache.mutex);
     }
 
     /// Download using curl (simplified implementation)

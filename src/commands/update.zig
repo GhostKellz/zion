@@ -35,7 +35,7 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
     var dry_run = false;
     var specific_packages = std.ArrayList([]const u8){};
     defer specific_packages.deinit(allocator);
-    
+
     // Process arguments starting from index 2 (skip "zion update")
     var i: usize = 2;
     while (i < args.len) : (i += 1) {
@@ -50,7 +50,7 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
             try specific_packages.append(allocator, arg);
         }
     }
-    
+
     if (dry_run) {
         std.debug.print("🔍 Checking for updates (dry run)...\n", .{});
     } else if (specific_packages.items.len > 0) {

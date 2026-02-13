@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
-const Mutex = std.Thread.Mutex;
 const Dir = std.Io.Dir;
 const Io = std.Io;
 const zion_root = @import("root.zig");
@@ -45,7 +44,7 @@ pub const ParallelDownloader = struct {
     allocator: Allocator,
     config: DownloadConfig,
     progress: DownloadProgress,
-    mutex: Mutex,
+    mutex: std.c.pthread_mutex_t,
 
     const Self = @This();
 
@@ -54,15 +53,12 @@ pub const ParallelDownloader = struct {
             .allocator = allocator,
             .config = config,
             .progress = DownloadProgress.init(),
-            .mutex = Mutex{},
+            .mutex = std.c.PTHREAD_MUTEX_INITIALIZER,
         };
     }
 
     /// Download multiple packages concurrently
-    pub fn downloadPackages(
-        self: *Self,
-        requests: []const DownloadRequest
-    ) ![]ParallelDownloadResult {
+    pub fn downloadPackages(self: *Self, requests: []const DownloadRequest) ![]ParallelDownloadResult {
         if (requests.len == 0) {
             return &[_]ParallelDownloadResult{};
         }
@@ -73,11 +69,11 @@ pub const ParallelDownloader = struct {
         }
 
         self.progress.total = requests.len;
-        self.progress.start_time = std.time.milliTimestamp();
+        self.progress.start_time = zion_root.milliTimestamp();
 
         // Prepare results array
         const results = try self.allocator.alloc(ParallelDownloadResult, requests.len);
-        
+
         // Initialize all results
         for (results, 0..) |*result, i| {
             result.* = ParallelDownloadResult{
@@ -115,17 +111,13 @@ pub const ParallelDownloader = struct {
     /// Worker thread function
     fn workerThread(self: *Self, work_queue: *WorkQueue, worker_id: u8) void {
         _ = worker_id; // Could be used for logging
-        
+
         while (work_queue.getNextTask()) |task| {
-            const start_time = std.time.milliTimestamp();
-            
+            const start_time = zion_root.milliTimestamp();
+
             // Perform the download
             const result = self.downloadSinglePackage(task.request) catch |err| {
-                task.result.error_message = std.fmt.allocPrint(
-                    self.allocator, 
-                    "Download failed: {}", 
-                    .{err}
-                ) catch "Unknown error";
+                task.result.error_message = std.fmt.allocPrint(self.allocator, "Download failed: {}", .{err}) catch "Unknown error";
                 task.result.success = false;
                 continue;
             };
@@ -133,7 +125,7 @@ pub const ParallelDownloader = struct {
             // Update result
             task.result.success = true;
             task.result.result = result;
-            task.result.duration_ms = @as(u64, @intCast(std.time.milliTimestamp() - start_time));
+            task.result.duration_ms = @as(u64, @intCast(zion_root.milliTimestamp() - start_time));
 
             // Update progress
             self.updateProgress();
@@ -143,16 +135,16 @@ pub const ParallelDownloader = struct {
     /// Download a single package with retries
     fn downloadSinglePackage(self: *Self, request: DownloadRequest) !downloader.DownloadResult {
         var last_error: ?anyerror = null;
-        
+
         for (0..self.config.retry_count) |attempt| {
             if (attempt > 0) {
                 if (self.config.show_progress) {
                     std.debug.print("🔄 Retry {d}/{d} for {s}\n", .{ attempt, self.config.retry_count - 1, request.package_ref });
                 }
-                
+
                 // Exponential backoff: 1s, 2s, 4s...
                 const delay_ms = @as(u64, 1000) << @as(u6, @intCast(attempt - 1));
-                std.time.sleep(delay_ms * std.time.ns_per_ms);
+                zion_root.sleep(delay_ms * std.time.ns_per_ms);
             }
 
             const result = downloader.downloadAndHashPackage(self.allocator, request.package_ref) catch |err| {
@@ -168,23 +160,18 @@ pub const ParallelDownloader = struct {
 
     /// Update download progress (thread-safe)
     fn updateProgress(self: *Self) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         self.progress.completed += 1;
-        
+
         if (self.config.show_progress) {
             const percent = (self.progress.completed * 100) / self.progress.total;
-            const elapsed = std.time.milliTimestamp() - self.progress.start_time;
+            const elapsed = zion_root.milliTimestamp() - self.progress.start_time;
             const rate = if (elapsed > 0) (self.progress.completed * 1000) / @as(usize, @intCast(elapsed)) else 0;
-            
-            std.debug.print("\r📊 Progress: {d}/{d} ({d}%) - Rate: {d}/s", .{
-                self.progress.completed,
-                self.progress.total,
-                percent,
-                rate
-            });
-            
+
+            std.debug.print("\r📊 Progress: {d}/{d} ({d}%) - Rate: {d}/s", .{ self.progress.completed, self.progress.total, percent, rate });
+
             if (self.progress.completed == self.progress.total) {
                 std.debug.print("\n");
             }
@@ -193,7 +180,7 @@ pub const ParallelDownloader = struct {
 
     /// Print final download summary
     fn printFinalSummary(self: *Self, results: []const ParallelDownloadResult) void {
-        const total_time = std.time.milliTimestamp() - self.progress.start_time;
+        const total_time = zion_root.milliTimestamp() - self.progress.start_time;
         var successful: usize = 0;
         var failed: usize = 0;
 
@@ -213,7 +200,7 @@ pub const ParallelDownloader = struct {
         }
         std.debug.print("   ⏱️  Total time: {d}ms\n", .{total_time});
         std.debug.print("   🚀 Average: {d}ms per package\n", .{if (results.len > 0) total_time / results.len else 0});
-        
+
         if (failed > 0) {
             std.debug.print("\n⚠️  Failed downloads:\n");
             for (results) |result| {
@@ -232,24 +219,20 @@ const WorkQueue = struct {
     requests: []const DownloadRequest,
     results: []ParallelDownloadResult,
     next_index: usize,
-    mutex: Mutex,
+    mutex: std.c.pthread_mutex_t,
 
     const Task = struct {
         request: DownloadRequest,
         result: *ParallelDownloadResult,
     };
 
-    pub fn init(
-        allocator: Allocator,
-        requests: []const DownloadRequest,
-        results: []ParallelDownloadResult
-    ) WorkQueue {
+    pub fn init(allocator: Allocator, requests: []const DownloadRequest, results: []ParallelDownloadResult) WorkQueue {
         return WorkQueue{
             .allocator = allocator,
             .requests = requests,
             .results = results,
             .next_index = 0,
-            .mutex = Mutex{},
+            .mutex = std.c.PTHREAD_MUTEX_INITIALIZER,
         };
     }
 
@@ -259,8 +242,8 @@ const WorkQueue = struct {
     }
 
     pub fn getNextTask(self: *WorkQueue) ?Task {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        _ = std.c.pthread_mutex_lock(&self.mutex);
+        defer _ = std.c.pthread_mutex_unlock(&self.mutex);
 
         if (self.next_index >= self.requests.len) {
             return null;
@@ -288,36 +271,29 @@ const DownloadProgress = struct {
 };
 
 /// Convenience function for downloading multiple packages
-pub fn downloadPackagesConcurrently(
-    allocator: Allocator,
-    package_refs: []const []const u8,
-    config: DownloadConfig
-) ![]ParallelDownloadResult {
+pub fn downloadPackagesConcurrently(allocator: Allocator, package_refs: []const []const u8, config: DownloadConfig) ![]ParallelDownloadResult {
     var downloader_instance = ParallelDownloader.init(allocator, config);
-    
+
     // Convert package refs to download requests
     var requests = try allocator.alloc(DownloadRequest, package_refs.len);
     defer allocator.free(requests);
-    
+
     for (package_refs, 0..) |package_ref, i| {
         requests[i] = DownloadRequest{ .package_ref = package_ref };
     }
-    
+
     return downloader_instance.downloadPackages(requests);
 }
 
 /// Enhanced download function with progress and concurrency
-pub fn downloadWithProgress(
-    allocator: Allocator,
-    package_refs: []const []const u8
-) ![]ParallelDownloadResult {
+pub fn downloadWithProgress(allocator: Allocator, package_refs: []const []const u8) ![]ParallelDownloadResult {
     const config = DownloadConfig{
         .max_concurrent = 4,
         .show_progress = true,
         .retry_count = 3,
         .timeout_seconds = 30,
     };
-    
+
     return downloadPackagesConcurrently(allocator, package_refs, config);
 }
 
@@ -330,7 +306,7 @@ pub fn downloadSingleWithProgress(
 ) !downloader.DownloadResult {
     // Check if it looks like a URL or package reference
     const is_url = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
-    
+
     if (is_url) {
         // For direct URLs, use the enhanced downloader directly with a fallback
         return enhancedDownloadFromUrl(allocator, url, package_name);
@@ -348,14 +324,14 @@ fn enhancedDownloadFromUrl(
 ) !downloader.DownloadResult {
     // Ensure cache directory exists
     try downloader.ensureCacheDir(allocator);
-    
+
     // Generate cache path
     const sanitized_name = try sanitizePackageName(allocator, package_name);
     defer allocator.free(sanitized_name);
-    
+
     const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{sanitized_name});
     errdefer allocator.free(cache_path);
-    
+
     // Check if cached
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
@@ -384,7 +360,7 @@ fn enhancedDownloadFromUrl(
         const file = try cwd.openFile(io, cache_path, .{});
         defer file.close(io);
         const file_size = try file.length(io);
-        
+
         if (download_time > 0) {
             const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
             std.debug.print("📊 Download speed: {d:.1} MB/s\\n", .{speed_mbps});
@@ -392,14 +368,14 @@ fn enhancedDownloadFromUrl(
     } else {
         std.debug.print("💾 Using cached package: {s}\\n", .{cache_path});
     }
-    
+
     // Calculate hash
     const hash = try downloader.calculateFileHash(allocator, cache_path);
     errdefer allocator.free(hash);
-    
+
     const url_copy = try allocator.dupe(u8, url);
     errdefer allocator.free(url_copy);
-    
+
     return downloader.DownloadResult{
         .url = url_copy,
         .hash = hash,
@@ -426,11 +402,16 @@ fn downloadWithEnhancedCurl(allocator: Allocator, url: []const u8, output_path: 
         "-L", // Follow redirects
         "-f", // Fail on HTTP errors
         "--progress-bar", // Show progress bar
-        "--retry", "3",
-        "--retry-delay", "2",
-        "--max-time", "300",
-        "--connect-timeout", "10",
-        "-o", output_path,
+        "--retry",
+        "3",
+        "--retry-delay",
+        "2",
+        "--max-time",
+        "300",
+        "--connect-timeout",
+        "10",
+        "-o",
+        output_path,
         url,
     };
 

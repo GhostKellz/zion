@@ -40,9 +40,9 @@ pub const doc = @import("doc.zig").doc;
 pub const outdated = @import("outdated.zig").outdated;
 pub const zig_manager = @import("zig_manager.zig").zig_manager;
 
-pub var zig_command_override: ?fn(std.mem.Allocator, [][:0]u8) anyerror!void = null;
+pub var zig_command_override: ?fn (std.mem.Allocator, [][:0]u8) anyerror!void = null;
 
-pub fn setZigCommandHandler(handler: ?fn(std.mem.Allocator, [][:0]u8) anyerror!void) void {
+pub fn setZigCommandHandler(handler: ?fn (std.mem.Allocator, [][:0]u8) anyerror!void) void {
     zig_command_override = handler;
 }
 

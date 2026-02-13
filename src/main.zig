@@ -59,12 +59,12 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "kr")) return "keyring";
     if (std.mem.eql(u8, command, "key")) return "keyring";
     if (std.mem.eql(u8, command, "archver")) return "archver";
-    
+
     // v1.0.7 aliases
     if (std.mem.eql(u8, command, "hc")) return "health";
     if (std.mem.eql(u8, command, "bench")) return "benchmark";
     if (std.mem.eql(u8, command, "perf")) return "benchmark";
-    
+
     // Return original command if no alias found
     return command;
 }
@@ -177,18 +177,18 @@ fn zionMain(io: zsync.Io) !void {
     }
 
     const raw_command = args[1];
-    
+
     // Handle standard flags first
     if (std.mem.eql(u8, raw_command, "--help") or std.mem.eql(u8, raw_command, "-h")) {
         try commands.help(allocator);
         return;
     }
-    
+
     if (std.mem.eql(u8, raw_command, "--version") or std.mem.eql(u8, raw_command, "-V")) {
         try commands.version(allocator);
         return;
     }
-    
+
     const command = resolveCommandAlias(raw_command);
 
     if (std.mem.eql(u8, command, "init")) {
@@ -205,7 +205,7 @@ fn zionMain(io: zsync.Io) !void {
 
         const packages = args[2..];
         const options = commands.AddOptions{};
-        
+
         if (packages.len == 1) {
             // Use enhanced async add for single package
             async_handler.addAsync(packages[0], options) catch |err| {
@@ -292,7 +292,7 @@ fn zionMain(io: zsync.Io) !void {
             std.debug.print("Example: zion search http\n", .{});
             return;
         }
-        
+
         // Use enhanced racing search
         async_handler.searchAsync(args[2]) catch |err| {
             std.debug.print("❌ Async search failed: {}, falling back to sync\n", .{err});
@@ -308,32 +308,32 @@ fn zionMain(io: zsync.Io) !void {
         try commands.fmt(allocator, args);
     } else if (std.mem.eql(u8, command, "analyze")) {
         try commands.analyze(allocator, args);
-    
-    // v1.0.7 Enhanced Commands (zsync v0.5.4 powered)
+
+        // v1.0.7 Enhanced Commands (zsync v0.5.4 powered)
     } else if (std.mem.eql(u8, command, "health")) {
         // Registry health check using racing queries
         try async_handler.healthCheckRegistries();
     } else if (std.mem.eql(u8, command, "benchmark")) {
         // Performance benchmark for new features
         try async_handler.benchmarkPerformance();
-        
-    // v0.7.0 Enhanced Commands
+
+        // v0.7.0 Enhanced Commands
     } else if (std.mem.eql(u8, command, "publish")) {
         try commands.publish(allocator, args);
     } else if (std.mem.eql(u8, command, "search-interactive")) {
         try commands.search_interactive(allocator);
     } else if (std.mem.eql(u8, command, "interface")) {
         try commands.interface(allocator);
-    
-    // v1.0.5 Production-ready Features
+
+        // v1.0.5 Production-ready Features
     } else if (std.mem.eql(u8, command, "verify")) {
         try commands.signature_verify(allocator, args);
     } else if (std.mem.eql(u8, command, "cache")) {
         try commands.cache(allocator, args);
     } else if (std.mem.eql(u8, command, "tui") or std.mem.eql(u8, command, "interactive")) {
         try commands.tui(allocator, args);
-    
-    // v1.2.0 Zeke AI Integration Commands
+
+        // v1.2.0 Zeke AI Integration Commands
     } else if (std.mem.eql(u8, command, "status")) {
         try commands.status(allocator, io, args);
     } else if (std.mem.eql(u8, command, "ai-search")) {
@@ -353,8 +353,8 @@ fn zionMain(io: zsync.Io) !void {
         std.debug.print("🤖 AI-powered add not yet implemented, using regular add\n", .{});
         const options = commands.AddOptions{};
         try commands.add(allocator, args[2], options);
-    
-    // v0.8.0 New Commands
+
+        // v0.8.0 New Commands
     } else if (std.mem.eql(u8, command, "setup")) {
         try commands.setup(allocator, args);
     } else if (std.mem.eql(u8, command, "zls")) {
@@ -377,7 +377,7 @@ fn zionMain(io: zsync.Io) !void {
         try commands.keyring(allocator, &archver_args);
     } else {
         std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});
-        
+
         // Use smart command suggestions
         const suggester = qol.CommandSuggester.init();
         if (suggester.suggestCommand(raw_command)) |suggestion| {
@@ -386,7 +386,7 @@ fn zionMain(io: zsync.Io) !void {
             // Try multiple suggestions
             const suggestions = suggester.suggestCommands(allocator, raw_command) catch &[_][]const u8{};
             defer allocator.free(suggestions);
-            
+
             if (suggestions.len > 0) {
                 std.debug.print("💡 Similar commands:\n", .{});
                 for (suggestions) |cmd| {
@@ -397,7 +397,7 @@ fn zionMain(io: zsync.Io) !void {
                 std.debug.print("💡 Run 'zion help' or 'zion --help' for available commands\n\n", .{});
             }
         }
-        
+
         std.debug.print("🚀 Common commands:\n", .{});
         std.debug.print("  zion search <package>     - Search for packages\n", .{});
         std.debug.print("  zion add <package>        - Add a package\n", .{});

@@ -47,7 +47,8 @@ pub fn sleep(nanoseconds: u64) void {
 /// Helper to get current Unix timestamp in seconds (Zig 0.16.0 compatibility)
 /// Replaces std.time.timestamp() which was removed
 pub fn timestamp() i64 {
-    const ts = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch return 0;
+    var ts: std.c.timespec = undefined;
+    if (std.c.clock_gettime(std.posix.CLOCK.REALTIME, &ts) != 0) return 0;
     return ts.sec;
 }
 
@@ -55,22 +56,93 @@ pub fn timestamp() i64 {
 /// Replaces std.time.milliTimestamp() which was removed
 /// Uses monotonic clock for elapsed time measurements
 pub fn milliTimestamp() i64 {
-    const instant = std.time.Instant.now() catch {
-        // Fallback to posix clock if Instant fails
-        if (std.posix.clock_gettime(std.posix.CLOCK.REALTIME)) |ts| {
-            return @as(i64, ts.sec) * 1000 + @divTrunc(@as(i64, ts.nsec), std.time.ns_per_ms);
-        } else |_| {
+    var ts: std.c.timespec = undefined;
+    if (std.c.clock_gettime(std.posix.CLOCK.MONOTONIC, &ts) != 0) {
+        // Fallback to realtime clock
+        if (std.c.clock_gettime(std.posix.CLOCK.REALTIME, &ts) != 0) {
             return 0;
         }
-    };
-    // Convert to approximate milliseconds since process start
-    // For elapsed time calculations, the absolute value doesn't matter
-    const ns = switch (@import("builtin").os.tag) {
-        .windows => instant.timestamp * 100, // QPC ticks, rough conversion
-        .uefi, .wasi => instant.timestamp,
-        else => @as(u64, @intCast(instant.timestamp.sec)) * std.time.ns_per_s + @as(u64, @intCast(instant.timestamp.nsec)),
-    };
-    return @intCast(@divTrunc(ns, std.time.ns_per_ms));
+    }
+    return @as(i64, ts.sec) * 1000 + @divTrunc(@as(i64, ts.nsec), std.time.ns_per_ms);
+}
+
+// ============================================================================
+// Accessibility Features (v0.1.2)
+// ============================================================================
+
+/// Check if colors should be disabled (NO_COLOR standard)
+/// See: https://no-color.org/
+pub fn shouldDisableColors() bool {
+    // NO_COLOR standard - any value means disable colors
+    if (getEnv("NO_COLOR")) |_| return true;
+    // Also check ZION_NO_COLOR for zion-specific override
+    if (getEnv("ZION_NO_COLOR")) |_| return true;
+    // Check if output is not a TTY (for piping)
+    // Note: In Zig 0.16.0, we'd check std.io.getStdOut().isTty() but
+    // for simplicity we'll rely on environment variables
+    if (getEnv("TERM")) |term| {
+        if (std.mem.eql(u8, term, "dumb")) return true;
+    }
+    return false;
+}
+
+/// ANSI color codes - returns empty string if colors disabled
+pub const Color = struct {
+    pub const reset = "\x1b[0m";
+    pub const bold = "\x1b[1m";
+    pub const dim = "\x1b[2m";
+    pub const red = "\x1b[31m";
+    pub const green = "\x1b[32m";
+    pub const yellow = "\x1b[33m";
+    pub const blue = "\x1b[34m";
+    pub const magenta = "\x1b[35m";
+    pub const cyan = "\x1b[36m";
+    pub const white = "\x1b[37m";
+    pub const bright_red = "\x1b[91m";
+    pub const bright_green = "\x1b[92m";
+    pub const bright_yellow = "\x1b[93m";
+    pub const bright_blue = "\x1b[94m";
+
+    /// Get color code, respecting NO_COLOR
+    pub fn get(code: []const u8) []const u8 {
+        if (shouldDisableColors()) return "";
+        return code;
+    }
+};
+
+/// Print success message with optional emoji (screen reader friendly)
+pub fn printSuccess(comptime fmt: []const u8, args: anytype) void {
+    const prefix = if (shouldDisableColors()) "[OK] " else "✅ ";
+    std.debug.print("{s}" ++ fmt ++ "\n", .{prefix} ++ args);
+}
+
+/// Print error message with optional emoji (screen reader friendly)
+pub fn printError(comptime fmt: []const u8, args: anytype) void {
+    const prefix = if (shouldDisableColors()) "[ERROR] " else "❌ ";
+    std.debug.print("{s}{s}" ++ fmt ++ "{s}\n", .{ Color.get(Color.red), prefix } ++ args ++ .{Color.get(Color.reset)});
+}
+
+/// Print warning message with optional emoji (screen reader friendly)
+pub fn printWarning(comptime fmt: []const u8, args: anytype) void {
+    const prefix = if (shouldDisableColors()) "[WARN] " else "⚠️  ";
+    std.debug.print("{s}{s}" ++ fmt ++ "{s}\n", .{ Color.get(Color.yellow), prefix } ++ args ++ .{Color.get(Color.reset)});
+}
+
+/// Print info message with optional emoji (screen reader friendly)
+pub fn printInfo(comptime fmt: []const u8, args: anytype) void {
+    const prefix = if (shouldDisableColors()) "[INFO] " else "ℹ️  ";
+    std.debug.print("{s}" ++ fmt ++ "\n", .{prefix} ++ args);
+}
+
+/// Print a section header (accessible format)
+pub fn printHeader(title: []const u8) void {
+    if (shouldDisableColors()) {
+        std.debug.print("\n=== {s} ===\n\n", .{title});
+    } else {
+        std.debug.print("\n{s}{s}{s} {s} {s}{s}\n\n", .{
+            Color.bold, Color.cyan, "━━━", title, "━━━", Color.reset,
+        });
+    }
 }
 
 // v0.7.0 Enhanced Modules
@@ -93,5 +165,5 @@ pub const downloader = @import("downloader.zig");
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {
     std.debug.print("Zion v{s} package manager is ready!\n", .{ZION_VERSION});
-    std.debug.print("🔥 New in v1.0.6: GPG keyring integration, Arch Linux support, and Zig v0.16.0 compatibility!\n", .{});
+    std.debug.print("🔥 New in v1.2.0: Full Zig 0.16.0 compatibility with updated std.Io, std.c, and pthread APIs!\n", .{});
 }

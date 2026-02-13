@@ -18,21 +18,21 @@ pub const CacheEntry = struct {
     dependencies: [][]const u8,
     build_flags: [][]const u8,
     output_files: [][]const u8,
-    
+
     pub fn deinit(self: *CacheEntry, allocator: Allocator) void {
         allocator.free(self.source_hash);
         allocator.free(self.build_hash);
-        
+
         for (self.dependencies) |dep| {
             allocator.free(dep);
         }
         allocator.free(self.dependencies);
-        
+
         for (self.build_flags) |flag| {
             allocator.free(flag);
         }
         allocator.free(self.build_flags);
-        
+
         for (self.output_files) |file| {
             allocator.free(file);
         }
@@ -44,7 +44,7 @@ pub const BuildCache = struct {
     allocator: Allocator,
     cache_dir: []const u8,
     entries: std.StringHashMap(CacheEntry),
-    
+
     pub fn init(allocator: Allocator, cache_dir: []const u8) !BuildCache {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -60,7 +60,7 @@ pub const BuildCache = struct {
             .entries = std.StringHashMap(CacheEntry).init(allocator),
         };
     }
-    
+
     pub fn deinit(self: *BuildCache) void {
         var iterator = self.entries.iterator();
         while (iterator.next()) |entry| {
@@ -70,7 +70,7 @@ pub const BuildCache = struct {
         self.entries.deinit();
         self.allocator.free(self.cache_dir);
     }
-    
+
     pub fn computeSourceHash(self: *BuildCache, source_path: []const u8) ![]const u8 {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -130,15 +130,15 @@ pub const BuildCache = struct {
         const hex_str = std.fmt.bufPrint(&hex_buf, "{x}", .{hash_buf}) catch return error.InvalidHash;
         return try self.allocator.dupe(u8, hex_str);
     }
-    
+
     fn stringLessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
         return std.mem.order(u8, lhs, rhs) == .lt;
     }
-    
+
     pub fn getCacheEntry(self: *BuildCache, project_name: []const u8) ?CacheEntry {
         return self.entries.get(project_name);
     }
-    
+
     pub fn isCacheValid(self: *BuildCache, project_name: []const u8, current_source_hash: []const u8, dependencies: [][]const u8, build_flags: [][]const u8) !bool {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -172,7 +172,7 @@ pub const BuildCache = struct {
 
         return true;
     }
-    
+
     pub fn storeBuildResult(self: *BuildCache, project_name: []const u8, source_hash: []const u8, build_hash: []const u8, dependencies: [][]const u8, build_flags: [][]const u8, output_files: [][]const u8) !void {
         var owned_dependencies: std.ArrayListUnmanaged([]const u8) = .empty;
         defer owned_dependencies.deinit(self.allocator);
@@ -215,7 +215,7 @@ pub const BuildCache = struct {
         const owned_name = try self.allocator.dupe(u8, project_name);
         try self.entries.put(owned_name, entry);
     }
-    
+
     pub fn restoreCachedBuild(self: *BuildCache, project_name: []const u8, output_dir: []const u8) !bool {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -242,7 +242,7 @@ pub const BuildCache = struct {
         std.debug.print("✅ Successfully restored build from cache\n", .{});
         return true;
     }
-    
+
     pub fn cacheBuildOutput(self: *BuildCache, _: []const u8, output_files: [][]const u8) !void {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -255,7 +255,7 @@ pub const BuildCache = struct {
             try cwd.copyFile(output_file, cwd, cached_path, io, .{});
         }
     }
-    
+
     pub fn clearCache(self: *BuildCache) !void {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -282,7 +282,7 @@ pub const BuildCache = struct {
 
         std.debug.print("🗑️  Build cache cleared\n", .{});
     }
-    
+
     pub fn getStats(self: *const BuildCache, allocator: Allocator) !CacheStats {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
@@ -327,7 +327,7 @@ pub const CacheStats = struct {
     total_size_bytes: u64,
     file_count: u64,
     cache_dir: []const u8,
-    
+
     pub fn deinit(self: *CacheStats, allocator: Allocator) void {
         allocator.free(self.cache_dir);
     }

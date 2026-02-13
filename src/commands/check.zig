@@ -20,7 +20,7 @@ pub const PackageHealth = struct {
     name: []const u8,
     status: HealthStatus,
     issues: std.ArrayList([]const u8),
-    
+
     pub fn init(_: Allocator, name: []const u8) PackageHealth {
         return PackageHealth{
             .name = name,
@@ -28,14 +28,14 @@ pub const PackageHealth = struct {
             .issues = .empty,
         };
     }
-    
+
     pub fn deinit(self: *PackageHealth, allocator: Allocator) void {
         for (self.issues.items) |issue| {
             allocator.free(issue);
         }
         self.issues.deinit(allocator);
     }
-    
+
     pub fn addIssue(self: *PackageHealth, allocator: Allocator, severity: HealthStatus, message: []const u8) !void {
         try self.issues.append(allocator, try allocator.dupe(u8, message));
         if (severity == .@"error" or (severity == .warning and self.status == .healthy)) {
@@ -60,16 +60,16 @@ pub fn check(allocator: Allocator) !void {
         }
         return err;
     };
-    
+
     // Load files
     var zon_file = try ZonFile.loadFromFile(allocator, zon_path);
     defer zon_file.deinit();
-    
+
     var lock_file = try LockFile.loadFromFile(allocator);
     defer lock_file.deinit();
-    
+
     std.debug.print("📋 Analyzing {d} dependencies...\n\n", .{zon_file.dependencies.count()});
-    
+
     var package_healths: std.ArrayList(PackageHealth) = .empty;
     defer {
         for (package_healths.items) |*health| {
@@ -77,19 +77,19 @@ pub fn check(allocator: Allocator) !void {
         }
         package_healths.deinit(allocator);
     }
-    
+
     var overall_status = HealthStatus.healthy;
-    
+
     // Check each dependency
     var it = zon_file.dependencies.iterator();
     while (it.next()) |entry| {
         const package_name = entry.key_ptr.*;
         const dep = entry.value_ptr.*;
-        
+
         std.debug.print("🔍 Checking {s}...\n", .{package_name});
-        
+
         var health = PackageHealth.init(allocator, package_name);
-        
+
         // Check 1: URL accessibility
         if (checkUrlAccessibility(allocator, dep.url)) |accessible| {
             if (!accessible) {
@@ -104,11 +104,11 @@ pub fn check(allocator: Allocator) !void {
             try health.addIssue(allocator, .warning, msg);
             std.debug.print("  ⚠️  Could not verify URL accessibility\n", .{});
         }
-        
+
         // Check 2: Hash integrity
         const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{package_name});
         defer allocator.free(cache_path);
-        
+
         const cached_exists = blk: {
             cwd.access(io, cache_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
@@ -118,7 +118,7 @@ pub fn check(allocator: Allocator) !void {
             };
             break :blk true;
         };
-        
+
         if (cached_exists) {
             if (downloader.calculateFileHash(allocator, cache_path)) |computed_hash| {
                 defer allocator.free(computed_hash);
@@ -138,11 +138,11 @@ pub fn check(allocator: Allocator) !void {
             try health.addIssue(allocator, .warning, "Package not cached - run 'zion fetch'");
             std.debug.print("  ⚠️  Not cached\n", .{});
         }
-        
+
         // Check 3: Extraction status
         const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
         defer allocator.free(deps_path);
-        
+
         const extracted_exists = blk: {
             cwd.access(io, deps_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
@@ -152,12 +152,12 @@ pub fn check(allocator: Allocator) !void {
             };
             break :blk true;
         };
-        
+
         if (extracted_exists) {
             // Check if it has a build.zig file
             const build_zig_path = try std.fmt.allocPrint(allocator, "{s}/build.zig", .{deps_path});
             defer allocator.free(build_zig_path);
-            
+
             cwd.access(io, build_zig_path, .{}) catch |err| {
                 if (err == error.FileNotFound) {
                     try health.addIssue(allocator, .warning, "No build.zig found in package");
@@ -170,7 +170,7 @@ pub fn check(allocator: Allocator) !void {
             try health.addIssue(allocator, .warning, "Package not extracted - run 'zion fetch'");
             std.debug.print("  ⚠️  Not extracted\n", .{});
         }
-        
+
         // Check 4: Lock file consistency
         if (lock_file.getPackage(package_name)) |locked_pkg| {
             if (!std.mem.eql(u8, locked_pkg.hash, dep.hash)) {
@@ -183,15 +183,15 @@ pub fn check(allocator: Allocator) !void {
             try health.addIssue(allocator, .warning, "Package not in lock file");
             std.debug.print("  ⚠️  Not in lock file\n", .{});
         }
-        
+
         // Check 5: Version availability (if we can detect package reference)
         if (extractPackageRefFromUrl(allocator, dep.url)) |package_ref| {
             defer allocator.free(package_ref);
-            
+
             if (github.getLatestVersion(allocator, package_ref)) |latest_version_const| {
                 var latest_version = latest_version_const;
                 defer latest_version.deinit(allocator);
-                
+
                 if (!std.mem.eql(u8, dep.url, latest_version.url)) {
                     const msg = try std.fmt.allocPrint(allocator, "New version available: {s}", .{latest_version.version});
                     defer allocator.free(msg);
@@ -206,21 +206,21 @@ pub fn check(allocator: Allocator) !void {
         } else |_| {
             std.debug.print("  ⚠️  Non-GitHub URL, cannot check for updates\n", .{});
         }
-        
+
         // Update overall status
         if (health.status == .@"error") {
             overall_status = .@"error";
         } else if (health.status == .warning and overall_status == .healthy) {
             overall_status = .warning;
         }
-        
+
         try package_healths.append(allocator, health);
         std.debug.print("\n", .{});
     }
-    
+
     // Check project structure
     std.debug.print("🏗️  Checking project structure...\n", .{});
-    
+
     // Check for build.zig
     cwd.access(io, "build.zig", .{}) catch |err| {
         if (err == error.FileNotFound) {
@@ -250,14 +250,14 @@ pub fn check(allocator: Allocator) !void {
             std.debug.print("  ✅ src/main.zig found\n", .{});
         }
     };
-    
+
     // Print summary
     std.debug.print("\n📊 Health Summary:\n", .{});
-    
+
     var healthy_count: usize = 0;
     var warning_count: usize = 0;
     var error_count: usize = 0;
-    
+
     for (package_healths.items) |health| {
         switch (health.status) {
             .healthy => {
@@ -280,7 +280,7 @@ pub fn check(allocator: Allocator) !void {
             },
         }
     }
-    
+
     std.debug.print("\n🎯 Overall Status: ", .{});
     switch (overall_status) {
         .healthy => {
@@ -298,7 +298,7 @@ pub fn check(allocator: Allocator) !void {
             std.debug.print("   Run 'zion repair' to fix hash mismatches and broken dependencies.\n", .{});
         },
     }
-    
+
     std.debug.print("\n📈 Statistics:\n", .{});
     std.debug.print("   Healthy: {d}\n", .{healthy_count});
     std.debug.print("   Warnings: {d}\n", .{warning_count});
@@ -370,17 +370,17 @@ fn extractPackageRefFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
     // https://github.com/user/repo/archive/refs/heads/main.tar.gz
     // https://github.com/user/repo/archive/refs/tags/v1.0.0.tar.gz
     const github_prefix = "https://github.com/";
-    
+
     if (!std.mem.startsWith(u8, url, github_prefix)) {
         return error.UnsupportedUrl;
     }
-    
+
     const after_prefix = url[github_prefix.len..];
-    
+
     // Find the end of user/repo part
     var parts = std.mem.splitScalar(u8, after_prefix, '/');
     const user = parts.next() orelse return error.InvalidGitHubUrl;
     const repo = parts.next() orelse return error.InvalidGitHubUrl;
-    
+
     return std.fmt.allocPrint(allocator, "{s}/{s}", .{ user, repo });
 }

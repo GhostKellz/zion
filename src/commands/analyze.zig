@@ -83,25 +83,25 @@ fn analyzeDependencies(allocator: Allocator) !void {
     var in_deps_section = false;
 
     std.debug.print("📦 Dependencies Overview:\n");
-    
+
     while (lines.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t");
-        
+
         if (std.mem.indexOf(u8, trimmed, ".dependencies") != null) {
             in_deps_section = true;
             continue;
         }
-        
+
         if (in_deps_section) {
             if (std.mem.indexOf(u8, trimmed, "}") != null) {
                 break;
             }
-            
+
             // Look for dependency entries (lines with dots and equals)
-            if (std.mem.indexOf(u8, trimmed, ".") != null and 
+            if (std.mem.indexOf(u8, trimmed, ".") != null and
                 std.mem.indexOf(u8, trimmed, "=") != null and
-                !std.mem.startsWith(u8, trimmed, "//")) {
-                
+                !std.mem.startsWith(u8, trimmed, "//"))
+            {
                 dep_count += 1;
                 const dep_name = extractDepName(trimmed) orelse "unknown";
                 std.debug.print("  📌 {s}\n", .{dep_name});
@@ -115,7 +115,7 @@ fn analyzeDependencies(allocator: Allocator) !void {
     } else {
         std.debug.print("\n📊 Summary:\n");
         std.debug.print("   Total dependencies: {d}\n", .{dep_count});
-        
+
         // Check for lock file
         cwd.access("zion.lock", .{}) catch |err| {
             switch (err) {
@@ -127,9 +127,9 @@ fn analyzeDependencies(allocator: Allocator) !void {
                 else => return err,
             }
         };
-        
+
         std.debug.print("   ✅ Lock file present\n");
-        
+
         // Check modules directory
         cwd.access("zion_modules", .{}) catch |err| {
             switch (err) {
@@ -141,7 +141,7 @@ fn analyzeDependencies(allocator: Allocator) !void {
                 else => return err,
             }
         };
-        
+
         std.debug.print("   ✅ Dependencies downloaded\n");
     }
 }
@@ -152,14 +152,14 @@ fn findUnusedDependencies(allocator: Allocator) !void {
 
     // This is a simplified implementation
     // In a full implementation, we'd parse all .zig files and check imports
-    
+
     std.debug.print("📋 Dependency Usage Analysis:\n");
     std.debug.print("   🚧 Advanced static analysis coming soon!\n");
     std.debug.print("\n💡 Manual check:\n");
     std.debug.print("   1. Review your @import() statements\n");
     std.debug.print("   2. Check if all dependencies in build.zig.zon are used\n");
     std.debug.print("   3. Remove unused entries with 'zion remove <package>'\n");
-    
+
     // We could implement basic grep-based checking here
     std.debug.print("\n🔍 Quick scan of common import patterns:\n");
     try scanForImports(allocator);
@@ -170,7 +170,7 @@ fn findVersionConflicts(allocator: Allocator) !void {
     std.debug.print("🔍 Checking for version conflicts...\n\n");
 
     const cwd = fs.cwd();
-    
+
     // Check if lock file exists
     const lock_file = cwd.openFile("zion.lock", .{}) catch |err| {
         switch (err) {
@@ -188,7 +188,7 @@ fn findVersionConflicts(allocator: Allocator) !void {
     std.debug.print("\n💡 Zion uses precise commit hashes to avoid conflicts\n");
     std.debug.print("   Each dependency is pinned to a specific version\n");
     std.debug.print("   Run 'zion update' to get latest compatible versions\n");
-    
+
     _ = allocator; // unused in this simplified implementation
 }
 
@@ -200,13 +200,13 @@ fn securityAudit(allocator: Allocator) !void {
     std.debug.print("   ✅ Using HTTPS for all downloads\n");
     std.debug.print("   ✅ SHA256 hash verification enabled\n");
     std.debug.print("   ✅ No known vulnerable patterns detected\n");
-    
+
     std.debug.print("\n🔍 Security Recommendations:\n");
     std.debug.print("   • Regularly update dependencies with 'zion update'\n");
     std.debug.print("   • Review dependency sources on GitHub\n");
     std.debug.print("   • Use specific version tags when possible\n");
     std.debug.print("   • Monitor security advisories for your dependencies\n");
-    
+
     _ = allocator; // unused in this simplified implementation
 }
 
@@ -217,20 +217,20 @@ fn analyzeBinarySize(allocator: Allocator) !void {
     // Check if we can find build artifacts
     const cwd = fs.cwd();
     var found_binary = false;
-    
+
     // Check common binary locations
     const binary_paths = [_][]const u8{
         "zig-out/bin",
         "zig-cache",
         ".zig-cache",
     };
-    
+
     for (binary_paths) |path| {
         cwd.access(path, .{}) catch continue;
         found_binary = true;
         break;
     }
-    
+
     if (!found_binary) {
         std.debug.print("⚠️  No build artifacts found\n");
         std.debug.print("💡 Run 'zig build' first to generate binaries\n");
@@ -240,14 +240,14 @@ fn analyzeBinarySize(allocator: Allocator) !void {
         std.debug.print("   • Profile with 'zig build -Doptimize=ReleaseFast --verbose'\n");
         return;
     }
-    
+
     std.debug.print("📊 Binary Size Analysis:\n");
     std.debug.print("   🚧 Detailed size analysis coming soon!\n");
     std.debug.print("\n💡 Manual size optimization:\n");
     std.debug.print("   • Build with release modes for size comparison\n");
     std.debug.print("   • Use 'objdump -t' to analyze symbol sizes\n");
     std.debug.print("   • Consider link-time optimization\n");
-    
+
     _ = allocator; // unused in this simplified implementation
 }
 
@@ -256,19 +256,19 @@ fn extractDepName(line: []const u8) ?[]const u8 {
     // Look for pattern like ".package_name = .{"
     if (std.mem.indexOf(u8, line, ".") == null) return null;
     if (std.mem.indexOf(u8, line, "=") == null) return null;
-    
+
     const start = std.mem.indexOf(u8, line, ".").? + 1;
-    const end = std.mem.indexOf(u8, line[start..], " ") orelse 
-               std.mem.indexOf(u8, line[start..], "=") orelse 
-               return null;
-    
-    return line[start..start + end];
+    const end = std.mem.indexOf(u8, line[start..], " ") orelse
+        std.mem.indexOf(u8, line[start..], "=") orelse
+        return null;
+
+    return line[start .. start + end];
 }
 
 /// Basic import scanning
 fn scanForImports(allocator: Allocator) !void {
     _ = allocator; // would be used for file reading
-    
+
     const cwd = fs.cwd();
     var src_dir = cwd.openDir("src", .{ .iterate = true }) catch |err| {
         switch (err) {
@@ -283,13 +283,13 @@ fn scanForImports(allocator: Allocator) !void {
 
     var import_count: u32 = 0;
     var iterator = src_dir.iterate();
-    
+
     while (try iterator.next()) |entry| {
         if (entry.kind == .file and std.mem.endsWith(u8, entry.name, ".zig")) {
             import_count += 1;
         }
     }
-    
+
     std.debug.print("   📁 Found {d} .zig files in src/\n", .{import_count});
     std.debug.print("   💡 Use 'grep -r \"@import\" src/' to find all imports\n");
 }

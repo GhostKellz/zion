@@ -16,9 +16,9 @@ pub fn zigistry(allocator: Allocator, args: []const [:0]const u8) !void {
         try showZigistryHelp();
         return;
     }
-    
+
     const subcommand = args[0];
-    
+
     if (std.mem.eql(u8, subcommand, "login")) {
         try zigistryLogin(allocator, args[1..]);
     } else if (std.mem.eql(u8, subcommand, "publish")) {
@@ -86,13 +86,13 @@ fn showZigistryHelp() !void {
 
 fn zigistryLogin(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
-    
+
     print("🔐 Zigistry Authentication\n\n", .{});
-    
+
     // Check if already authenticated
     if (zion_root.getEnv("ZIGISTRY_TOKEN")) |token| {
         print("✅ Already authenticated with Zigistry\n", .{});
-        
+
         // Verify token
         if (try verifyZigistryToken(allocator, token)) {
             print("✅ Token is valid\n", .{});
@@ -101,34 +101,34 @@ fn zigistryLogin(allocator: Allocator, args: []const [:0]const u8) !void {
             print("❌ Token is invalid or expired\n", .{});
         }
     }
-    
+
     print("📝 To authenticate with Zigistry:\n", .{});
     print("1. Visit: https://zigistry.dev/auth/token\n", .{});
     print("2. Generate a new API token\n", .{});
     print("3. Set environment variable:\n", .{});
     print("   export ZIGISTRY_TOKEN=\"your-token-here\"\n\n", .{});
-    
+
     print("💡 Or add to your shell profile for persistence\n", .{});
 }
 
 fn zigistryPublish(allocator: Allocator, args: []const [:0]const u8) !void {
     var sign_package = false;
-    
+
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--sign")) {
             sign_package = true;
         }
     }
-    
+
     print("📦 Publishing to Zigistry\n\n", .{});
-    
+
     // Check authentication
     const token = zion_root.getEnv("ZIGISTRY_TOKEN") orelse {
         print("❌ Not authenticated with Zigistry\n", .{});
         print("💡 Run 'zion zigistry login' first\n", .{});
         return;
     };
-    
+
     // Verify build.zig.zon exists
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
@@ -141,64 +141,64 @@ fn zigistryPublish(allocator: Allocator, args: []const [:0]const u8) !void {
         else => return err,
     };
     defer allocator.free(zon_content);
-    
+
     // Extract package metadata
     const metadata = try extractPackageMetadata(allocator, zon_content);
     defer metadata.deinit(allocator);
-    
+
     print("📝 Package Info:\n", .{});
     print("  Name: {s}\n", .{metadata.name});
     print("  Version: {s}\n", .{metadata.version});
     if (metadata.description) |desc| {
         print("  Description: {s}\n", .{desc});
     }
-    
+
     if (sign_package) {
         print("  🔐 Signing: Enabled\n", .{});
     }
-    
+
     print("\n", .{});
-    
+
     // Build package
     print("🔨 Building package...\n", .{});
     try buildPackageForPublish(allocator);
-    
+
     // Create tarball
     print("📦 Creating package archive...\n", .{});
     try createPackageTarball(allocator);
-    
+
     // Sign if requested
     if (sign_package) {
         print("🔐 Signing package...\n", .{});
         try signPackage(allocator);
     }
-    
+
     // Upload to Zigistry
     print("🚀 Uploading to Zigistry...\n", .{});
     try uploadToZigistry(allocator, token, metadata, sign_package);
-    
+
     print("✅ Package published successfully!\n", .{});
     print("🔗 View at: https://zigistry.dev/packages/{s}\n", .{metadata.name});
 }
 
 fn zigistryStatus(allocator: Allocator, package_name: []const u8) !void {
     print("📈 Zigistry Package Status: {s}\n\n", .{package_name});
-    
+
     const package_info = try fetchZigistryPackageInfo(allocator, package_name);
     defer package_info.deinit(allocator);
-    
+
     if (package_info.found) {
         print("✅ Package Status: Available\n", .{});
         print("📊 Downloads: {}\n", .{package_info.download_count});
         print("⭐ Stars: {}\n", .{package_info.star_count});
-        
+
         if (package_info.rating) |rating| {
             print("🎆 Rating: {d:.1}/5.0\n", .{rating});
         }
-        
+
         print("📅 Last Updated: {s}\n", .{package_info.last_updated});
         print("📝 Versions: {}\n", .{package_info.version_count});
-        
+
         if (package_info.is_ziglibs) {
             print("🎆 Ziglibs Member: Yes\n", .{});
         }
@@ -209,11 +209,11 @@ fn zigistryStatus(allocator: Allocator, package_name: []const u8) !void {
 
 fn showZigistryConnectionStatus(allocator: Allocator) !void {
     print("🔌 Zigistry Connection Status\n\n", .{});
-    
+
     // Check authentication
     if (zion_root.getEnv("ZIGISTRY_TOKEN")) |token| {
         print("🔐 Authentication: ✅ Configured\n", .{});
-        
+
         if (try verifyZigistryToken(allocator, token)) {
             print("✅ Token Status: Valid\n", .{});
         } else {
@@ -222,16 +222,16 @@ fn showZigistryConnectionStatus(allocator: Allocator) !void {
     } else {
         print("❌ Authentication: Not configured\n", .{});
     }
-    
+
     // Test connection
     print("\n🌍 Testing connection...\n", .{});
-    
+
     if (try testZigistryConnection(allocator)) {
         print("✅ Connection: Healthy\n", .{});
-        
+
         const stats = try getZigistryStats(allocator);
         defer stats.deinit(allocator);
-        
+
         print("\n📊 Zigistry Statistics:\n", .{});
         print("  Total Packages: {}\n", .{stats.total_packages});
         print("  Total Downloads: {}\n", .{stats.total_downloads});
@@ -253,17 +253,17 @@ fn zigistryAnalytics(allocator: Allocator, args: []const [:0]const u8) !void {
 
 fn zigistrySearch(allocator: Allocator, query: []const u8) !void {
     print("🔍 Enhanced Zigistry Search: {s}\n\n", .{query});
-    
+
     // Load configuration
     var config = ZionConfig.init(allocator);
     defer config.deinit();
     try config.loadFromEnvironment();
-    
+
     // Initialize registry manager
     var manager = try RegistryManager.init(allocator, &config);
     defer manager.deinit();
     try manager.initClients();
-    
+
     // Search specifically in Zigistry
     for (manager.clients.items) |*client| {
         if (std.mem.eql(u8, client.config.name, "zigistry")) {
@@ -272,42 +272,42 @@ fn zigistrySearch(allocator: Allocator, query: []const u8) !void {
                 for (packages) |pkg| pkg.deinit(allocator);
                 allocator.free(packages);
             }
-            
+
             if (packages.len == 0) {
                 print("❌ No packages found on Zigistry for: {s}\n", .{query});
                 return;
             }
-            
+
             print("📊 Found {} packages on Zigistry:\n\n", .{packages.len});
-            
+
             for (packages, 0..) |pkg, i| {
                 print("{}. 📦 {s}", .{ i + 1, pkg.full_name });
-                
+
                 if (pkg.is_ziglibs) print(" 🎆", .{});
-                
+
                 print("\n", .{});
-                
+
                 if (pkg.description) |desc| {
                     print("   {s}\n", .{desc});
                 }
-                
+
                 print("   Version: {s}", .{pkg.version});
-                
+
                 if (pkg.download_count) |downloads| {
                     print(" | Downloads: 📊 {}", .{downloads});
                 }
-                
+
                 if (pkg.star_count) |stars| {
                     print(" | Stars: ⭐ {}", .{stars});
                 }
-                
+
                 if (pkg.rating) |rating| {
                     print(" | Rating: 🎆 {d:.1}/5", .{rating});
                 }
-                
+
                 print("\n\n", .{});
             }
-            
+
             break;
         }
     }
@@ -315,74 +315,74 @@ fn zigistrySearch(allocator: Allocator, query: []const u8) !void {
 
 fn zigistryTrending(allocator: Allocator) !void {
     print("🔥 Trending Zigistry Packages\n\n", .{});
-    
+
     const trending = try fetchTrendingPackages(allocator);
     defer {
         for (trending) |pkg| pkg.deinit(allocator);
         allocator.free(trending);
     }
-    
+
     for (trending, 0..) |pkg, i| {
         print("{}. 🔥 {s}", .{ i + 1, pkg.full_name });
-        
+
         if (pkg.is_ziglibs) print(" 🎆", .{});
-        
+
         print("\n", .{});
-        
+
         if (pkg.description) |desc| {
             print("   {s}\n", .{desc});
         }
-        
+
         if (pkg.download_count) |downloads| {
             print("   📊 {} downloads this week", .{downloads});
         }
-        
+
         if (pkg.star_count) |stars| {
             print(" | ⭐ {} stars", .{stars});
         }
-        
+
         print("\n\n", .{});
     }
-    
+
     print("💡 Use 'zion add <package>' to install any of these\n", .{});
 }
 
 fn zigistryPackageInfo(allocator: Allocator, package_name: []const u8) !void {
     print("📝 Detailed Zigistry Package Info: {s}\n\n", .{package_name});
-    
+
     const info = try fetchZigistryPackageInfo(allocator, package_name);
     defer info.deinit(allocator);
-    
+
     if (!info.found) {
         print("❌ Package not found on Zigistry\n", .{});
         return;
     }
-    
+
     print("📦 {s}\n", .{info.full_name});
     print("{s}\n\n", .{"─" ** 50});
-    
+
     if (info.description) |desc| {
         print("📝 Description: {s}\n\n", .{desc});
     }
-    
+
     print("📈 Statistics:\n", .{});
     print("  Downloads: 📊 {}\n", .{info.download_count});
     print("  Stars: ⭐ {}\n", .{info.star_count});
     print("  Versions: 📝 {}\n", .{info.version_count});
-    
+
     if (info.rating) |rating| {
         print("  Rating: 🎆 {d:.1}/5.0\n", .{rating});
     }
-    
+
     print("\n📅 Release Info:\n", .{});
     print("  Latest Version: {s}\n", .{info.latest_version});
     print("  Last Updated: {s}\n", .{info.last_updated});
     print("  Published: {s}\n", .{info.published_at});
-    
+
     if (info.is_ziglibs) {
         print("\n🎆 Ziglibs Member: High-quality, community-maintained\n", .{});
     }
-    
+
     print("\n💡 Install with: zion add {s}\n", .{package_name});
 }
 
@@ -391,7 +391,7 @@ const PackageMetadata = struct {
     name: []const u8,
     version: []const u8,
     description: ?[]const u8,
-    
+
     fn deinit(self: PackageMetadata, allocator: Allocator) void {
         allocator.free(self.name);
         allocator.free(self.version);
@@ -411,7 +411,7 @@ const ZigistryPackageInfo = struct {
     published_at: []const u8,
     version_count: u32,
     is_ziglibs: bool,
-    
+
     fn deinit(self: ZigistryPackageInfo, allocator: Allocator) void {
         allocator.free(self.full_name);
         if (self.description) |desc| allocator.free(desc);
@@ -425,7 +425,7 @@ const ZigistryStats = struct {
     total_packages: u64,
     total_downloads: u64,
     active_maintainers: u32,
-    
+
     fn deinit(self: ZigistryStats, allocator: Allocator) void {
         _ = self;
         _ = allocator;
@@ -509,10 +509,10 @@ fn getZigistryStats(allocator: Allocator) !ZigistryStats {
 
 fn showZigistryOverallAnalytics(allocator: Allocator) !void {
     print("📈 Zigistry Overall Analytics\n\n", .{});
-    
+
     const stats = try getZigistryStats(allocator);
     defer stats.deinit(allocator);
-    
+
     print("🌍 Registry Overview:\n", .{});
     print("  Total Packages: {}\n", .{stats.total_packages});
     print("  Total Downloads: {}\n", .{stats.total_downloads});
@@ -522,26 +522,26 @@ fn showZigistryOverallAnalytics(allocator: Allocator) !void {
 
 fn showZigistryPackageAnalytics(allocator: Allocator, package_name: []const u8) !void {
     print("📈 Package Analytics: {s}\n\n", .{package_name});
-    
+
     const info = try fetchZigistryPackageInfo(allocator, package_name);
     defer info.deinit(allocator);
-    
+
     if (!info.found) {
         print("❌ Package not found\n", .{});
         return;
     }
-    
+
     print("📊 Download Statistics:\n", .{});
     print("  Total Downloads: {}\n", .{info.download_count});
     print("  Average Downloads/Day: ~{}\n", .{info.download_count / 30}); // Rough estimate
-    
+
     print("\n⭐ Community Engagement:\n", .{});
     print("  Stars: {}\n", .{info.star_count});
-    
+
     if (info.rating) |rating| {
         print("  Rating: {d:.1}/5.0\n", .{rating});
     }
-    
+
     print("\n📝 Release Statistics:\n", .{});
     print("  Total Versions: {}\n", .{info.version_count});
     print("  Latest Version: {s}\n", .{info.latest_version});
@@ -551,7 +551,7 @@ fn showZigistryPackageAnalytics(allocator: Allocator, package_name: []const u8) 
 fn fetchTrendingPackages(allocator: Allocator) ![]Package {
     // Would fetch trending packages from Zigistry API
     var packages: std.ArrayList(Package) = .{};
-    
+
     // Mock trending packages
     try packages.append(allocator, Package{
         .name = try allocator.dupe(u8, "http"),
@@ -569,6 +569,6 @@ fn fetchTrendingPackages(allocator: Allocator) ![]Package {
         .star_count = 156,
         .rating = 4.8,
     });
-    
+
     return packages.toOwnedSlice(allocator);
 }

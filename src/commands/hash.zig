@@ -55,12 +55,11 @@ fn generateHash(allocator: Allocator, args: []const [:0]const u8) !void {
         const multihash = try std.fmt.allocPrint(allocator, "1220{s}", .{file_hash});
         defer allocator.free(multihash);
         std.debug.print("🏷️  Multihash: {s}\n", .{multihash});
-
     } else |_| {
         // Assume it's a package reference
         if (std.mem.indexOf(u8, target, "@")) |at_index| {
             const package_ref = target[0..at_index];
-            const version = target[at_index + 1..];
+            const version = target[at_index + 1 ..];
 
             std.debug.print("📦 Generating hash for {s}@{s}...\n", .{ package_ref, version });
 
@@ -78,7 +77,6 @@ fn generateHash(allocator: Allocator, args: []const [:0]const u8) !void {
             const multihash = try std.fmt.allocPrint(allocator, "1220{s}", .{download_result.hash});
             defer allocator.free(multihash);
             std.debug.print("🏷️  Multihash: {s}\n", .{multihash});
-
         } else {
             // Latest version
             std.debug.print("📦 Generating hash for latest {s}...\n", .{target});

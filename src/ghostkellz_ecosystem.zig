@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 pub const GhostKellzEcosystem = struct {
     allocator: Allocator,
     packages: std.ArrayList(GhostKellzPackage),
-    
+
     pub const GhostKellzPackage = struct {
         name: []const u8,
         description: []const u8,
@@ -15,7 +15,7 @@ pub const GhostKellzEcosystem = struct {
         dependencies: []const []const u8,
         zig_version: []const u8,
         maturity: Maturity,
-        
+
         pub const Category = enum {
             crypto,
             networking,
@@ -27,7 +27,7 @@ pub const GhostKellzEcosystem = struct {
             async_framework,
             virtualization,
             security,
-            
+
             pub fn getIcon(self: Category) []const u8 {
                 return switch (self) {
                     .crypto => "🔐",
@@ -42,7 +42,7 @@ pub const GhostKellzEcosystem = struct {
                     .security => "🛡️",
                 };
             }
-            
+
             pub fn getDisplayName(self: Category) []const u8 {
                 return switch (self) {
                     .crypto => "Cryptography",
@@ -50,7 +50,7 @@ pub const GhostKellzEcosystem = struct {
                     .database => "Database",
                     .runtime => "Runtime",
                     .development_tools => "Development Tools",
-                    .system_tools => "System Tools", 
+                    .system_tools => "System Tools",
                     .tui_framework => "TUI Framework",
                     .async_framework => "Async Framework",
                     .virtualization => "Virtualization",
@@ -58,13 +58,13 @@ pub const GhostKellzEcosystem = struct {
                 };
             }
         };
-        
+
         pub const Maturity = enum {
             alpha,
             beta,
             stable,
             mature,
-            
+
             pub fn getIcon(self: Maturity) []const u8 {
                 return switch (self) {
                     .alpha => "🚧",
@@ -73,51 +73,48 @@ pub const GhostKellzEcosystem = struct {
                     .mature => "🏆",
                 };
             }
-            
+
             pub fn getDisplayName(self: Maturity) []const u8 {
                 return switch (self) {
                     .alpha => "Alpha",
-                    .beta => "Beta", 
+                    .beta => "Beta",
                     .stable => "Stable",
                     .mature => "Mature",
                 };
             }
         };
-        
+
         pub fn getGitHubUrl(self: *const GhostKellzPackage) []const u8 {
             return self.github_repo;
         }
-        
+
         pub fn getZigFetchCommand(self: *const GhostKellzPackage, allocator: Allocator) ![]const u8 {
-            return std.fmt.allocPrint(allocator, 
-                "zig fetch --save https://github.com/ghostkellz/{s}/archive/refs/heads/main.tar.gz",
-                .{self.name}
-            );
+            return std.fmt.allocPrint(allocator, "zig fetch --save https://github.com/ghostkellz/{s}/archive/refs/heads/main.tar.gz", .{self.name});
         }
     };
-    
+
     pub fn init(allocator: Allocator) !GhostKellzEcosystem {
         var ecosystem = GhostKellzEcosystem{
             .allocator = allocator,
             .packages = .{},
         };
-        
+
         try ecosystem.initializePackages();
         return ecosystem;
     }
-    
+
     pub fn deinit(self: *GhostKellzEcosystem) void {
         for (self.packages.items) |*pkg| {
             self.allocator.free(pkg.name);
             self.allocator.free(pkg.description);
             self.allocator.free(pkg.github_repo);
             self.allocator.free(pkg.zig_version);
-            
+
             for (pkg.main_features) |feature| {
                 self.allocator.free(feature);
             }
             self.allocator.free(pkg.main_features);
-            
+
             for (pkg.dependencies) |dep| {
                 self.allocator.free(dep);
             }
@@ -125,7 +122,7 @@ pub const GhostKellzEcosystem = struct {
         }
         self.packages.deinit(self.allocator);
     }
-    
+
     fn initializePackages(self: *GhostKellzEcosystem) !void {
         // Core GhostKellz ecosystem packages
         const package_definitions = [_]struct {
@@ -141,7 +138,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "High-performance cryptographic library with quantum-resistant algorithms",
                 .category = .crypto,
                 .features = &[_][]const u8{ "AES-256", "ChaCha20-Poly1305", "Ed25519", "Quantum-safe NIST PQC", "Hardware acceleration" },
-                .deps = &[_][]const u8{ "zsync" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .stable,
             },
             .{
@@ -165,7 +162,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Lightning-fast embedded SQL database optimized for Zig",
                 .category = .database,
                 .features = &[_][]const u8{ "ACID compliance", "Zero-copy operations", "Async I/O", "Memory-mapped storage", "SQL compatibility" },
-                .deps = &[_][]const u8{ "zsync" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .stable,
             },
             // ghostnet removed - replaced with standard HTTP client
@@ -182,7 +179,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Next-generation TUI framework with advanced widgets and animations",
                 .category = .tui_framework,
                 .features = &[_][]const u8{ "Real-time rendering", "Widget animations", "Universal package browser", "Theme system" },
-                .deps = &[_][]const u8{ "zsync" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .stable,
             },
             .{
@@ -206,7 +203,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "High-performance JIT compiler framework",
                 .category = .runtime,
                 .features = &[_][]const u8{ "LLVM integration", "Hot reloading", "Adaptive optimization", "Debug support" },
-                .deps = &[_][]const u8{ "zsync" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .alpha,
             },
             .{
@@ -298,26 +295,26 @@ pub const GhostKellzEcosystem = struct {
                 .maturity = .alpha,
             },
         };
-        
+
         for (package_definitions) |pkg_def| {
             // Allocate and copy strings
             const name = try self.allocator.dupe(u8, pkg_def.name);
             const description = try self.allocator.dupe(u8, pkg_def.description);
             const github_repo = try std.fmt.allocPrint(self.allocator, "https://github.com/ghostkellz/{s}", .{pkg_def.name});
             const zig_version = try self.allocator.dupe(u8, "0.14.0");
-            
+
             // Copy features
             const features = try self.allocator.alloc([]const u8, pkg_def.features.len);
             for (pkg_def.features, 0..) |feature, i| {
                 features[i] = try self.allocator.dupe(u8, feature);
             }
-            
+
             // Copy dependencies
             const deps = try self.allocator.alloc([]const u8, pkg_def.deps.len);
             for (pkg_def.deps, 0..) |dep, i| {
                 deps[i] = try self.allocator.dupe(u8, dep);
             }
-            
+
             const package = GhostKellzPackage{
                 .name = name,
                 .description = description,
@@ -328,23 +325,23 @@ pub const GhostKellzEcosystem = struct {
                 .zig_version = zig_version,
                 .maturity = pkg_def.maturity,
             };
-            
+
             try self.packages.append(self.allocator, package);
         }
     }
-    
+
     pub fn getPackagesByCategory(self: *const GhostKellzEcosystem, category: GhostKellzPackage.Category) std.ArrayList(*const GhostKellzPackage) {
         var result = std.ArrayList(*const GhostKellzPackage).empty;
-        
+
         for (self.packages.items) |*pkg| {
             if (pkg.category == category) {
                 result.append(self.allocator, pkg) catch break;
             }
         }
-        
+
         return result;
     }
-    
+
     pub fn findPackage(self: *const GhostKellzEcosystem, name: []const u8) ?*const GhostKellzPackage {
         for (self.packages.items) |*pkg| {
             if (std.mem.eql(u8, pkg.name, name)) {
@@ -353,16 +350,16 @@ pub const GhostKellzEcosystem = struct {
         }
         return null;
     }
-    
+
     pub fn getDependencyTree(self: *const GhostKellzEcosystem, package_name: []const u8, allocator: Allocator) !std.ArrayList([]const u8) {
         var deps = std.ArrayList([]const u8).empty;
         var visited = std.StringHashMap(void).init(allocator);
         defer visited.deinit(allocator);
-        
+
         try self.collectDependencies(package_name, &deps, &visited, allocator);
         return deps;
     }
-    
+
     fn collectDependencies(
         self: *const GhostKellzEcosystem,
         package_name: []const u8,
@@ -372,7 +369,7 @@ pub const GhostKellzEcosystem = struct {
     ) !void {
         if (visited.contains(package_name)) return;
         try visited.put(package_name, {});
-        
+
         if (self.findPackage(package_name)) |pkg| {
             for (pkg.dependencies) |dep| {
                 try deps.append(allocator, dep);
@@ -380,27 +377,27 @@ pub const GhostKellzEcosystem = struct {
             }
         }
     }
-    
+
     pub fn generateInstallScript(self: *const GhostKellzEcosystem, package_names: []const []const u8, allocator: Allocator) ![]const u8 {
         var script = std.ArrayList(u8).empty;
         try script.appendSlice(allocator, "#!/bin/bash\n");
         try script.appendSlice(allocator, "# GhostKellz Package Installation Script\n");
         try script.appendSlice(allocator, "# Generated by Zion Package Manager\n\n");
-        
+
         var all_deps = std.StringHashMap(void).init(allocator);
         defer all_deps.deinit(allocator);
-        
+
         // Collect all unique dependencies
         for (package_names) |pkg_name| {
             const deps = try self.getDependencyTree(pkg_name, allocator);
             defer deps.deinit(allocator);
-            
+
             for (deps.items) |dep| {
                 try all_deps.put(dep, {});
             }
             try all_deps.put(pkg_name, {});
         }
-        
+
         // Generate zig fetch commands in dependency order
         var dep_iterator = all_deps.iterator();
         while (dep_iterator.next()) |entry| {
@@ -408,16 +405,16 @@ pub const GhostKellzEcosystem = struct {
             if (self.findPackage(pkg_name)) |pkg| {
                 const fetch_cmd = try pkg.getZigFetchCommand(allocator);
                 defer allocator.free(fetch_cmd);
-                
+
                 try script.writer().print("echo \"📦 Fetching {s}...\"\n", .{pkg_name});
                 try script.writer().print("{s}\n", .{fetch_cmd});
                 try script.appendSlice(allocator, "echo \"✅ {s} added to dependencies\"\n\n");
             }
         }
-        
+
         try script.appendSlice(allocator, "echo \"🎉 All GhostKellz packages installed successfully!\"\n");
         try script.appendSlice(allocator, "echo \"Run 'zig build' to verify integration\"\n");
-        
+
         return script.toOwnedSlice(allocator);
     }
 };

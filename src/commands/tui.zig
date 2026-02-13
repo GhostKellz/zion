@@ -20,7 +20,7 @@ pub fn tui(allocator: Allocator, args: []const [:0]const u8) !void {
     // Get stdin for user input
     const stdin_file = File.stdin();
     var stdin_buffer: [256]u8 = undefined;
-    
+
     while (running) {
         switch (current_screen) {
             .main_menu => {
@@ -78,7 +78,7 @@ pub fn tui(allocator: Allocator, args: []const [:0]const u8) !void {
             },
         }
     }
-    
+
     std.debug.print("\n🚀 Thanks for using Zion!\n", .{});
 }
 
@@ -94,7 +94,7 @@ fn drawMainMenu() !void {
     std.debug.print("│          🚀 ZION v1.0.6 TUI           │\n", .{});
     std.debug.print("│        The Cargo for Zig               │\n", .{});
     std.debug.print("└─────────────────────────────────────────┘\n\n", .{});
-    
+
     std.debug.print("📦 Main Menu:\n", .{});
     std.debug.print("═══════════════\n", .{});
     std.debug.print("1. 🔍 Search Packages\n", .{});
@@ -122,7 +122,7 @@ fn drawSettingsMenu() !void {
     std.debug.print("┌─────────────────────────────────────────┐\n", .{});
     std.debug.print("│         ⚙️  Settings & Performance     │\n", .{});
     std.debug.print("└─────────────────────────────────────────┘\n\n", .{});
-    
+
     std.debug.print("Settings Menu:\n", .{});
     std.debug.print("═════════════\n", .{});
     std.debug.print("1. 📊 Performance Status\n", .{});
@@ -156,16 +156,12 @@ fn getSearchInput(allocator: Allocator, io: Io, stdin_file: File, buffer: *[256]
 fn performSearchCommand(allocator: Allocator, query: []const u8) !void {
     std.debug.print("\n🔍 Searching for '{s}'...\n", .{query});
     std.debug.print("══════════════════════════════\n\n", .{});
-    
-    const search_args = [_][:0]u8{
-        try allocator.dupeZ(u8, "zion"),
-        try allocator.dupeZ(u8, "search"), 
-        try allocator.dupeZ(u8, query)
-    };
+
+    const search_args = [_][:0]u8{ try allocator.dupeZ(u8, "zion"), try allocator.dupeZ(u8, "search"), try allocator.dupeZ(u8, query) };
     defer {
         for (search_args) |arg| allocator.free(arg);
     }
-    
+
     try commands.search(allocator, &search_args);
 }
 

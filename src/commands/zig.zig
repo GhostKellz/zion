@@ -6,7 +6,6 @@ const downloader = @import("../downloader.zig");
 
 /// Zig version manager functionality (like anyzig/zigup)
 /// Supports installing, switching, and managing Zig versions
-
 /// Available Zig installation commands
 pub fn zigManager(allocator: Allocator, args: []const []const u8) !void {
     if (args.len < 3) {
@@ -103,7 +102,7 @@ fn installZig(allocator: Allocator, version: []const u8) !void {
     defer allocator.free(archive_path);
 
     try extractZigArchive(allocator, version, archive_path);
-    
+
     std.debug.print("✅ Successfully installed Zig {s}\n", .{version});
     std.debug.print("💡 Run 'zion zig use {s}' to make it active\n", .{version});
 }
@@ -131,15 +130,15 @@ fn listZigVersions(allocator: Allocator) !void {
 
     var iterator = dir.iterate();
     var count: usize = 0;
-    
+
     while (try iterator.next()) |entry| {
         if (entry.kind == .directory) {
             const current = try getCurrentZig(allocator);
             defer if (current) |c| allocator.free(c);
-            
+
             const is_current = if (current) |c| std.mem.eql(u8, entry.name, c) else false;
             const marker = if (is_current) " (current)" else "";
-            
+
             std.debug.print("  • {s}{s}\n", .{ entry.name, marker });
             count += 1;
         }
@@ -164,13 +163,13 @@ fn useZig(allocator: Allocator, version: []const u8) !void {
 
     // Create symlink to make this version active
     try setActiveZig(allocator, version);
-    
+
     std.debug.print("✅ Now using Zig {s}\n", .{version});
-    
+
     // Verify the switch worked
     const current = try getCurrentZig(allocator);
     defer if (current) |c| allocator.free(c);
-    
+
     if (current) |c| {
         if (std.mem.eql(u8, c, version)) {
             std.debug.print("🚀 Active: zig {s}\n", .{version});
@@ -205,7 +204,7 @@ fn removeZig(allocator: Allocator, version: []const u8) !void {
     // Check if this is the current version
     const current = try getCurrentZig(allocator);
     defer if (current) |c| allocator.free(c);
-    
+
     if (current) |c| {
         if (std.mem.eql(u8, c, version)) {
             std.debug.print("⚠️  Cannot remove currently active version {s}\n", .{version});
@@ -223,19 +222,19 @@ fn removeZig(allocator: Allocator, version: []const u8) !void {
 
     const cwd = fs.cwd();
     try cwd.deleteTree(version_dir);
-    
+
     std.debug.print("✅ Successfully removed Zig {s}\n", .{version});
 }
 
 /// Show available Zig versions for download
 fn availableZigVersions(allocator: Allocator) !void {
     std.debug.print("🌐 Fetching available Zig versions...\n", .{});
-    
+
     // This would normally fetch from the Zig releases API
     // For now, show some common versions
     const common_versions = [_][]const u8{
         "0.15.0-dev",
-        "0.14.0", 
+        "0.14.0",
         "0.13.0",
         "0.12.0",
         "0.11.0",
@@ -248,12 +247,11 @@ fn availableZigVersions(allocator: Allocator) !void {
         const marker = if (installed) " (installed)" else "";
         std.debug.print("  • {s}{s}\n", .{ version, marker });
     }
-    
+
     std.debug.print("\n💡 Install with: zion zig install <version>\n", .{});
 }
 
 /// Helper functions
-
 /// Ensure Zion directories exist
 fn ensureZionDirs(allocator: Allocator) !void {
     const home_dir = try getHomeDir(allocator);
@@ -272,20 +270,20 @@ fn ensureZionDirs(allocator: Allocator) !void {
     defer allocator.free(cache_dir);
 
     const cwd = fs.cwd();
-    
+
     // Create directories
     cwd.makePath(zion_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
-    
+
     cwd.makePath(zig_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
-    
+
     cwd.makePath(bin_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
-    
+
     cwd.makePath(cache_dir) catch |err| {
         if (err != error.PathAlreadyExists) return err;
     };
@@ -320,10 +318,10 @@ fn isZigInstalled(allocator: Allocator, version: []const u8) !bool {
 
 /// Get the download URL for a Zig version
 fn getZigDownloadUrl(allocator: Allocator, version: []const u8) ![]const u8 {
-    // Detect platform  
+    // Detect platform
     const os_tag = @tagName(builtin.target.os.tag);
     const arch_tag = @tagName(builtin.target.cpu.arch);
-    
+
     const platform = if (std.mem.eql(u8, os_tag, "linux"))
         if (std.mem.eql(u8, arch_tag, "x86_64")) "x86_64-linux" else "aarch64-linux"
     else if (std.mem.eql(u8, os_tag, "macos"))
@@ -337,7 +335,7 @@ fn getZigDownloadUrl(allocator: Allocator, version: []const u8) ![]const u8 {
     if (std.mem.eql(u8, version, "master")) {
         return try std.fmt.allocPrint(allocator, "https://ziglang.org/builds/zig-{s}.tar.xz", .{platform});
     }
-    
+
     // For release versions
     return try std.fmt.allocPrint(allocator, "https://ziglang.org/download/{s}/zig-{s}-{s}.tar.xz", .{ version, platform, version });
 }
@@ -351,14 +349,15 @@ fn downloadZigArchive(allocator: Allocator, version: []const u8, url: []const u8
     defer allocator.free(archive_name);
 
     const archive_path = try std.fmt.allocPrint(allocator, "{s}/.zion/cache/{s}", .{ home_dir, archive_name });
-    
+
     std.debug.print("📥 Downloading from {s}...\n", .{url});
-    
+
     // Use curl to download
     const argv = [_][]const u8{
         "curl",
         "-L", // Follow redirects
-        "-o", archive_path,
+        "-o",
+        archive_path,
         url,
     };
 
@@ -395,18 +394,19 @@ fn extractZigArchive(allocator: Allocator, version: []const u8, archive_path: []
     defer allocator.free(extract_dir);
 
     const cwd = fs.cwd();
-    
+
     // Create extraction directory
     try cwd.makePath(extract_dir);
 
     std.debug.print("📦 Extracting Zig archive...\n", .{});
-    
+
     // Use tar to extract
     const argv = [_][]const u8{
         "tar",
         "-xJf", // Extract, XZ format
         archive_path,
-        "-C", extract_dir,
+        "-C",
+        extract_dir,
         "--strip-components=1", // Remove top-level directory
     };
 
@@ -445,7 +445,7 @@ fn setActiveZig(allocator: Allocator, version: []const u8) !void {
     defer allocator.free(active_zig);
 
     const cwd = fs.cwd();
-    
+
     // Remove existing symlink
     cwd.deleteFile(active_zig) catch |err| {
         if (err != error.FileNotFound) return err;
@@ -464,7 +464,7 @@ fn getCurrentZig(allocator: Allocator) !?[]const u8 {
     defer allocator.free(active_zig);
 
     const cwd = fs.cwd();
-    
+
     // Read symlink target
     var buffer: [fs.max_path_bytes]u8 = undefined;
     const target = cwd.readLink(active_zig, &buffer) catch |err| {
@@ -481,7 +481,7 @@ fn getCurrentZig(allocator: Allocator) !?[]const u8 {
     if (std.mem.indexOf(u8, target, zig_dir_prefix)) |start| {
         const version_start = start + zig_dir_prefix.len;
         if (std.mem.indexOf(u8, target[version_start..], "/")) |end| {
-            return try allocator.dupe(u8, target[version_start..version_start + end]);
+            return try allocator.dupe(u8, target[version_start .. version_start + end]);
         }
     }
 

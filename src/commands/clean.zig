@@ -16,7 +16,7 @@ pub fn clean(allocator: Allocator, clean_all: bool) !void {
     const dirs_to_clean = [_][]const u8{
         ".zig-cache",
         ".zion/cache",
-        "zig-out",  // Always clean build output
+        "zig-out", // Always clean build output
     };
 
     var cleaned_count: u32 = 0;
@@ -47,7 +47,7 @@ pub fn clean(allocator: Allocator, clean_all: bool) !void {
         // Additional cleanup for --all flag
         const all_dirs = [_][]const u8{
             ".zion/deps", // Clean extracted dependencies
-            ".zion",      // Clean entire .zion directory
+            ".zion", // Clean entire .zion directory
         };
 
         const all_files = [_][]const u8{
@@ -235,7 +235,8 @@ fn resetBuildZig(allocator: Allocator, io: Io, cwd: Dir) !bool {
 
         // Skip zion-added lines
         if (std.mem.indexOf(u8, trimmed, "// Added by zion") != null or
-            std.mem.indexOf(u8, trimmed, "_mod = b.addModule") != null) {
+            std.mem.indexOf(u8, trimmed, "_mod = b.addModule") != null)
+        {
             found_zion_content = true;
             continue;
         }

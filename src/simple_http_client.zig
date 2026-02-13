@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 /// Simplified HTTP client for Zig 0.16 compatibility
 pub const SimpleHttpClient = struct {
     allocator: Allocator,
-    
+
     pub fn init(allocator: Allocator, runtime: anytype) !*SimpleHttpClient {
         _ = runtime;
         const client = try allocator.create(SimpleHttpClient);
@@ -14,11 +14,11 @@ pub const SimpleHttpClient = struct {
         };
         return client;
     }
-    
+
     pub fn deinit(self: *SimpleHttpClient) void {
         self.allocator.destroy(self);
     }
-    
+
     pub fn get(self: *SimpleHttpClient, url: []const u8) !SimpleHttpResponse {
         _ = url;
         // Mock implementation for now
@@ -30,7 +30,7 @@ pub const SimpleHttpClient = struct {
             .response_time_ms = 50,
         };
     }
-    
+
     pub fn post(self: *SimpleHttpClient, url: []const u8, data: []const u8) !SimpleHttpResponse {
         _ = url;
         _ = data;
@@ -42,13 +42,13 @@ pub const SimpleHttpClient = struct {
             .response_time_ms = 75,
         };
     }
-    
+
     pub fn setTimeout(self: *SimpleHttpClient, timeout_ms: u64) void {
         _ = self;
         _ = timeout_ms;
         // No-op for mock implementation
     }
-    
+
     pub fn setMaxRetries(self: *SimpleHttpClient, max_retries: u32) void {
         _ = self;
         _ = max_retries;
@@ -62,14 +62,14 @@ pub const SimpleHttpResponse = struct {
     body: ?[]const u8,
     headers: std.StringHashMap([]const u8),
     response_time_ms: u64,
-    
+
     pub fn deinit(self: *SimpleHttpResponse, allocator: Allocator) void {
         _ = allocator;
-        
+
         if (self.body) |body| {
             self.allocator.free(body);
         }
-        
+
         var iter = self.headers.iterator();
         while (iter.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
@@ -77,11 +77,11 @@ pub const SimpleHttpResponse = struct {
         }
         self.headers.deinit();
     }
-    
+
     pub fn isSuccess(self: *const SimpleHttpResponse) bool {
         return self.status_code >= 200 and self.status_code < 300;
     }
-    
+
     pub fn getHeader(self: *const SimpleHttpResponse, name: []const u8) ?[]const u8 {
         return self.headers.get(name);
     }

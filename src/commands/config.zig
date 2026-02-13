@@ -11,9 +11,9 @@ pub fn config(allocator: Allocator, args: []const [:0]const u8) !void {
         printConfigHelp();
         return;
     }
-    
+
     const subcommand = args[2];
-    
+
     if (std.mem.eql(u8, subcommand, "init")) {
         return initConfig(allocator, args[3..]);
     } else if (std.mem.eql(u8, subcommand, "get")) {
@@ -38,7 +38,7 @@ fn initConfig(allocator: Allocator, args: []const [:0]const u8) !void {
         .json
     else
         .lua; // Default to Lua for Neovim integration
-    
+
     switch (format) {
         .lua => {
             std.debug.print("🚀 Creating Lua configuration for Neovim integration...\n", .{});
@@ -49,7 +49,7 @@ fn initConfig(allocator: Allocator, args: []const [:0]const u8) !void {
             try ZionConfig.createSampleConfig(allocator, .json);
         },
     }
-    
+
     std.debug.print("\n💡 Configuration created! You can now:\n", .{});
     std.debug.print("   • Use 'zion fetch mypackage' to auto-resolve your packages\n", .{});
     std.debug.print("   • Set ZION_GITHUB_USERNAME environment variable\n", .{});
@@ -62,11 +62,11 @@ fn getConfig(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("❌ Usage: zion config get <key>\n", .{});
         return;
     }
-    
+
     const key = args[0];
     var zion_config = try ZionConfig.load(allocator);
     defer zion_config.deinit();
-    
+
     if (std.mem.eql(u8, key, "github_username")) {
         if (zion_config.github_username) |username| {
             std.debug.print("{s}\n", .{username});
@@ -105,14 +105,14 @@ fn setConfig(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("  security.verify_signatures Set signature verification (true/false)\n", .{});
         return;
     }
-    
+
     const key = args[0];
     const value = args[1];
-    
+
     // Load current config
     var zion_config = ZionConfig.load(allocator) catch ZionConfig.init(allocator);
     defer zion_config.deinit();
-    
+
     // Update the value based on key
     if (std.mem.eql(u8, key, "github_username")) {
         if (zion_config.github_username) |old_username| {
@@ -150,7 +150,7 @@ fn setConfig(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("Run 'zion config set' without arguments to see available keys.\n", .{});
         return;
     }
-    
+
     std.debug.print("💾 Configuration updated! (Note: saving not fully implemented yet)\n", .{});
 }
 
@@ -158,16 +158,16 @@ fn setConfig(allocator: Allocator, args: []const [:0]const u8) !void {
 fn showConfig(allocator: Allocator) !void {
     var zion_config = try ZionConfig.load(allocator);
     defer zion_config.deinit();
-    
+
     std.debug.print("📋 Current Zion Configuration:\n\n", .{});
-    
+
     std.debug.print("🔗 GitHub Settings:\n", .{});
     if (zion_config.github_username) |username| {
         std.debug.print("   Username: {s}\n", .{username});
     } else {
         std.debug.print("   Username: (not set)\n", .{});
     }
-    
+
     if (zion_config.github_orgs.items.len > 0) {
         std.debug.print("   Organizations: ", .{});
         for (zion_config.github_orgs.items, 0..) |org, i| {
@@ -178,25 +178,25 @@ fn showConfig(allocator: Allocator) !void {
     } else {
         std.debug.print("   Organizations: (none)\n", .{});
     }
-    
+
     std.debug.print("\n⚙️  Package Management:\n", .{});
     std.debug.print("   Auto add to build.zig: {s}\n", .{if (zion_config.auto_add_to_build) "yes" else "no"});
     std.debug.print("   Auto update lock: {s}\n", .{if (zion_config.auto_update_lock) "yes" else "no"});
     std.debug.print("   Prefer releases: {s}\n", .{if (zion_config.prefer_releases) "yes" else "no"});
-    
+
     std.debug.print("\n💾 Cache Settings:\n", .{});
     std.debug.print("   TTL: {d} hours\n", .{zion_config.cache_ttl_hours});
     std.debug.print("   Max size: {d} MB\n", .{zion_config.max_cache_size_mb});
-    
+
     std.debug.print("\n🌐 Download Settings:\n", .{});
     std.debug.print("   Concurrent downloads: {d}\n", .{zion_config.concurrent_downloads});
     std.debug.print("   Timeout: {d} seconds\n", .{zion_config.download_timeout_sec});
     std.debug.print("   Retry attempts: {d}\n", .{zion_config.retry_attempts});
-    
+
     std.debug.print("\n🔐 Security Settings:\n", .{});
     std.debug.print("   Verify signatures: {s}\n", .{if (zion_config.verify_signatures) "yes" else "no"});
     std.debug.print("   Trust level required: {s}\n", .{zion_config.trust_level_required});
-    
+
     std.debug.print("\n🔧 Editor Integration:\n", .{});
     std.debug.print("   Neovim integration: {s}\n", .{if (zion_config.neovim_integration) "enabled" else "disabled"});
     std.debug.print("   VSCode integration: {s}\n", .{if (zion_config.vscode_integration) "enabled" else "disabled"});
@@ -205,27 +205,27 @@ fn showConfig(allocator: Allocator) !void {
 /// Show environment variable help
 fn showEnvHelp() void {
     std.debug.print("🌍 Zion Environment Variables:\n\n", .{});
-    
+
     std.debug.print("📋 GitHub Configuration:\n", .{});
     std.debug.print("   ZION_GITHUB_USERNAME     Your GitHub username\n", .{});
     std.debug.print("   ZION_GITHUB_ORGS         Comma-separated list of organizations\n", .{});
-    
+
     std.debug.print("\n⚙️  Behavior Settings:\n", .{});
     std.debug.print("   ZION_AUTO_ADD_TO_BUILD   Automatically modify build.zig (true/false)\n", .{});
     std.debug.print("   ZION_VERIFY_SIGNATURES   Verify package signatures (true/false)\n", .{});
-    
+
     std.debug.print("\n💾 Cache Settings:\n", .{});
     std.debug.print("   ZION_CACHE_TTL_HOURS     Cache time-to-live in hours\n", .{});
     std.debug.print("   ZION_MAX_CACHE_SIZE_MB   Maximum cache size in MB\n", .{});
-    
+
     std.debug.print("\n🌐 Download Settings:\n", .{});
     std.debug.print("   ZION_CONCURRENT_DOWNLOADS Number of parallel downloads\n", .{});
-    
+
     std.debug.print("\n💡 Examples:\n", .{});
     std.debug.print("   export ZION_GITHUB_USERNAME=ghostkellz\n", .{});
     std.debug.print("   export ZION_GITHUB_ORGS=\"ghostkellz,CK-Technology\"\n", .{});
     std.debug.print("   export ZION_AUTO_ADD_TO_BUILD=true\n", .{});
-    
+
     std.debug.print("\n🚀 Quick Setup:\n", .{});
     std.debug.print("   echo 'export ZION_GITHUB_USERNAME=ghostkellz' >> ~/.bashrc\n", .{});
     std.debug.print("   echo 'export ZION_GITHUB_ORGS=\"ghostkellz,CK-Technology\"' >> ~/.bashrc\n", .{});

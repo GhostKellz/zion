@@ -18,7 +18,7 @@ pub fn fmt(allocator: Allocator, args: []const []const u8) !void {
     var i: usize = 2;
     while (i < args.len) {
         const arg = args[i];
-        
+
         if (std.mem.eql(u8, arg, "--check")) {
             options.check_only = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {
@@ -34,7 +34,7 @@ pub fn fmt(allocator: Allocator, args: []const []const u8) !void {
             // It's a file or directory
             try target_files.append(allocator, arg);
         }
-        
+
         i += 1;
     }
 
@@ -91,7 +91,7 @@ fn formatProject(allocator: Allocator, options: FmtOptions) !void {
 
     // Discover all .zig files in the project
     try formatter.discoverFiles(".");
-    
+
     if (formatter.files.items.len == 0) {
         std.debug.print("❌ No .zig files found in project\n");
         return;
@@ -103,7 +103,7 @@ fn formatProject(allocator: Allocator, options: FmtOptions) !void {
 
     // Format all discovered files
     try formatter.formatAll();
-    
+
     // Print summary
     try formatter.printSummary();
 }
@@ -141,7 +141,7 @@ fn formatTargets(allocator: Allocator, targets: []const []const u8, options: Fmt
 
     // Format all discovered files
     try formatter.formatAll();
-    
+
     // Print summary
     try formatter.printSummary();
 }
@@ -184,11 +184,7 @@ const ProjectFormatter = struct {
 
         var iterator = dir.iterate();
         while (try iterator.next()) |entry| {
-            const full_path = try std.fmt.allocPrint(
-                self.allocator, 
-                "{s}/{s}", 
-                .{ dir_path, entry.name }
-            );
+            const full_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ dir_path, entry.name });
             defer self.allocator.free(full_path);
 
             if (entry.kind == .directory) {
@@ -196,14 +192,14 @@ const ProjectFormatter = struct {
                 if (self.shouldSkipDirectory(entry.name)) {
                     continue;
                 }
-                
+
                 try self.discoverFiles(full_path);
             } else if (entry.kind == .file and std.mem.endsWith(u8, entry.name, ".zig")) {
                 // Check if we should skip this file
                 if (self.shouldSkipFile(entry.name)) {
                     continue;
                 }
-                
+
                 try self.files.append(try self.allocator.dupe(u8, full_path));
             }
         }
@@ -215,10 +211,10 @@ const ProjectFormatter = struct {
             if (self.options.verbose) {
                 std.debug.print("📝 Processing: {s}\n", .{file});
             }
-            
+
             const result = try self.formatFile(file);
             self.updateStats(result);
-            
+
             if (!self.options.check_only and result == .formatted) {
                 if (self.options.verbose) {
                     std.debug.print("   ✅ Formatted\n");
@@ -269,17 +265,17 @@ const ProjectFormatter = struct {
         if (child_format.stderr) |stderr_pipe| {
             var output_buf = std.ArrayList(u8).init(self.allocator);
             defer output_buf.deinit(allocator);
-            
+
             var read_buf: [4096]u8 = undefined;
             while (true) {
                 const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
                 if (bytes_read == 0) break;
                 try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
             }
-            
+
             const stderr_data = try self.allocator.dupe(u8, output_buf.items);
             defer self.allocator.free(stderr_data);
-            
+
             if (stderr_data.len > 0) {
                 std.debug.print("⚠️  Formatting error in {s}:\n{s}\n", .{ file_path, stderr_data });
                 return .error_occurred;
@@ -295,10 +291,10 @@ const ProjectFormatter = struct {
     /// Check if directory should be skipped
     fn shouldSkipDirectory(self: *Self, dir_name: []const u8) bool {
         _ = self;
-        
+
         const skip_dirs = [_][]const u8{
             ".git",
-            ".zig-cache", 
+            ".zig-cache",
             "zig-cache",
             "zig-out",
             "node_modules",
@@ -320,16 +316,18 @@ const ProjectFormatter = struct {
     /// Check if file should be skipped
     fn shouldSkipFile(self: *Self, file_name: []const u8) bool {
         // Skip test files if requested
-        if (self.options.exclude_tests and 
+        if (self.options.exclude_tests and
             (std.mem.indexOf(u8, file_name, "test") != null or
-             std.mem.endsWith(u8, file_name, "_test.zig"))) {
+                std.mem.endsWith(u8, file_name, "_test.zig")))
+        {
             return true;
         }
 
-        // Skip example files if requested  
+        // Skip example files if requested
         if (self.options.exclude_examples and
             (std.mem.indexOf(u8, file_name, "example") != null or
-             std.mem.startsWith(u8, file_name, "example_"))) {
+                std.mem.startsWith(u8, file_name, "example_")))
+        {
             return true;
         }
 
@@ -351,7 +349,7 @@ const ProjectFormatter = struct {
     pub fn printSummary(self: *Self) !void {
         std.debug.print("\n📊 Formatting Summary:\n");
         std.debug.print("   Total files: {d}\n", .{self.stats.total});
-        
+
         if (!self.options.check_only) {
             std.debug.print("   ✅ Already formatted: {d}\n", .{self.stats.already_formatted});
             std.debug.print("   🎨 Newly formatted: {d}\n", .{self.stats.formatted});
@@ -359,7 +357,7 @@ const ProjectFormatter = struct {
             std.debug.print("   ✅ Properly formatted: {d}\n", .{self.stats.already_formatted});
             std.debug.print("   ❌ Need formatting: {d}\n", .{self.stats.needs_formatting});
         }
-        
+
         if (self.stats.errors > 0) {
             std.debug.print("   ⚠️  Errors: {d}\n", .{self.stats.errors});
         }

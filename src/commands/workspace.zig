@@ -146,7 +146,7 @@ fn buildWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
         if (std.mem.eql(u8, arg, "--all")) {
             build_all = true;
         } else if (std.mem.startsWith(u8, arg, "--jobs=") or std.mem.startsWith(u8, arg, "-j=")) {
-            const jobs_str = arg[std.mem.indexOf(u8, arg, "=").? + 1..];
+            const jobs_str = arg[std.mem.indexOf(u8, arg, "=").? + 1 ..];
             parallel_jobs = std.fmt.parseInt(u8, jobs_str, 10) catch 1;
         } else if (!std.mem.startsWith(u8, arg, "--")) {
             target_package = arg;
@@ -220,7 +220,7 @@ fn buildWorkspace(allocator: Allocator, args: []const [:0]const u8) !void {
             .stdin = .ignore,
             .stdout = .pipe,
             .stderr = .pipe,
-            .cwd = package_dir,
+            .cwd = .{ .path = package_dir },
         }) catch |err| {
             std.debug.print("  Error spawning build for {s}: {}\n", .{ member, err });
             failed_builds += 1;
@@ -518,7 +518,7 @@ fn resolveWorkspaceDependencies(allocator: Allocator) !void {
 
         if (std.mem.indexOf(u8, trimmed, "=")) |eq_pos| {
             const dep_name = std.mem.trim(u8, trimmed[0..eq_pos], " \t\"");
-            const dep_spec = std.mem.trim(u8, trimmed[eq_pos + 1..], " \t\"");
+            const dep_spec = std.mem.trim(u8, trimmed[eq_pos + 1 ..], " \t\"");
 
             std.debug.print("    {s} = {s}\n", .{ dep_name, dep_spec });
             deps_found += 1;
