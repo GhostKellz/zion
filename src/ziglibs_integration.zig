@@ -149,8 +149,8 @@ pub const ZigLibsIntegration = struct {
     pub fn init(allocator: Allocator) !ZigLibsIntegration {
         var integration = ZigLibsIntegration{
             .allocator = allocator,
-            .packages = .{},
-            .tools = .{},
+            .packages = .empty,
+            .tools = .empty,
         };
 
         try integration.initializeCommonPackages();

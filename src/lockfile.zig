@@ -6,6 +6,9 @@ const Allocator = std.mem.Allocator;
 const json = std.json;
 const zion_root = @import("root.zig");
 
+/// Lock file format version
+pub const LOCK_FILE_VERSION: u32 = 2;
+
 /// Represents a package entry in the lock file
 pub const LockedPackage = struct {
     name: []const u8,
@@ -19,6 +22,11 @@ pub const LockedPackage = struct {
     integrity: ?[]const u8 = null,
     dependencies: ?[][]const u8 = null,
     dev_only: bool = false,
+    // v0.8.0 version constraint fields
+    version_constraint: ?[]const u8 = null, // Original constraint like "^1.0.0"
+    pinned: bool = false, // If true, skip auto-updates
+    pinned_ref: ?[]const u8 = null, // Git ref if pinned (tag or commit)
+    last_checked: ?i64 = null, // When we last checked for updates
 
     pub fn deinit(self: *LockedPackage, allocator: Allocator) void {
         allocator.free(self.name);
@@ -32,6 +40,8 @@ pub const LockedPackage = struct {
             for (deps) |dep| allocator.free(dep);
             allocator.free(deps);
         }
+        if (self.version_constraint) |vc| allocator.free(vc);
+        if (self.pinned_ref) |pr| allocator.free(pr);
     }
 };
 
@@ -43,7 +53,7 @@ pub const LockFile = struct {
     /// Initialize a new, empty lock file
     pub fn init(allocator: Allocator) LockFile {
         return LockFile{
-            .packages = .{},
+            .packages = .empty,
             .allocator = allocator,
         };
     }
@@ -67,7 +77,7 @@ pub const LockFile = struct {
         return self.addPackageWithMetadata(name, url, hash, .{ .version = version });
     }
 
-    /// Enhanced metadata structure for v0.7.0
+    /// Enhanced metadata structure for v0.7.0+
     pub const PackageMetadata = struct {
         version: ?[]const u8 = null,
         registry: ?[]const u8 = null,
@@ -75,6 +85,10 @@ pub const LockFile = struct {
         integrity: ?[]const u8 = null,
         dependencies: ?[][]const u8 = null,
         dev_only: bool = false,
+        // v0.8.0 constraint fields
+        version_constraint: ?[]const u8 = null,
+        pinned: bool = false,
+        pinned_ref: ?[]const u8 = null,
     };
 
     /// Add a package with enhanced metadata (v0.7.0)
@@ -100,12 +114,16 @@ pub const LockFile = struct {
                     .integrity = if (metadata.integrity) |i| try self.allocator.dupe(u8, i) else null,
                     .dependencies = if (metadata.dependencies) |deps| blk: {
                         const deps_copy = try self.allocator.alloc([]const u8, deps.len);
-                        for (deps, 0..) |dep, i| {
-                            deps_copy[i] = try self.allocator.dupe(u8, dep);
+                        for (deps, 0..) |dep, idx| {
+                            deps_copy[idx] = try self.allocator.dupe(u8, dep);
                         }
                         break :blk deps_copy;
                     } else null,
                     .dev_only = metadata.dev_only,
+                    .version_constraint = if (metadata.version_constraint) |vc| try self.allocator.dupe(u8, vc) else null,
+                    .pinned = metadata.pinned,
+                    .pinned_ref = if (metadata.pinned_ref) |pr| try self.allocator.dupe(u8, pr) else null,
+                    .last_checked = zion_root.timestamp(),
                     .timestamp = zion_root.timestamp(),
                 };
                 return;
@@ -123,12 +141,16 @@ pub const LockFile = struct {
             .integrity = if (metadata.integrity) |i| try self.allocator.dupe(u8, i) else null,
             .dependencies = if (metadata.dependencies) |deps| blk: {
                 const deps_copy = try self.allocator.alloc([]const u8, deps.len);
-                for (deps, 0..) |dep, i| {
-                    deps_copy[i] = try self.allocator.dupe(u8, dep);
+                for (deps, 0..) |dep, idx| {
+                    deps_copy[idx] = try self.allocator.dupe(u8, dep);
                 }
                 break :blk deps_copy;
             } else null,
             .dev_only = metadata.dev_only,
+            .version_constraint = if (metadata.version_constraint) |vc| try self.allocator.dupe(u8, vc) else null,
+            .pinned = metadata.pinned,
+            .pinned_ref = if (metadata.pinned_ref) |pr| try self.allocator.dupe(u8, pr) else null,
+            .last_checked = zion_root.timestamp(),
             .timestamp = zion_root.timestamp(),
         };
 
@@ -227,9 +249,9 @@ pub const LockFile = struct {
                                 if (deps_val == .array) {
                                     const deps_array = deps_val.array.items;
                                     const deps_copy = try allocator.alloc([]const u8, deps_array.len);
-                                    for (deps_array, 0..) |dep_val, i| {
+                                    for (deps_array, 0..) |dep_val, idx| {
                                         if (dep_val == .string) {
-                                            deps_copy[i] = try allocator.dupe(u8, dep_val.string);
+                                            deps_copy[idx] = try allocator.dupe(u8, dep_val.string);
                                         } else {
                                             break :blk null;
                                         }
@@ -239,6 +261,27 @@ pub const LockFile = struct {
                                 break :blk null;
                             } else null;
 
+                            // v0.8.0 constraint fields
+                            const version_constraint = if (pkg_obj.get("version_constraint")) |vc|
+                                if (vc == .string) vc.string else null
+                            else
+                                null;
+
+                            const pinned = if (pkg_obj.get("pinned")) |p|
+                                if (p == .bool) p.bool else false
+                            else
+                                false;
+
+                            const pinned_ref = if (pkg_obj.get("pinned_ref")) |pr|
+                                if (pr == .string) pr.string else null
+                            else
+                                null;
+
+                            const last_checked = if (pkg_obj.get("last_checked")) |lc|
+                                if (lc == .integer) lc.integer else null
+                            else
+                                null;
+
                             try lock_file.packages.append(allocator, LockedPackage{
                                 .name = try allocator.dupe(u8, name),
                                 .url = try allocator.dupe(u8, url),
@@ -246,9 +289,13 @@ pub const LockFile = struct {
                                 .version = if (version) |v| try allocator.dupe(u8, v) else null,
                                 .registry = if (registry) |r| try allocator.dupe(u8, r) else null,
                                 .resolved_from = if (resolved_from) |rf| try allocator.dupe(u8, rf) else null,
-                                .integrity = if (integrity) |i| try allocator.dupe(u8, i) else null,
+                                .integrity = if (integrity) |integ| try allocator.dupe(u8, integ) else null,
                                 .dependencies = dependencies,
                                 .dev_only = dev_only,
+                                .version_constraint = if (version_constraint) |vc| try allocator.dupe(u8, vc) else null,
+                                .pinned = pinned,
+                                .pinned_ref = if (pinned_ref) |pr| try allocator.dupe(u8, pr) else null,
+                                .last_checked = last_checked,
                                 .timestamp = timestamp,
                             });
                         }
@@ -270,7 +317,10 @@ pub const LockFile = struct {
         defer file.close(io);
 
         // Create a simple JSON structure manually for better control
-        try file.writeStreamingAll(io, "{\n  \"packages\": [\n");
+        // Write version header for migration support
+        const header_line = try std.fmt.allocPrint(self.allocator, "{{\n  \"version\": {d},\n  \"packages\": [\n", .{LOCK_FILE_VERSION});
+        defer self.allocator.free(header_line);
+        try file.writeStreamingAll(io, header_line);
 
         for (self.packages.items, 0..) |pkg, i| {
             try file.writeStreamingAll(io, "    {\n");
@@ -332,6 +382,29 @@ pub const LockFile = struct {
                 const dev_only_line = try std.fmt.allocPrint(self.allocator, ",\n      \"dev_only\": {}", .{pkg.dev_only});
                 defer self.allocator.free(dev_only_line);
                 try file.writeStreamingAll(io, dev_only_line);
+            }
+
+            // v0.8.0 constraint fields
+            if (pkg.version_constraint) |vc| {
+                const vc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version_constraint\": \"{s}\"", .{vc});
+                defer self.allocator.free(vc_line);
+                try file.writeStreamingAll(io, vc_line);
+            }
+
+            if (pkg.pinned) {
+                try file.writeStreamingAll(io, ",\n      \"pinned\": true");
+            }
+
+            if (pkg.pinned_ref) |pr| {
+                const pr_line = try std.fmt.allocPrint(self.allocator, ",\n      \"pinned_ref\": \"{s}\"", .{pr});
+                defer self.allocator.free(pr_line);
+                try file.writeStreamingAll(io, pr_line);
+            }
+
+            if (pkg.last_checked) |lc| {
+                const lc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"last_checked\": {d}", .{lc});
+                defer self.allocator.free(lc_line);
+                try file.writeStreamingAll(io, lc_line);
             }
 
             try file.writeStreamingAll(io, "\n    }");

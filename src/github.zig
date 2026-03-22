@@ -21,6 +21,31 @@ pub const GitHubTag = struct {
     }
 };
 
+/// Error for malformed JSON responses
+pub const JsonError = error{
+    MalformedJson,
+    MissingField,
+    InvalidFieldType,
+};
+
+/// Safely get a string field from a JSON object, returning error instead of panicking
+fn getJsonString(obj: std.json.ObjectMap, field: []const u8) JsonError![]const u8 {
+    const val = obj.get(field) orelse return JsonError.MissingField;
+    return switch (val) {
+        .string => |s| s,
+        else => JsonError.InvalidFieldType,
+    };
+}
+
+/// Safely get a bool field from a JSON object, returning error instead of panicking
+fn getJsonBool(obj: std.json.ObjectMap, field: []const u8) JsonError!bool {
+    const val = obj.get(field) orelse return JsonError.MissingField;
+    return switch (val) {
+        .bool => |b| b,
+        else => JsonError.InvalidFieldType,
+    };
+}
+
 pub const GitHubRelease = struct {
     tag_name: []const u8,
     name: []const u8,
@@ -60,7 +85,7 @@ pub fn fetchPackageVersions(allocator: Allocator, package_ref: []const u8) ![]Pa
     const owner = package_ref[0..slash_index];
     const repo = package_ref[slash_index + 1 ..];
 
-    var versions: std.ArrayList(PackageVersion) = .{};
+    var versions: std.ArrayList(PackageVersion) = .empty;
     errdefer {
         for (versions.items) |*version| {
             version.deinit(allocator);
@@ -250,25 +275,26 @@ fn fetchReleases(allocator: Allocator, owner: []const u8, repo: []const u8) ![]G
     defer parsed.deinit();
 
     const releases_array = parsed.value.array;
-    var releases: std.ArrayList(GitHubRelease) = .{};
+    var releases: std.ArrayList(GitHubRelease) = .empty;
 
     for (releases_array.items) |release_json| {
         const release_obj = release_json.object;
 
-        const tag_name = try allocator.dupe(u8, release_obj.get("tag_name").?.string);
-        const name = try allocator.dupe(u8, release_obj.get("name").?.string);
-        const published_at = try allocator.dupe(u8, release_obj.get("published_at").?.string);
-        const prerelease = release_obj.get("prerelease").?.bool;
-        const tarball_url = try allocator.dupe(u8, release_obj.get("tarball_url").?.string);
-        const zipball_url = try allocator.dupe(u8, release_obj.get("zipball_url").?.string);
+        // Use safe JSON field access - skip malformed entries instead of panicking
+        const tag_name = getJsonString(release_obj, "tag_name") catch continue;
+        const name_str = getJsonString(release_obj, "name") catch continue;
+        const published_at = getJsonString(release_obj, "published_at") catch continue;
+        const prerelease = getJsonBool(release_obj, "prerelease") catch continue;
+        const tarball_url = getJsonString(release_obj, "tarball_url") catch continue;
+        const zipball_url = getJsonString(release_obj, "zipball_url") catch continue;
 
         try releases.append(allocator, GitHubRelease{
-            .tag_name = tag_name,
-            .name = name,
-            .published_at = published_at,
+            .tag_name = try allocator.dupe(u8, tag_name),
+            .name = try allocator.dupe(u8, name_str),
+            .published_at = try allocator.dupe(u8, published_at),
             .prerelease = prerelease,
-            .tarball_url = tarball_url,
-            .zipball_url = zipball_url,
+            .tarball_url = try allocator.dupe(u8, tarball_url),
+            .zipball_url = try allocator.dupe(u8, zipball_url),
         });
     }
 
@@ -299,25 +325,26 @@ fn fetchReleasesFromRegistry(allocator: Allocator, reg: *const registry.Registry
     defer parsed.deinit();
 
     const releases_array = parsed.value.array;
-    var releases: std.ArrayList(GitHubRelease) = .{};
+    var releases: std.ArrayList(GitHubRelease) = .empty;
 
     for (releases_array.items) |release_json| {
         const release_obj = release_json.object;
 
-        const tag_name = try allocator.dupe(u8, release_obj.get("tag_name").?.string);
-        const name = try allocator.dupe(u8, release_obj.get("name").?.string);
-        const published_at = try allocator.dupe(u8, release_obj.get("published_at").?.string);
-        const prerelease = release_obj.get("prerelease").?.bool;
-        const tarball_url = try allocator.dupe(u8, release_obj.get("tarball_url").?.string);
-        const zipball_url = try allocator.dupe(u8, release_obj.get("zipball_url").?.string);
+        // Use safe JSON field access - skip malformed entries instead of panicking
+        const tag_name = getJsonString(release_obj, "tag_name") catch continue;
+        const name_str = getJsonString(release_obj, "name") catch continue;
+        const published_at = getJsonString(release_obj, "published_at") catch continue;
+        const prerelease = getJsonBool(release_obj, "prerelease") catch continue;
+        const tarball_url = getJsonString(release_obj, "tarball_url") catch continue;
+        const zipball_url = getJsonString(release_obj, "zipball_url") catch continue;
 
         try releases.append(allocator, GitHubRelease{
-            .tag_name = tag_name,
-            .name = name,
-            .published_at = published_at,
+            .tag_name = try allocator.dupe(u8, tag_name),
+            .name = try allocator.dupe(u8, name_str),
+            .published_at = try allocator.dupe(u8, published_at),
             .prerelease = prerelease,
-            .tarball_url = tarball_url,
-            .zipball_url = zipball_url,
+            .tarball_url = try allocator.dupe(u8, tarball_url),
+            .zipball_url = try allocator.dupe(u8, zipball_url),
         });
     }
 
@@ -348,19 +375,20 @@ fn fetchTagsFromRegistry(allocator: Allocator, reg: *const registry.RegistryClie
     defer parsed.deinit();
 
     const tags_array = parsed.value.array;
-    var tags: std.ArrayList(GitHubTag) = .{};
+    var tags: std.ArrayList(GitHubTag) = .empty;
 
     for (tags_array.items) |tag_json| {
         const tag_obj = tag_json.object;
 
-        const name = try allocator.dupe(u8, tag_obj.get("name").?.string);
-        const tarball_url = try allocator.dupe(u8, tag_obj.get("tarball_url").?.string);
-        const zipball_url = try allocator.dupe(u8, tag_obj.get("zipball_url").?.string);
+        // Use safe JSON field access - skip malformed entries instead of panicking
+        const name = getJsonString(tag_obj, "name") catch continue;
+        const tarball_url = getJsonString(tag_obj, "tarball_url") catch continue;
+        const zipball_url = getJsonString(tag_obj, "zipball_url") catch continue;
 
         try tags.append(allocator, GitHubTag{
-            .name = name,
-            .tarball_url = tarball_url,
-            .zipball_url = zipball_url,
+            .name = try allocator.dupe(u8, name),
+            .tarball_url = try allocator.dupe(u8, tarball_url),
+            .zipball_url = try allocator.dupe(u8, zipball_url),
         });
     }
 
@@ -391,19 +419,20 @@ fn fetchTags(allocator: Allocator, owner: []const u8, repo: []const u8) ![]GitHu
     defer parsed.deinit();
 
     const tags_array = parsed.value.array;
-    var tags: std.ArrayList(GitHubTag) = .{};
+    var tags: std.ArrayList(GitHubTag) = .empty;
 
     for (tags_array.items) |tag_json| {
         const tag_obj = tag_json.object;
 
-        const name = try allocator.dupe(u8, tag_obj.get("name").?.string);
-        const tarball_url = try allocator.dupe(u8, tag_obj.get("tarball_url").?.string);
-        const zipball_url = try allocator.dupe(u8, tag_obj.get("zipball_url").?.string);
+        // Use safe JSON field access - skip malformed entries instead of panicking
+        const name = getJsonString(tag_obj, "name") catch continue;
+        const tarball_url = getJsonString(tag_obj, "tarball_url") catch continue;
+        const zipball_url = getJsonString(tag_obj, "zipball_url") catch continue;
 
         try tags.append(allocator, GitHubTag{
-            .name = name,
-            .tarball_url = tarball_url,
-            .zipball_url = zipball_url,
+            .name = try allocator.dupe(u8, name),
+            .tarball_url = try allocator.dupe(u8, tarball_url),
+            .zipball_url = try allocator.dupe(u8, zipball_url),
         });
     }
 

@@ -96,7 +96,7 @@ pub const GhostKellzEcosystem = struct {
     pub fn init(allocator: Allocator) !GhostKellzEcosystem {
         var ecosystem = GhostKellzEcosystem{
             .allocator = allocator,
-            .packages = .{},
+            .packages = .empty,
         };
 
         try ecosystem.initializePackages();

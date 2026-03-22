@@ -22,7 +22,7 @@ test "Performance: concurrent operations benchmark" {
         const start = std.time.nanoTimestamp();
 
         // Simulate concurrent operations
-        var tasks = std.ArrayList(std.Thread){};
+        var tasks = std.ArrayList(std.Thread).empty;
         defer tasks.deinit(allocator);
 
         for (0..4) |_| {
@@ -63,7 +63,7 @@ test "Memory: allocation stress test" {
     }
 
     // Test concurrent allocations
-    var threads = std.ArrayList(std.Thread){};
+    var threads = std.ArrayList(std.Thread).empty;
     defer threads.deinit(allocator);
 
     for (0..4) |_| {
@@ -88,7 +88,7 @@ test "Integration: full workflow simulation" {
     const allocator = std.testing.allocator;
 
     // Simulate a complete package resolution workflow
-    var workflow_steps = std.ArrayList([]const u8){};
+    var workflow_steps = std.ArrayList([]const u8).empty;
     defer workflow_steps.deinit(allocator);
 
     try workflow_steps.append(allocator, "1. Initialize registry manager");
@@ -142,7 +142,7 @@ test "Concurrency: race condition detection" {
     var shared_counter: u32 = 0;
     var mutex = std.Thread.Mutex{};
 
-    var threads = std.ArrayList(std.Thread){};
+    var threads = std.ArrayList(std.Thread).empty;
     defer threads.deinit(allocator);
 
     // Spawn threads that increment counter

@@ -141,7 +141,7 @@ pub const UnifiedRegistryManager = struct {
         }
 
         // Create futures for parallel resolution
-        var futures: std.ArrayList(*zsync.Future(PackageResult)) = .{};
+        var futures: std.ArrayList(*zsync.Future(PackageResult)) = .empty;
         defer {
             for (futures.items) |future| future.deinit(allocator);
             futures.deinit(self.allocator);
@@ -214,7 +214,7 @@ pub const UnifiedRegistryManager = struct {
         }
 
         // Create futures for parallel search
-        var search_futures: std.ArrayList(*zsync.Future(SearchResult)) = .{};
+        var search_futures: std.ArrayList(*zsync.Future(SearchResult)) = .empty;
         defer {
             for (search_futures.items) |future| future.deinit(allocator);
             search_futures.deinit(self.allocator);
@@ -286,7 +286,7 @@ pub const UnifiedRegistryManager = struct {
         }
 
         // Convert to sorted array
-        var final_results: std.ArrayList(Package) = .{};
+        var final_results: std.ArrayList(Package) = .empty;
         defer final_results.deinit(self.allocator);
 
         var iterator = result_map.iterator();
@@ -622,7 +622,7 @@ pub const UnifiedRegistryManager = struct {
             return error.InvalidJsonFormat;
         }
 
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayList(Package) = .empty;
 
         for (packages_array.items) |item| {
             if (item != .object) continue;

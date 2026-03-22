@@ -40,7 +40,7 @@ pub const CommandSuggester = struct {
 
     /// Get multiple suggestions for ambiguous inputs
     pub fn suggestCommands(self: *const CommandSuggester, allocator: Allocator, input: []const u8) ![][]const u8 {
-        var suggestions: std.ArrayList([]const u8) = .{};
+        var suggestions: std.ArrayList([]const u8) = .empty;
         defer suggestions.deinit(allocator);
 
         // Find prefix matches first
@@ -364,7 +364,7 @@ pub const CommandHistory = struct {
         };
         defer self.allocator.free(content);
 
-        var commands: std.ArrayList([]const u8) = .{};
+        var commands: std.ArrayList([]const u8) = .empty;
         defer commands.deinit(self.allocator);
 
         var lines = std.mem.splitBackwards(u8, content, "\n");

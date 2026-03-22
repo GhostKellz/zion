@@ -1,11 +1,15 @@
 const std = @import("std");
 const http = std.http;
 
+/// Maximum response size to prevent OOM attacks (50MB)
+pub const MAX_RESPONSE_SIZE: usize = 50 * 1024 * 1024;
+
 pub const HttpError = error{
     RequestFailed,
     Timeout,
     InvalidResponse,
     NetworkError,
+    ResponseTooLarge,
 };
 
 pub fn makeResilientRequest(
@@ -65,14 +69,23 @@ fn makeSingleRequest(allocator: std.mem.Allocator, url: []const u8, timeout_sec:
         return HttpError.InvalidResponse;
     }
 
-    var output_buf: std.ArrayList(u8) = .{};
+    var output_buf: std.ArrayList(u8) = .empty;
     defer output_buf.deinit(allocator);
 
     var read_buf: [4096]u8 = undefined;
     while (true) {
+        // Security: Check response size before reading more data
+        if (output_buf.items.len > MAX_RESPONSE_SIZE) {
+            return HttpError.ResponseTooLarge;
+        }
         const bytes_read = req.readAll(read_buf[0..]) catch return HttpError.InvalidResponse;
         if (bytes_read == 0) break;
-        output_buf.appendSlice(read_buf[0..bytes_read]) catch return HttpError.InvalidResponse;
+        output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch return HttpError.InvalidResponse;
+    }
+
+    // Final size check
+    if (output_buf.items.len > MAX_RESPONSE_SIZE) {
+        return HttpError.ResponseTooLarge;
     }
 
     return allocator.dupe(u8, output_buf.items) catch HttpError.InvalidResponse;

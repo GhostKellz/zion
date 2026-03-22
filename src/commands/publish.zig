@@ -7,7 +7,7 @@ const Io = std.Io;
 const zion_root = @import("../root.zig");
 const enhanced_config = @import("../enhanced_config.zig");
 const registry_manager = @import("../registry_manager.zig");
-const registry_v2 = @import("../registry_v2.zig");
+const package_registry = @import("../package_registry.zig");
 const security = @import("../security.zig");
 const ZonFile = @import("../manifest.zig").ZonFile;
 
@@ -33,7 +33,7 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
     std.debug.print("📦 Publishing package to registry: {s}\n", .{target_registry});
 
     // Find registry client
-    var target_client: ?*registry_v2.RegistryClient = null;
+    var target_client: ?*package_registry.RegistryClient = null;
     for (manager.clients.items) |*client| {
         if (std.mem.eql(u8, client.config.name, target_registry)) {
             target_client = client;
@@ -362,8 +362,8 @@ fn readPackageMetadata(allocator: Allocator) !PackageMetadata {
     } else |_| {}
 
     // Parse dependencies from ZON file
-    var dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
-    var dev_dependencies: std.ArrayList(PackageMetadata.Dependency) = .{};
+    var dependencies: std.ArrayList(PackageMetadata.Dependency) = .empty;
+    var dev_dependencies: std.ArrayList(PackageMetadata.Dependency) = .empty;
 
     // In a real implementation, would parse the ZON file structure
 
@@ -425,7 +425,7 @@ fn validatePackageMetadata(metadata: PackageMetadata) !void {
 }
 
 /// Check if package already exists in registry
-fn checkExistingPackage(client: *registry_v2.RegistryClient, metadata: PackageMetadata) !?registry_v2.Package {
+fn checkExistingPackage(client: *package_registry.RegistryClient, metadata: PackageMetadata) !?package_registry.Package {
     // Parse package name for owner/repo
     var parts = std.mem.splitScalar(u8, metadata.name, '/');
     const owner = parts.next() orelse metadata.name;
@@ -577,7 +577,7 @@ fn signPackage(allocator: Allocator, package_path: []const u8, metadata: Package
 /// Upload package to registry
 fn uploadPackage(
     allocator: Allocator,
-    client: *registry_v2.RegistryClient,
+    client: *package_registry.RegistryClient,
     package_path: []const u8,
     metadata: PackageMetadata,
     signature: ?security.PackageSignature,

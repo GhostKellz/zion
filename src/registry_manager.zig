@@ -1,14 +1,14 @@
 const std = @import("std");
 const enhanced_config = @import("enhanced_config.zig");
-const registry_v2 = @import("registry_v2.zig");
+const package_registry = @import("package_registry.zig");
 const RegistryConfig = enhanced_config.RegistryConfig;
 const ZionConfig = enhanced_config.ZionConfig;
-const RegistryClient = registry_v2.RegistryClient;
-const Package = registry_v2.Package;
-const Release = registry_v2.Release;
-const Dependency = registry_v2.Dependency;
-const SearchFilters = registry_v2.SearchFilters;
-const RegistryHealth = registry_v2.RegistryHealth;
+const RegistryClient = package_registry.RegistryClient;
+const Package = package_registry.Package;
+const Release = package_registry.Release;
+const Dependency = package_registry.Dependency;
+const SearchFilters = package_registry.SearchFilters;
+const RegistryHealth = package_registry.RegistryHealth;
 const zion_root = @import("root.zig");
 
 /// Registry Manager for v0.7.0 - coordinates multiple registries
@@ -24,7 +24,7 @@ pub const RegistryManager = struct {
         return RegistryManager{
             .allocator = allocator,
             .config = zion_config,
-            .clients = .{},
+            .clients = .empty,
             .health_monitor = HealthMonitor.init(allocator),
             .package_resolver = PackageResolver.init(allocator),
             .dependency_analyzer = DependencyAnalyzer.init(allocator),
@@ -67,7 +67,7 @@ pub const RegistryManager = struct {
     pub fn resolvePackage(self: *RegistryManager, package_name: []const u8, version: ?[]const u8) !?Package {
         std.log.info("🔍 Resolving package: {s} {s}", .{ package_name, version orelse "latest" });
 
-        var resolved_packages: std.ArrayList(Package) = .{};
+        var resolved_packages: std.ArrayList(Package) = .empty;
         defer {
             for (resolved_packages.items) |pkg| {
                 pkg.deinit(self.allocator);
@@ -131,7 +131,7 @@ pub const RegistryManager = struct {
     pub fn searchPackages(self: *RegistryManager, query: []const u8, filters: SearchFilters) ![]Package {
         std.log.info("🔍 Searching for packages: {s}", .{query});
 
-        var all_packages: std.ArrayList(Package) = .{};
+        var all_packages: std.ArrayList(Package) = .empty;
         defer all_packages.deinit(self.allocator);
 
         var seen_packages = std.StringHashMap(void).init(self.allocator);
@@ -234,7 +234,7 @@ pub const RegistryManager = struct {
 
     /// Get registry health status
     pub fn getRegistryStatus(self: *RegistryManager) ![]RegistryHealth {
-        var statuses: std.ArrayList(RegistryHealth) = .{};
+        var statuses: std.ArrayList(RegistryHealth) = .empty;
 
         for (self.clients.items) |client| {
             try statuses.append(self.allocator, client.health_metrics);
@@ -245,17 +245,17 @@ pub const RegistryManager = struct {
 
     fn clonePackage(self: *RegistryManager, pkg: Package) !Package {
         // Deep clone a package
-        var keywords: std.ArrayList([]const u8) = .{};
+        var keywords: std.ArrayList([]const u8) = .empty;
         for (pkg.keywords) |kw| {
             try keywords.append(self.allocator, try self.allocator.dupe(u8, kw));
         }
 
-        var categories: std.ArrayList([]const u8) = .{};
+        var categories: std.ArrayList([]const u8) = .empty;
         for (pkg.categories) |cat| {
             try categories.append(self.allocator, try self.allocator.dupe(u8, cat));
         }
 
-        var dependencies: std.ArrayList(Dependency) = .{};
+        var dependencies: std.ArrayList(Dependency) = .empty;
         for (pkg.dependencies) |dep| {
             try dependencies.append(self.allocator, Dependency{
                 .name = try self.allocator.dupe(u8, dep.name),
@@ -420,7 +420,7 @@ pub const DependencyAnalyzer = struct {
         var analysis = DependencyAnalysis{
             .root_package = try self.allocator.dupe(u8, package.full_name),
             .total_dependencies = 0,
-            .conflicts = .{},
+            .conflicts = .empty,
             .dependency_tree = std.StringHashMap([]const u8).init(self.allocator),
             .allocator = self.allocator,
         };

@@ -87,7 +87,7 @@ pub fn getPrimaryRegistry(allocator: Allocator, config: *const ZionConfig) Regis
 
 /// Get fallback registry clients
 pub fn getFallbackRegistries(allocator: Allocator, config: *const ZionConfig) ![]RegistryClient {
-    var registries: std.ArrayList(RegistryClient) = .{};
+    var registries: std.ArrayList(RegistryClient) = .empty;
 
     for (config.fallback_registries.items) |registry_url| {
         try registries.append(allocator, RegistryClient.init(allocator, registry_url, config.registry_timeout_sec));

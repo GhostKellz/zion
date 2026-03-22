@@ -5,7 +5,7 @@ const zion_root = @import("root.zig");
 const Dir = std.Io.Dir;
 const Io = std.Io;
 
-const add_v2 = @import("commands/add_v2.zig");
+const add_cmd = @import("commands/add.zig");
 const remove_cmd = @import("commands/remove.zig");
 const manifest = @import("manifest.zig");
 const ghostspec_pkg = @import("ghostspec");
@@ -289,11 +289,11 @@ fn ensureDependency(allocator: Allocator, update: bool) !bool {
         return false;
     }
 
-    const add_opts = add_v2.AddOptions{
+    const add_opts = add_cmd.AddOptions{
         .auto_integrate = false,
         .update_if_exists = update,
     };
-    try add_v2.add(allocator, "ghostkellz/ghostspec", add_opts);
+    try add_cmd.add(allocator, "ghostkellz/ghostspec", add_opts);
     return true;
 }
 

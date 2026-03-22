@@ -123,7 +123,7 @@ fn generateRelatedSearches(query: []const u8) !void {
     };
 
     // Find related suggestions based on query keywords
-    var found_suggestions: std.ArrayList([]const u8) = .{};
+    var found_suggestions: std.ArrayList([]const u8) = .empty;
     defer found_suggestions.deinit(std.heap.page_allocator);
 
     for (suggestions) |suggestion| {

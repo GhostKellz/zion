@@ -33,7 +33,7 @@ fn printUpdateHelp() void {
 pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
     // Parse command line arguments
     var dry_run = false;
-    var specific_packages = std.ArrayList([]const u8){};
+    var specific_packages = std.ArrayList([]const u8).empty;
     defer specific_packages.deinit(allocator);
 
     // Process arguments starting from index 2 (skip "zion update")
@@ -90,7 +90,7 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
 
     std.debug.print("Checking {d} dependencies for updates...\n", .{zon_file.dependencies.count()});
 
-    var updated_packages = std.ArrayList([]const u8){};
+    var updated_packages = std.ArrayList([]const u8).empty;
     defer {
         for (updated_packages.items) |pkg_name| {
             allocator.free(pkg_name);
@@ -98,7 +98,7 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
         updated_packages.deinit(allocator);
     }
 
-    var unchanged_packages = std.ArrayList([]const u8){};
+    var unchanged_packages = std.ArrayList([]const u8).empty;
     defer {
         for (unchanged_packages.items) |pkg_name| {
             allocator.free(pkg_name);

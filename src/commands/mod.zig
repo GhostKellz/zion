@@ -9,11 +9,11 @@ pub const version_mod = @import("version.zig");
 pub const help_mod = @import("help.zig");
 pub const lock_mod = @import("lock.zig");
 
-// Re-export all command modules - v0.7.0 uses enhanced commands as defaults
+// Re-export all command modules
 pub const init = @import("init.zig").init;
-pub const add = @import("add_v2.zig").add; // v0.7.0: Enhanced add is now default
-pub const addMultiple = @import("add_v2.zig").addMultiple; // v0.7.0: Enhanced add multiple
-pub const AddOptions = @import("add_v2.zig").AddOptions; // Export AddOptions type
+pub const add = @import("add.zig").add;
+pub const addMultiple = @import("add.zig").addMultiple;
+pub const AddOptions = @import("add.zig").AddOptions;
 pub const remove = @import("remove.zig").remove;
 pub const update = @import("update.zig").update;
 pub const list = @import("list.zig").list;
@@ -50,9 +50,9 @@ pub fn resetZigCommandHandler() void {
     zig_command_override = null;
 }
 pub const nvim = @import("nvim.zig").nvim;
-pub const search = @import("search_v2.zig").search; // v0.7.0: Enhanced search is now default
-pub const registry = @import("registry_v2.zig").registryCommand; // v0.7.0: Enhanced registry is now default
-pub const publish = @import("publish.zig").publish; // v0.7.0: New publishing feature
+pub const search = @import("search.zig").search;
+pub const registry = @import("registry.zig").registryCommand;
+pub const publish = @import("publish.zig").publish;
 pub const setup = @import("setup_simple.zig").setup; // v0.8.0: Simplified setup system
 pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
 pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
@@ -83,13 +83,6 @@ pub const ai_chat = @import("ai_search.zig").aiChat; // v1.2.0: Interactive AI a
 // NEW v1.3.0: Enhanced Security & GPG Integration
 pub const keyring = @import("keyring.zig").keyring; // v1.3.0: GPG keyring management with Arch Linux support
 
-// Interactive search mode (legacy)
-// pub const search_interactive = @import("search_v2.zig").interactiveSearch;
-
-// Legacy command aliases (for transition period if needed)
-pub const add_legacy = @import("add.zig").add;
-pub const search_legacy = @import("search.zig").search;
-pub const registry_legacy = @import("registry.zig").registryCommand;
 
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {

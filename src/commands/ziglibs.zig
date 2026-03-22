@@ -111,7 +111,7 @@ fn listZiglibsPackages(allocator: Allocator, category: ?[]const u8) !void {
     for (packages) |pkg| {
         const cat = try inferCategory(allocator, pkg);
 
-        var entry = try categorized.getOrPutValue(cat, std.ArrayList(Package){});
+        var entry = try categorized.getOrPutValue(cat, std.ArrayList(Package).empty);
         try entry.value_ptr.append(allocator, pkg);
     }
 

@@ -116,7 +116,7 @@ pub const RequestBatcher = struct {
     /// Execute a batch of search requests
     fn executeBatchSearch(self: *Self, batch: *RequestBatch) !void {
         // Combine all search queries into a single request
-        var combined_query: std.ArrayList([]const u8) = .{};
+        var combined_query: std.ArrayList([]const u8) = .empty;
         defer combined_query.deinit(self.allocator);
 
         for (batch.requests.items) |request| {
@@ -165,7 +165,7 @@ pub const RequestBatcher = struct {
     /// Execute a batch of package info requests
     fn executeBatchPackageInfo(self: *Self, batch: *RequestBatch) !void {
         // Combine all package names into a single request
-        var package_names: std.ArrayList([]const u8) = .{};
+        var package_names: std.ArrayList([]const u8) = .empty;
         defer package_names.deinit(self.allocator);
 
         for (batch.requests.items) |request| {
@@ -216,7 +216,7 @@ pub const RequestBatcher = struct {
         // Downloads are typically executed individually for security/integrity
         // But we can still batch the metadata requests
 
-        var download_futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+        var download_futures: std.ArrayList(*zsync.Future(BatchedResult)) = .empty;
         defer download_futures.deinit(self.allocator);
 
         // Start parallel downloads
@@ -672,7 +672,7 @@ pub fn batchedSearch(
     registry: []const u8,
     queries: []const []const u8,
 ) ![]BatchedResult {
-    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .empty;
     defer futures.deinit(allocator);
 
     // Submit all search requests
@@ -701,7 +701,7 @@ pub fn batchedPackageInfo(
     registry: []const u8,
     package_names: []const []const u8,
 ) ![]BatchedResult {
-    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .{};
+    var futures: std.ArrayList(*zsync.Future(BatchedResult)) = .empty;
     defer futures.deinit(allocator);
 
     // Submit all package info requests

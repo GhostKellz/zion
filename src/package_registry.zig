@@ -402,7 +402,7 @@ pub const RegistryClient = struct {
 
     // URL builders for different registry types
     fn buildGitHubSearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
-        var url_buffer: std.ArrayList(u8) = .{};
+        var url_buffer: std.ArrayList(u8) = .empty;
         defer url_buffer.deinit(self.allocator);
 
         try url_buffer.appendSlice(self.allocator, api_url);
@@ -451,7 +451,7 @@ pub const RegistryClient = struct {
     }
 
     fn buildZigistrySearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
-        var url_buffer: std.ArrayList(u8) = .{};
+        var url_buffer: std.ArrayList(u8) = .empty;
         defer url_buffer.deinit(self.allocator);
 
         try url_buffer.appendSlice(self.allocator, api_url);
@@ -522,10 +522,10 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
 
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayList(Package) = .empty;
         for (parsed.value.items) |item| {
             // Clone topics/categories
-            var categories: std.ArrayList([]const u8) = .{};
+            var categories: std.ArrayList([]const u8) = .empty;
             for (item.topics) |topic| {
                 try categories.append(self.allocator, try self.allocator.dupe(u8, topic));
             }
@@ -574,10 +574,10 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
 
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayList(Package) = .empty;
         for (parsed.value.results) |result| {
             // Clone topics
-            var categories: std.ArrayList([]const u8) = .{};
+            var categories: std.ArrayList([]const u8) = .empty;
             for (result.topics) |topic| {
                 try categories.append(self.allocator, try self.allocator.dupe(u8, topic));
             }
@@ -611,20 +611,20 @@ pub const RegistryClient = struct {
         defer parsed.deinit();
 
         // Deep clone packages
-        var packages: std.ArrayList(Package) = .{};
+        var packages: std.ArrayList(Package) = .empty;
         for (parsed.value.items) |pkg| {
             // Clone all string fields
-            var keywords: std.ArrayList([]const u8) = .{};
+            var keywords: std.ArrayList([]const u8) = .empty;
             for (pkg.keywords) |kw| {
                 try keywords.append(self.allocator, try self.allocator.dupe(u8, kw));
             }
 
-            var categories: std.ArrayList([]const u8) = .{};
+            var categories: std.ArrayList([]const u8) = .empty;
             for (pkg.categories) |cat| {
                 try categories.append(self.allocator, try self.allocator.dupe(u8, cat));
             }
 
-            var dependencies: std.ArrayList(Dependency) = .{};
+            var dependencies: std.ArrayList(Dependency) = .empty;
             for (pkg.dependencies) |dep| {
                 try dependencies.append(self.allocator, Dependency{
                     .name = try self.allocator.dupe(u8, dep.name),
@@ -694,7 +694,7 @@ pub const RegistryClient = struct {
         }, self.allocator, response, .{});
         defer parsed.deinit();
 
-        var deps: std.ArrayList(Dependency) = .{};
+        var deps: std.ArrayList(Dependency) = .empty;
         for (parsed.value.dependencies) |dep| {
             try deps.append(self.allocator, Dependency{
                 .name = try self.allocator.dupe(u8, dep.name),

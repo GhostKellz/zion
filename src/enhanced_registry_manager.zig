@@ -71,7 +71,7 @@ pub const RegistryManager = struct {
 
         // For now, use sequential search across registries
         // TODO: Implement proper async search with zsync Future API
-        var all_packages: std.ArrayList(Package) = .{};
+        var all_packages: std.ArrayList(Package) = .empty;
         defer all_packages.deinit(self.allocator);
 
         for (self.clients.items) |*client| {
@@ -143,7 +143,7 @@ pub const RegistryManager = struct {
                 const packages = try client.searchPackages(search_query, "zig");
 
                 // Filter for ziglibs only
-                var ziglibs_packages: std.ArrayList(Package) = .{};
+                var ziglibs_packages: std.ArrayList(Package) = .empty;
                 for (packages) |pkg| {
                     if (pkg.is_ziglibs) {
                         try ziglibs_packages.append(self.allocator, pkg);

@@ -4,6 +4,8 @@ pub const commands = @import("commands/mod.zig");
 pub const logger = @import("logger.zig");
 pub const progress = @import("progress.zig");
 pub const qol_enhancements = @import("qol_enhancements.zig");
+pub const semver = @import("semver.zig");
+pub const version_resolver = @import("version_resolver.zig");
 
 /// Current version of zion
 pub const ZION_VERSION = "1.2.0";
@@ -145,19 +147,18 @@ pub fn printHeader(title: []const u8) void {
     }
 }
 
-// v0.7.0 Enhanced Modules
+// Enhanced Modules
 pub const enhanced_config = @import("enhanced_config.zig");
-pub const registry_v2 = @import("registry_v2.zig");
+pub const package_registry = @import("package_registry.zig");
 pub const registry_manager = @import("registry_manager.zig");
 pub const security = @import("security.zig");
 pub const parallel_downloader = @import("parallel_downloader.zig");
-pub const zion_v7 = @import("zion_v7.zig");
 
-// v1.2.0 Zeke AI Integration
+// AI Integration
 pub const zeke_client = @import("zeke_client_simple.zig");
 pub const enhanced_add_zeke = @import("commands/enhanced_add_zeke.zig").enhancedAdd;
 
-// Legacy compatibility
+// Core modules
 pub const config = @import("config.zig");
 pub const registry = @import("registry.zig");
 pub const downloader = @import("downloader.zig");

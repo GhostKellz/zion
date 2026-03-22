@@ -43,7 +43,7 @@ pub const ZionConfig = struct {
     pub fn init(allocator: Allocator) ZionConfig {
         return ZionConfig{
             .allocator = allocator,
-            .registries = .{},
+            .registries = .empty,
             .cache_dir = "/tmp/zion-cache", // Default
         };
     }

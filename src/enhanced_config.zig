@@ -84,10 +84,10 @@ pub const ZionConfig = struct {
 
     pub fn init(allocator: Allocator) ZionConfig {
         var config = ZionConfig{
-            .github_orgs = .{},
-            .fallback_registries = .{},
+            .github_orgs = .empty,
+            .fallback_registries = .empty,
             .dependency_aliases = std.StringHashMap(std.ArrayList([]const u8)).init(allocator),
-            .registries = .{},
+            .registries = .empty,
             .registry_auth_tokens = std.StringHashMap([]const u8).init(allocator),
             .allocator = allocator,
             .trust_level_required = "medium",
@@ -464,33 +464,33 @@ pub const ZionConfig = struct {
     /// Set up default dependency aliases for common use cases
     fn setupDefaultAliases(self: *ZionConfig) !void {
         // Crypto libraries bundle
-        var crypto_deps: std.ArrayList([]const u8) = .{};
+        var crypto_deps: std.ArrayList([]const u8) = .empty;
         try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "ghostkellz/zcrypto"));
         try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "jedisct1/libsodium"));
         try crypto_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/crypto"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "crypto"), crypto_deps);
 
         // HTTP/Network libraries bundle
-        var http_deps: std.ArrayList([]const u8) = .{};
+        var http_deps: std.ArrayList([]const u8) = .empty;
         try http_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/http.zig"));
         try http_deps.append(self.allocator, try self.allocator.dupe(u8, "mitchellh/libxev"));
         try http_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/http"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "http"), http_deps);
 
         // Database libraries bundle
-        var db_deps: std.ArrayList([]const u8) = .{};
+        var db_deps: std.ArrayList([]const u8) = .empty;
         try db_deps.append(self.allocator, try self.allocator.dupe(u8, "vrischmann/zig-sqlite"));
         try db_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/pg.zig"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "db"), db_deps);
 
         // Gaming/Graphics libraries bundle
-        var game_deps: std.ArrayList([]const u8) = .{};
+        var game_deps: std.ArrayList([]const u8) = .empty;
         try game_deps.append(self.allocator, try self.allocator.dupe(u8, "hexops/mach"));
         try game_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/raylib"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "game"), game_deps);
 
         // JSON/Serialization libraries bundle
-        var json_deps: std.ArrayList([]const u8) = .{};
+        var json_deps: std.ArrayList([]const u8) = .empty;
         try json_deps.append(self.allocator, try self.allocator.dupe(u8, "ziglang/json"));
         try json_deps.append(self.allocator, try self.allocator.dupe(u8, "karlseguin/json.zig"));
         try self.dependency_aliases.put(try self.allocator.dupe(u8, "json"), json_deps);
@@ -506,7 +506,7 @@ pub const ZionConfig = struct {
 
     /// Add a custom alias
     pub fn addAlias(self: *ZionConfig, alias: []const u8, dependencies: []const []const u8) !void {
-        var deps: std.ArrayList([]const u8) = .{};
+        var deps: std.ArrayList([]const u8) = .empty;
         for (dependencies) |dep| {
             try deps.append(self.allocator, try self.allocator.dupe(u8, dep));
         }

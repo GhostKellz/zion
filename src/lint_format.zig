@@ -101,7 +101,7 @@ pub const ZigLinter = struct {
         const content = try fs.cwd().readFileAlloc(file_path, self.allocator, @enumFromInt(10 * 1024 * 1024));
         defer self.allocator.free(content);
 
-        var issues: std.ArrayList(LintResult.LintIssue) = .{};
+        var issues: std.ArrayList(LintResult.LintIssue) = .empty;
         defer issues.deinit(self.allocator);
 
         try self.checkLineLength(content, &issues);
@@ -403,7 +403,7 @@ pub const ZigFormatter = struct {
     }
 
     fn applyCustomFormatting(self: *ZigFormatter, content: []const u8) ![]const u8 {
-        var result: std.ArrayList(u8) = .{};
+        var result: std.ArrayList(u8) = .empty;
         defer result.deinit(self.allocator);
 
         var lines = std.mem.split(u8, content, "\n");
@@ -424,7 +424,7 @@ pub const ZigFormatter = struct {
 
             // Apply indentation rules
             if (self.config.use_spaces) {
-                var formatted_line: std.ArrayList(u8) = .{};
+                var formatted_line: std.ArrayList(u8) = .empty;
                 defer formatted_line.deinit(self.allocator);
 
                 var indent_count: u32 = 0;

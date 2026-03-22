@@ -1,139 +1,27 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const registry = @import("../registry.zig");
 const enhanced_config = @import("../enhanced_config.zig");
-const zion = @import("zion");
-const qol = zion.qol_enhancements;
+const registry_manager = @import("../registry_manager.zig");
+const package_registry = @import("../package_registry.zig");
 
-/// Package search functionality
-/// Searches for Zig packages across multiple sources
-/// Optimized case-insensitive substring search using Boyer-Moore-like approach
-fn containsIgnoreCase(haystack: []const u8, needle: []const u8) bool {
-    if (needle.len == 0) return true;
-    if (haystack.len < needle.len) return false;
-
-    const first_char_lower = std.ascii.toLower(needle[0]);
-    var i: usize = 0;
-
-    while (i <= haystack.len - needle.len) {
-        // Quick first char check
-        if (std.ascii.toLower(haystack[i]) != first_char_lower) {
-            i += 1;
-            continue;
-        }
-
-        // Full match check only if first char matches
-        var match = true;
-        for (needle[1..], 1..) |c, j| {
-            if (std.ascii.toLower(haystack[i + j]) != std.ascii.toLower(c)) {
-                match = false;
-                break;
-            }
-        }
-        if (match) return true;
-        i += 1;
-    }
-    return false;
-}
-
-pub const SearchOptions = struct {
-    filters: []const []const u8 = &[_][]const u8{},
-    limit: usize = 10,
-    sort_by: enum { relevance, stars, updated } = .relevance,
-    min_stars: usize = 0,
-};
-
-pub fn search(allocator: Allocator, args: []const []const u8) !void {
-    if (args.len < 3) {
-        printSearchHelp();
-        return;
-    }
-
-    // Parse search options
-    var search_options = SearchOptions{};
-    const search_term: []const u8 = args[2];
-    var filters_list = std.ArrayList([]const u8).empty;
-    defer filters_list.deinit(allocator);
-
-    // Process additional arguments
-    var i: usize = 3;
-    while (i < args.len) : (i += 1) {
-        const arg = args[i];
-
-        if (std.mem.startsWith(u8, arg, "--filter=")) {
-            const filter_str = arg[9..];
-            var filter_it = std.mem.splitSequence(u8, filter_str, ",");
-            while (filter_it.next()) |filter| {
-                try filters_list.append(allocator, std.mem.trim(u8, filter, " "));
-            }
-        } else if (std.mem.startsWith(u8, arg, "--limit=")) {
-            search_options.limit = std.fmt.parseInt(usize, arg[8..], 10) catch 10;
-        } else if (std.mem.startsWith(u8, arg, "--sort=")) {
-            const sort_str = arg[7..];
-            if (std.mem.eql(u8, sort_str, "stars")) {
-                search_options.sort_by = .stars;
-            } else if (std.mem.eql(u8, sort_str, "updated")) {
-                search_options.sort_by = .updated;
-            } else {
-                search_options.sort_by = .relevance;
-            }
-        } else if (std.mem.startsWith(u8, arg, "--min-stars=")) {
-            search_options.min_stars = std.fmt.parseInt(usize, arg[12..], 10) catch 0;
-        } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
-            printSearchHelp();
-            return;
-        }
-    }
-
-    search_options.filters = try filters_list.toOwnedSlice(allocator);
-    defer allocator.free(search_options.filters);
-
-    // Display search configuration
-    std.debug.print("🔍 Searching for packages matching '{s}'", .{search_term});
-    if (search_options.filters.len > 0) {
-        std.debug.print(" (filters: ", .{});
-        for (search_options.filters, 0..) |filter, idx| {
-            if (idx > 0) std.debug.print(", ", .{});
-            std.debug.print("{s}", .{filter});
-        }
-        std.debug.print(")", .{});
-    }
-
-    // Use progress indicator for better user experience
-    var progress = qol.ProgressIndicator.init(3); // 3 search sources
-
-    progress.update(0, "Searching registries...");
-    searchRegistries(allocator, search_term, search_options) catch |err| {
-        std.debug.print("⚠️ Registry search failed: {}\n", .{err});
-    };
-
-    progress.update(1, "Searching Zig package index...");
-    searchZigPackageIndex(allocator, search_term, search_options) catch |err| {
-        std.debug.print("⚠️ Package index search failed: {}\n", .{err});
-    };
-
-    progress.update(2, "Searching awesome-zig...");
-    searchAwesome(allocator, search_term, search_options) catch |err| {
-        std.debug.print("⚠️ Awesome-zig search failed: {}\n", .{err});
-    };
-
-    progress.finish("Search completed");
-}
-
+/// Print help information for the search command
 fn printSearchHelp() void {
     std.debug.print("❌ Error: 'zion search' requires a search term\n", .{});
-    std.debug.print("\nUsage: zion search <term> [OPTIONS]\n", .{});
+    std.debug.print("\n📖 Usage: zion search <term> [options]\n", .{});
     std.debug.print("\nOptions:\n", .{});
-    std.debug.print("  --filter=<categories>  Filter by categories (web,crypto,json,etc.)\n", .{});
-    std.debug.print("  --limit=<number>       Limit results (default: 10)\n", .{});
-    std.debug.print("  --sort=<method>        Sort by: relevance, stars, updated\n", .{});
-    std.debug.print("  --min-stars=<number>   Minimum stars required\n", .{});
-    std.debug.print("  --help, -h             Show this help\n", .{});
+    std.debug.print("  --filter=<categories>   Filter by categories (comma-separated)\n", .{});
+    std.debug.print("  --license=<license>     Filter by license type\n", .{});
+    std.debug.print("  --min-stars=<count>     Minimum stars required\n", .{});
+    std.debug.print("  --sort=<field>          Sort by: relevance, stars, downloads, updated\n", .{});
+    std.debug.print("  --registry=<name>       Search specific registry only\n", .{});
+    std.debug.print("  --zig-version=<ver>     Filter by Zig version compatibility\n", .{});
+    std.debug.print("  --limit=<count>         Maximum results (default: 20)\n", .{});
+    std.debug.print("  --help, -h              Show this help message\n", .{});
     std.debug.print("\nExamples:\n", .{});
     std.debug.print("  zion search json\n", .{});
     std.debug.print("  zion search http --filter=web,network\n", .{});
-    std.debug.print("  zion search crypto --limit=5 --sort=stars\n", .{});
-    std.debug.print("  zion search game --min-stars=50\n", .{});
+    std.debug.print("  zion search crypto --license=MIT --min-stars=50\n", .{});
+    std.debug.print("  zion search game --registry=zigistry\n", .{});
     std.debug.print("\n💡 Try these popular searches:\n", .{});
     std.debug.print("  • zion search http\n", .{});
     std.debug.print("  • zion search json\n", .{});
@@ -141,277 +29,366 @@ fn printSearchHelp() void {
     std.debug.print("  • zion search game\n", .{});
 }
 
-/// Search multiple registries for packages
-fn searchRegistries(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
-    _ = options; // TODO: Use options for filtering and sorting
-    var config = enhanced_config.ZionConfig.load(allocator) catch enhanced_config.ZionConfig.init(allocator);
-    defer config.deinit();
-
-    std.debug.print("\n🔍 Registry Search Results:\n", .{});
-
-    // Search primary registry
-    const primary_registry = registry.getPrimaryRegistry(allocator, &config);
-    std.debug.print("\n📦 Primary Registry ({s}):\n", .{primary_registry.base_url});
-    trySearchRegistry(allocator, &primary_registry, term) catch |err| {
-        std.debug.print("⚠️ Primary registry search failed: {}\n", .{err});
-    };
-
-    // Search fallback registries
-    const fallback_registries = try registry.getFallbackRegistries(allocator, &config);
-    defer allocator.free(fallback_registries);
-
-    if (fallback_registries.len > 0) {
-        const progress = @import("../progress.zig");
-        var registry_progress = progress.ProgressBar.init(allocator, "🔍 Searching registries", fallback_registries.len);
-
-        for (fallback_registries, 0..) |fallback_registry, i| {
-            registry_progress.update(i);
-            std.debug.print("\n📦 Fallback Registry ({s}):\n", .{fallback_registry.base_url});
-            trySearchRegistry(allocator, &fallback_registry, term) catch |err| {
-                std.debug.print("⚠️ Fallback registry search failed: {}\n", .{err});
-            };
-        }
-
-        registry_progress.finish();
-    }
-}
-
-fn trySearchRegistry(allocator: Allocator, reg: *const registry.RegistryClient, term: []const u8) !void {
-    const search_url = try reg.getSearchUrl(term);
-    defer allocator.free(search_url);
-
-    // Handle different registry response formats
-    if (reg.registry_type == .zigistry) {
-        try searchZigistry(allocator, search_url, term);
+/// Enhanced search command for v0.7.0 with multi-registry support
+pub fn search(allocator: Allocator, args: []const []const u8) !void {
+    // Check for help first
+    if (args.len >= 3 and (std.mem.eql(u8, args[2], "--help") or std.mem.eql(u8, args[2], "-h"))) {
+        printSearchHelp();
         return;
     }
 
-    // For now, show some popular Zig packages that match common search terms
-    // TODO: Replace with actual API call to the registry
-    const popular_packages = [_]PackageInfo{
-        .{ .name = "zig-clap", .author = "Hejsil", .description = "Simple command line argument parsing library", .stars = 400 },
-        .{ .name = "zig-json", .author = "ziglang", .description = "JSON parsing and generation", .stars = 200 },
-        .{ .name = "libxev", .author = "mitchellh", .description = "High-performance event loop", .stars = 800 },
-        .{ .name = "zig-network", .author = "MasterQ32", .description = "Network abstractions library", .stars = 150 },
-        .{ .name = "zig-datetime", .author = "frmdstryr", .description = "Date and time handling", .stars = 90 },
-        .{ .name = "zig-regex", .author = "tiehuis", .description = "Regular expression engine", .stars = 120 },
-        .{ .name = "zig-zlib", .author = "mattnite", .description = "Compression library", .stars = 80 },
-        .{ .name = "zig-http", .author = "ducdetronquito", .description = "HTTP client/server", .stars = 160 },
-    };
+    if (args.len < 3) {
+        printSearchHelp();
+        return;
+    }
 
-    var found_count: usize = 0;
-    for (popular_packages) |pkg| {
-        // Simple substring matching
-        if (containsIgnoreCase(pkg.name, term) or
-            containsIgnoreCase(pkg.description, term))
-        {
-            std.debug.print("  📌 {s}/{s}\n", .{ pkg.author, pkg.name });
-            std.debug.print("     {s}\n", .{pkg.description});
-            std.debug.print("     ⭐ {d} stars\n", .{pkg.stars});
-            std.debug.print("     💾 zion add {s}/{s}\n", .{ pkg.author, pkg.name });
+    const search_term = args[2];
+
+    // Parse search options
+    var options = SearchOptions{};
+    try parseSearchOptions(&options, args[3..], allocator);
+    defer options.deinit(allocator);
+
+    // Load configuration
+    var config = try enhanced_config.ZionConfig.load(allocator);
+    defer config.deinit();
+
+    // Initialize registry manager
+    var manager = registry_manager.RegistryManager.init(allocator, &config);
+    defer manager.deinit();
+    try manager.initClients();
+
+    // Show search header
+    std.debug.print("🔍 Searching for packages matching '{s}'", .{search_term});
+    if (options.filters.categories.len > 0) {
+        std.debug.print(" in categories: ", .{});
+        for (options.filters.categories, 0..) |cat, i| {
+            if (i > 0) std.debug.print(", ", .{});
+            std.debug.print("{s}", .{cat});
+        }
+    }
+    if (options.specific_registry) |registry| {
+        std.debug.print(" (registry: {s})", .{registry});
+    }
+    std.debug.print("\n\n", .{});
+
+    // Perform search
+    const search_results = if (options.specific_registry) |registry_name|
+        try searchSpecificRegistry(allocator, &manager, search_term, registry_name, options.filters)
+    else
+        try manager.searchPackages(search_term, options.filters);
+
+    defer {
+        for (search_results) |pkg| pkg.deinit(allocator);
+        allocator.free(search_results);
+    }
+
+    // Display results
+    if (search_results.len == 0) {
+        std.debug.print("❌ No packages found matching '{s}'\n", .{search_term});
+        std.debug.print("\n💡 Suggestions:\n", .{});
+        std.debug.print("  • Try different search terms\n", .{});
+        std.debug.print("  • Check your spelling\n", .{});
+        std.debug.print("  • Remove filters to broaden the search\n", .{});
+        std.debug.print("  • Search in a different registry\n", .{});
+        return;
+    }
+
+    std.debug.print("✅ Found {d} packages:\n\n", .{search_results.len});
+
+    // Group results by registry if from multiple sources
+    var current_registry: []const u8 = "";
+
+    for (search_results, 0..) |pkg, i| {
+        // Show registry header if changed
+        if (!std.mem.eql(u8, current_registry, pkg.registry_name)) {
+            current_registry = pkg.registry_name;
+            std.debug.print("\n🌐 From {s}:\n", .{pkg.registry_name});
+            std.debug.print("{s}\n\n", .{"-" ** 60});
+        }
+
+        // Package header
+        std.debug.print("{d}. 📦 {s}", .{ i + 1, pkg.full_name });
+        if (pkg.version.len > 0 and !std.mem.eql(u8, pkg.version, "latest")) {
+            std.debug.print(" (v{s})", .{pkg.version});
+        }
+        std.debug.print("\n", .{});
+
+        // Description
+        if (pkg.description) |desc| {
+            // Wrap long descriptions
+            const max_width = 70;
+            if (desc.len > max_width) {
+                std.debug.print("   {s}...\n", .{desc[0..max_width]});
+            } else {
+                std.debug.print("   {s}\n", .{desc});
+            }
+        }
+
+        // Metadata line
+        std.debug.print("   ", .{});
+
+        // Stars
+        if (pkg.stars > 0) {
+            std.debug.print("⭐ {d} ", .{pkg.stars});
+        }
+
+        // Downloads
+        if (pkg.download_count > 0) {
+            std.debug.print("📥 {s} ", .{formatCount(pkg.download_count)});
+        }
+
+        // License
+        if (pkg.license) |license| {
+            std.debug.print("📜 {s} ", .{license});
+        }
+
+        // Author
+        if (pkg.author) |author| {
+            std.debug.print("👤 {s} ", .{author});
+        }
+
+        // Last updated
+        if (pkg.last_updated.len > 0) {
+            std.debug.print("🕐 {s}", .{formatDate(pkg.last_updated)});
+        }
+        std.debug.print("\n", .{});
+
+        // Categories/Topics
+        if (pkg.categories.len > 0) {
+            std.debug.print("   🏷️  ", .{});
+            for (pkg.categories, 0..) |cat, j| {
+                if (j > 0) std.debug.print(", ", .{});
+                std.debug.print("{s}", .{cat});
+            }
             std.debug.print("\n", .{});
-            found_count += 1;
         }
+
+        // Zig version compatibility
+        if (pkg.zig_version_min != null or pkg.zig_version_max != null) {
+            std.debug.print("   🔧 Zig ", .{});
+            if (pkg.zig_version_min) |min| {
+                std.debug.print("{s}", .{min});
+            }
+            if (pkg.zig_version_max) |max| {
+                if (pkg.zig_version_min != null) std.debug.print(" - ", .{});
+                std.debug.print("{s}", .{max});
+            }
+            std.debug.print("\n", .{});
+        }
+
+        // Homepage/Repository
+        if (pkg.homepage) |homepage| {
+            std.debug.print("   🏠 {s}\n", .{homepage});
+        } else if (pkg.repository_url) |repo_url| {
+            std.debug.print("   📂 {s}\n", .{repo_url});
+        }
+
+        // Installation command
+        std.debug.print("   💻 zion add {s}\n", .{pkg.full_name});
+
+        std.debug.print("\n", .{});
     }
 
-    if (found_count == 0) {
-        std.debug.print("  No matching packages found in this registry\n", .{});
-        if (reg.registry_type == .github) {
-            std.debug.print("  💡 Try searching on GitHub directly: https://github.com/search?q={s}+language:zig\n", .{term});
-        }
+    // Show registry health status
+    const registry_statuses = try manager.getRegistryStatus();
+    defer allocator.free(registry_statuses);
+
+    std.debug.print("\n📊 Registry Status:\n", .{});
+    for (registry_statuses) |status| {
+        const status_emoji = switch (status.status) {
+            .healthy => "✅",
+            .degraded => "⚠️",
+            .unhealthy => "❌",
+            .unknown => "❓",
+        };
+        std.debug.print("   {s} {s}: {s} ({d}ms)\n", .{
+            status_emoji,
+            status.name,
+            @tagName(status.status),
+            status.response_time_ms,
+        });
     }
+
+    // Search tips
+    std.debug.print("\n💡 Search Tips:\n", .{});
+    std.debug.print("   • Use 'zion info <package>' for detailed information\n", .{});
+    std.debug.print("   • Filter by category: zion search --filter=web,api\n", .{});
+    std.debug.print("   • Find popular packages: zion search --min-stars=100\n", .{});
+    std.debug.print("   • Search specific registry: zion search --registry=zigistry\n", .{});
 }
 
-/// Search the Zig package index (hypothetical)
-fn searchZigPackageIndex(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
-    _ = options;
-    _ = allocator;
-    _ = term;
+/// Search options structure
+const SearchOptions = struct {
+    filters: package_registry.SearchFilters = .{},
+    specific_registry: ?[]const u8 = null,
 
-    std.debug.print("\n📚 Zig Package Index:\n", .{});
-    std.debug.print("  (Package index integration coming soon)\n", .{});
-    std.debug.print("  💡 Visit https://ziglearn.org for community packages\n", .{});
-}
+    // Track what was allocated vs default literals
+    allocated_license: bool = false,
+    allocated_zig_version: bool = false,
+    allocated_registry: bool = false,
+    allocated_categories: bool = false,
 
-/// Search awesome-zig list
-fn searchAwesome(allocator: Allocator, term: []const u8, options: SearchOptions) !void {
-    _ = options;
-    _ = allocator;
+    fn deinit(self: *SearchOptions, allocator: Allocator) void {
+        // Only free language if it was changed from default
+        if (self.filters.language) |lang| {
+            if (!std.mem.eql(u8, lang, "zig")) {
+                allocator.free(lang);
+            }
+        }
 
-    std.debug.print("\n🌟 Awesome Zig:\n", .{});
+        if (self.allocated_license and self.filters.license != null) {
+            allocator.free(self.filters.license.?);
+        }
+        if (self.allocated_zig_version and self.filters.zig_version != null) {
+            allocator.free(self.filters.zig_version.?);
+        }
+        if (self.allocated_registry and self.specific_registry != null) {
+            allocator.free(self.specific_registry.?);
+        }
 
-    // Curated list of awesome Zig projects by category
-    const awesome_categories = [_]CategoryInfo{ .{ .name = "Web Development", .packages = &[_]PackageInfo{
-        .{ .name = "zap", .author = "renerocksai", .description = "Blazingly fast web framework", .stars = 500 },
-        .{ .name = "httpz", .author = "karlseguin", .description = "HTTP server library", .stars = 300 },
-        .{ .name = "zig-serve", .author = "bun", .description = "Static file server", .stars = 150 },
-    } }, .{ .name = "Game Development", .packages = &[_]PackageInfo{
-        .{ .name = "mach", .author = "hexops", .description = "Game engine and graphics toolkit", .stars = 1200 },
-        .{ .name = "raylib-zig", .author = "Not-Nik", .description = "Raylib bindings for Zig", .stars = 400 },
-        .{ .name = "zig-gamedev", .author = "michal-z", .description = "Game development libraries", .stars = 800 },
-    } }, .{ .name = "System Programming", .packages = &[_]PackageInfo{
-        .{ .name = "libxev", .author = "mitchellh", .description = "Cross-platform event loop", .stars = 800 },
-        .{ .name = "zig-network", .author = "MasterQ32", .description = "Networking abstractions", .stars = 250 },
-        .{ .name = "known-folders", .author = "ziglibs", .description = "Cross-platform folder detection", .stars = 180 },
-    } }, .{ .name = "Data & Parsing", .packages = &[_]PackageInfo{
-        .{ .name = "zig-toml", .author = "aeronavery", .description = "TOML parser", .stars = 120 },
-        .{ .name = "zig-yaml", .author = "kubkon", .description = "YAML parser", .stars = 90 },
-        .{ .name = "zig-xml", .author = "erocci", .description = "XML parser", .stars = 80 },
-    } } };
-
-    var found_count: usize = 0;
-    for (awesome_categories) |category| {
-        var category_matches: usize = 0;
-
-        for (category.packages) |pkg| {
-            if (containsIgnoreCase(pkg.name, term) or
-                containsIgnoreCase(pkg.description, term) or
-                containsIgnoreCase(category.name, term))
-            {
-                if (category_matches == 0) {
-                    std.debug.print("  📂 {s}:\n", .{category.name});
-                }
-
-                std.debug.print("    • {s}/{s}\n", .{ pkg.author, pkg.name });
-                std.debug.print("      {s}\n", .{pkg.description});
-                std.debug.print("      ⭐ {d} stars | 💾 zion add {s}/{s}\n", .{ pkg.stars, pkg.author, pkg.name });
-                std.debug.print("\n", .{});
-
-                category_matches += 1;
-                found_count += 1;
+        if (self.allocated_categories) {
+            for (self.filters.categories) |cat| {
+                allocator.free(cat);
+            }
+            if (self.filters.categories.len > 0) {
+                allocator.free(self.filters.categories);
             }
         }
     }
+};
 
-    if (found_count == 0) {
-        std.debug.print("  No matching packages found in curated lists\n", .{});
-        std.debug.print("  💡 Visit https://github.com/nrdmn/awesome-zig for more packages\n", .{});
+/// Parse command line options
+fn parseSearchOptions(options: *SearchOptions, args: []const []const u8, allocator: Allocator) !void {
+    for (args) |arg| {
+        if (std.mem.startsWith(u8, arg, "--filter=")) {
+            const filter_str = arg[9..];
+            var categories: std.ArrayList([]const u8) = .empty;
+            var it = std.mem.splitSequence(u8, filter_str, ",");
+            while (it.next()) |cat| {
+                try categories.append(allocator, try allocator.dupe(u8, cat));
+            }
+            options.filters.categories = try categories.toOwnedSlice(allocator);
+            options.allocated_categories = true;
+        } else if (std.mem.startsWith(u8, arg, "--license=")) {
+            options.filters.license = try allocator.dupe(u8, arg[10..]);
+            options.allocated_license = true;
+        } else if (std.mem.startsWith(u8, arg, "--min-stars=")) {
+            options.filters.min_stars = try std.fmt.parseInt(u64, arg[12..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--sort=")) {
+            const sort_str = arg[7..];
+            options.filters.sort_by = std.meta.stringToEnum(package_registry.SortOption, sort_str) orelse .relevance;
+        } else if (std.mem.startsWith(u8, arg, "--registry=")) {
+            options.specific_registry = try allocator.dupe(u8, arg[11..]);
+            options.allocated_registry = true;
+        } else if (std.mem.startsWith(u8, arg, "--zig-version=")) {
+            options.filters.zig_version = try allocator.dupe(u8, arg[14..]);
+            options.allocated_zig_version = true;
+        } else if (std.mem.startsWith(u8, arg, "--limit=")) {
+            options.filters.per_page = try std.fmt.parseInt(u32, arg[8..], 10);
+        }
     }
-
-    std.debug.print("\n💡 Tips:\n", .{});
-    std.debug.print("  • Use 'zion add <author>/<package>' to install\n", .{});
-    std.debug.print("  • Try broader terms like 'web', 'game', 'json', 'http'\n", .{});
-    std.debug.print("  • Visit https://ziglang.org/learn/ for official documentation\n", .{});
 }
 
-const PackageInfo = struct {
-    name: []const u8,
-    author: []const u8,
-    description: []const u8,
-    stars: u32,
-};
-
-const CategoryInfo = struct {
-    name: []const u8,
-    packages: []const PackageInfo,
-};
-
-/// Search Zigistry registry
-fn searchZigistry(allocator: Allocator, search_url: []const u8, term: []const u8) !void {
-    _ = term; // TODO: Use for filtering
-
-    // Make HTTP request to Zigistry API
-    var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit(allocator);
-
-    var header_buffer: [16384]u8 = undefined;
-    var req = client.open(.GET, std.Uri.parse(search_url) catch {
-        std.debug.print("  ❌ Invalid Zigistry URL format\n", .{});
-        return;
-    }, .{
-        .server_header_buffer = &header_buffer,
-    }) catch {
-        std.debug.print("  ❌ Failed to connect to Zigistry\n", .{});
-        return;
-    };
-    defer req.deinit(allocator);
-
-    req.send() catch {
-        std.debug.print("  ❌ Failed to send request to Zigistry\n", .{});
-        return;
-    };
-    req.finish() catch {
-        std.debug.print("  ❌ Failed to finish request to Zigistry\n", .{});
-        return;
-    };
-    req.wait() catch {
-        std.debug.print("  ❌ Request to Zigistry timed out\n", .{});
-        return;
-    };
-
-    if (req.response.status != .ok) {
-        std.debug.print("  ❌ Zigistry API error: {}\n", .{req.response.status});
-        return;
+/// Search a specific registry
+fn searchSpecificRegistry(
+    allocator: Allocator,
+    manager: *registry_manager.RegistryManager,
+    term: []const u8,
+    registry_name: []const u8,
+    filters: package_registry.SearchFilters,
+) ![]package_registry.Package {
+    // Find the specific registry client
+    for (manager.clients.items) |*client| {
+        if (std.mem.eql(u8, client.config.name, registry_name)) {
+            return try client.searchPackages(term, filters);
+        }
     }
 
-    var output_buf = std.ArrayList(u8).empty;
-    defer output_buf.deinit(allocator);
+    std.debug.print("⚠️  Registry '{s}' not found or not enabled\n", .{registry_name});
+    return allocator.alloc(package_registry.Package, 0);
+}
 
-    var read_buf: [4096]u8 = undefined;
-    while (true) {
-        const bytes_read = req.readAll(read_buf[0..]) catch {
-            std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
-            return;
-        };
-        if (bytes_read == 0) break;
-        output_buf.appendSlice(allocator, read_buf[0..bytes_read]) catch {
-            std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
-            return;
-        };
-    }
-
-    const body = allocator.dupe(u8, output_buf.items) catch {
-        std.debug.print("  ❌ Failed to read Zigistry response\n", .{});
-        return;
-    };
-    defer allocator.free(body);
-
-    // Parse Zigistry response (simplified - show first few results)
-    var parsed = std.json.parseFromSlice(std.json.Value, allocator, body, .{}) catch {
-        std.debug.print("  ❌ Failed to parse Zigistry response\n", .{});
-        return;
-    };
-    defer parsed.deinit(allocator);
-
-    if (parsed.value != .array) {
-        std.debug.print("  ⚠️ Unexpected Zigistry response format\n", .{});
-        return;
-    }
-
-    const packages = parsed.value.array;
-    var count: usize = 0;
-    const max_results = 5;
-
-    for (packages.items) |pkg| {
-        if (count >= max_results) break;
-
-        if (pkg != .object) continue;
-        const pkg_obj = pkg.object;
-
-        const name = pkg_obj.get("name") orelse continue;
-        const owner = pkg_obj.get("owner") orelse continue;
-        const description = pkg_obj.get("description") orelse continue;
-
-        if (name != .string or owner != .string or description != .string) continue;
-
-        // Extract star count if available
-        const stars = if (pkg_obj.get("stars")) |s|
-            if (s == .integer) @as(u32, @intCast(s.integer)) else 0
-        else
-            0;
-
-        std.debug.print("  📦 {s}/{s}\n", .{ owner.string, name.string });
-        std.debug.print("     {s}\n", .{description.string});
-        std.debug.print("     ⭐ {} stars\n", .{stars});
-        std.debug.print("     💾 zion add {s}/{s}\n", .{ owner.string, name.string });
-        std.debug.print("\n", .{});
-
-        count += 1;
-    }
-
-    if (count == 0) {
-        std.debug.print("  No packages found on Zigistry\n", .{});
+/// Format large numbers with K/M suffixes
+fn formatCount(count: u64) []const u8 {
+    if (count >= 1_000_000) {
+        return std.fmt.allocPrint(std.heap.page_allocator, "{d}M", .{count / 1_000_000}) catch "?";
+    } else if (count >= 1_000) {
+        return std.fmt.allocPrint(std.heap.page_allocator, "{d}K", .{count / 1_000}) catch "?";
     } else {
-        std.debug.print("  💡 Found {} packages from Zigistry community registry\n", .{count});
+        return std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{count}) catch "?";
     }
+}
+
+/// Format ISO date to relative time
+fn formatDate(iso_date: []const u8) []const u8 {
+    // In a real implementation, would parse and calculate relative time
+    // For now, just return a shortened version
+    if (iso_date.len >= 10) {
+        return iso_date[0..10];
+    }
+    return iso_date;
+}
+
+/// Interactive search mode for better UX
+pub fn interactiveSearch(allocator: Allocator) !void {
+    std.debug.print("🔍 Zion Interactive Package Search\n", .{});
+    std.debug.print("Type 'help' for search tips, 'exit' to quit\n\n", .{});
+
+    const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
+    const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
+
+    while (true) {
+        try stdout.writeAll("search> ");
+
+        var buf: [1024]u8 = undefined;
+        const bytes_read = try stdin.readAll(&buf);
+        if (bytes_read == 0) break; // EOF
+
+        const input = buf[0..bytes_read];
+        const trimmed = std.mem.trim(u8, input, " \t\r\n");
+
+        if (std.mem.eql(u8, trimmed, "exit") or std.mem.eql(u8, trimmed, "quit")) {
+            break;
+        } else if (std.mem.eql(u8, trimmed, "help")) {
+            try printInteractiveHelp();
+        } else if (trimmed.len > 0) {
+            // Parse the search command
+            var args = std.ArrayList([]const u8).init(allocator);
+            defer args.deinit(allocator);
+
+            try args.append(allocator, "zion");
+            try args.append(allocator, "search");
+
+            var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
+            while (it.next()) |token| {
+                try args.append(allocator, token);
+            }
+
+            search(allocator, args.items) catch |err| {
+                std.debug.print("❌ Search error: {}\n", .{err});
+            };
+        }
+    }
+
+    std.debug.print("\n👋 Happy coding with Zion!\n", .{});
+}
+
+fn printInteractiveHelp() !void {
+    std.debug.print("\n📖 Interactive Search Help:\n", .{});
+    std.debug.print("\nBasic search:\n", .{});
+    std.debug.print("  json                    Search for 'json' packages\n", .{});
+    std.debug.print("  \"http client\"           Search for exact phrase\n", .{});
+    std.debug.print("\nFiltered search:\n", .{});
+    std.debug.print("  crypto --filter=security,cryptography\n", .{});
+    std.debug.print("  web --license=MIT --min-stars=50\n", .{});
+    std.debug.print("  game --registry=zigistry\n", .{});
+    std.debug.print("\nSorting:\n", .{});
+    std.debug.print("  http --sort=stars       Sort by stars\n", .{});
+    std.debug.print("  json --sort=downloads   Sort by downloads\n", .{});
+    std.debug.print("  api --sort=updated      Sort by last updated\n", .{});
+    std.debug.print("\nCommands:\n", .{});
+    std.debug.print("  help                    Show this help\n", .{});
+    std.debug.print("  exit/quit               Exit interactive mode\n", .{});
+    std.debug.print("\n", .{});
 }

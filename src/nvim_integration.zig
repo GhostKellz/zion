@@ -205,7 +205,7 @@ pub const NvimIntegration = struct {
 
     /// Execute a zion command and return the result
     fn executeZionCommand(self: *NvimIntegration, args: []const []const u8) !CommandResult {
-        var cmd_args: std.ArrayList([]const u8) = .{};
+        var cmd_args: std.ArrayList([]const u8) = .empty;
         defer cmd_args.deinit(self.allocator);
 
         try cmd_args.append(self.allocator, "zion");
@@ -219,7 +219,7 @@ pub const NvimIntegration = struct {
 
         try child.spawn();
 
-        var stdout_output_buf: std.ArrayList(u8) = .{};
+        var stdout_output_buf: std.ArrayList(u8) = .empty;
         defer stdout_output_buf.deinit(self.allocator);
 
         var stdout_read_buf: [4096]u8 = undefined;
@@ -231,7 +231,7 @@ pub const NvimIntegration = struct {
 
         const stdout = try self.allocator.dupe(u8, stdout_output_buf.items);
 
-        var stderr_output_buf: std.ArrayList(u8) = .{};
+        var stderr_output_buf: std.ArrayList(u8) = .empty;
         defer stderr_output_buf.deinit(self.allocator);
 
         var stderr_read_buf: [4096]u8 = undefined;

@@ -550,7 +550,7 @@ fn showZigistryPackageAnalytics(allocator: Allocator, package_name: []const u8) 
 
 fn fetchTrendingPackages(allocator: Allocator) ![]Package {
     // Would fetch trending packages from Zigistry API
-    var packages: std.ArrayList(Package) = .{};
+    var packages: std.ArrayList(Package) = .empty;
 
     // Mock trending packages
     try packages.append(allocator, Package{

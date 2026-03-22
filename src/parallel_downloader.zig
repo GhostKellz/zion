@@ -297,7 +297,7 @@ pub fn downloadWithProgress(allocator: Allocator, package_refs: []const []const 
     return downloadPackagesConcurrently(allocator, package_refs, config);
 }
 
-/// Single package download with progress - compatible with existing add_v2.zig calls
+/// Single package download with progress - compatible with add command
 /// Returns a DownloadResult compatible with the existing downloader interface
 pub fn downloadSingleWithProgress(
     allocator: Allocator,
