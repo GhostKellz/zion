@@ -256,7 +256,7 @@ fn zionMain(io: zsync.Io) !void {
         const clean_all = args.len > 2 and std.mem.eql(u8, args[2], "--all");
         try commands.clean(allocator, clean_all);
     } else if (std.mem.eql(u8, command, "lock")) {
-        try commands.lock(allocator);
+        try commands.lock(allocator, args);
     } else if (std.mem.eql(u8, command, "version")) {
         try commands.version(allocator);
     } else if (std.mem.eql(u8, command, "hash")) {

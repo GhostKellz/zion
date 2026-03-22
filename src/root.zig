@@ -8,7 +8,7 @@ pub const semver = @import("semver.zig");
 pub const version_resolver = @import("version_resolver.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "1.2.0";
+pub const ZION_VERSION = "0.1.4";
 
 /// Application context passed through from main to commands
 /// Contains std.Io for filesystem and network operations (required by Zig 0.16.0)
@@ -162,9 +162,10 @@ pub const enhanced_add_zeke = @import("commands/enhanced_add_zeke.zig").enhanced
 pub const config = @import("config.zig");
 pub const registry = @import("registry.zig");
 pub const downloader = @import("downloader.zig");
+pub const hash_conversion = @import("hash_conversion.zig");
 
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {
     std.debug.print("Zion v{s} package manager is ready!\n", .{ZION_VERSION});
-    std.debug.print("🔥 New in v1.2.0: Full Zig 0.16.0 compatibility with updated std.Io, std.c, and pthread APIs!\n", .{});
+    std.debug.print("New in v0.1.4: Hash automation & lock enhancements for better dependency management!\n", .{});
 }

@@ -7,7 +7,7 @@
 [![Made with Zig](https://img.shields.io/badge/Made%20with-Zig-orange.svg)](https://ziglang.org)
 [![Zig 0.16+](https://img.shields.io/badge/Zig-0.16%2B-blue.svg)](https://ziglang.org/download)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-0.8.0-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
+[![Version](https://img.shields.io/badge/Version-0.1.4-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
 [![Arch Linux](https://img.shields.io/badge/Arch%20Linux-First%20Class-blue.svg)](https://archlinux.org)
 
@@ -35,7 +35,7 @@ zion build
 
 ## ✨ Features
 
-**🎯 v0.8.0 "The Cargo for Zig" - Complete Development Environment**
+**v0.1.4 - Complete Development Environment**
 
 ### 🔧 Zig Version Management (`anyzig`-like)
 - **Complete version lifecycle** - Install, switch, and manage multiple Zig versions

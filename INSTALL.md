@@ -14,7 +14,7 @@ This installs Zion locally to `~/.local/bin/zion`.
 
 ## Requirements
 
-- Zig 0.11.0 or newer
+- Zig 0.16.0 or newer (0.16.0-dev supported)
 - curl
 - tar
 - git
