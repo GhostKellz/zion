@@ -1,0 +1,256 @@
+{
+  "version": "1.0",
+  "entries": [
+    {
+      "name": "std",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 2,
+      "description": "By convention, root.zig is the root source file when making a library.",
+      "keywords": ["std", "variable", "convention", "root", "zig", "the", "root", "source", "file", "when", "making", "library"]
+    },
+    {
+      "name": "commands",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 3,
+      "keywords": ["commands", "variable"]
+    },
+    {
+      "name": "logger",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 4,
+      "keywords": ["logger", "variable"]
+    },
+    {
+      "name": "progress",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 5,
+      "keywords": ["progress", "variable"]
+    },
+    {
+      "name": "qol_enhancements",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 6,
+      "keywords": ["qol_enhancements", "variable"]
+    },
+    {
+      "name": "semver",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 7,
+      "keywords": ["semver", "variable"]
+    },
+    {
+      "name": "version_resolver",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 8,
+      "keywords": ["version_resolver", "variable"]
+    },
+    {
+      "name": "ZION_VERSION",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 11,
+      "keywords": ["ZION_VERSION", "variable"]
+    },
+    {
+      "name": "AppContext",
+      "type": "struct",
+      "file": "src/root.zig",
+      "line": 15,
+      "keywords": ["AppContext", "struct"]
+    },
+    {
+      "name": "app_context",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 24,
+      "keywords": ["app_context", "variable"]
+    },
+    {
+      "name": "getIo",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 28,
+      "signature": "fn() .",
+      "keywords": ["getIo", "function"]
+    },
+    {
+      "name": "getEnv",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 35,
+      "signature": "fn() ?",
+      "keywords": ["getEnv", "function"]
+    },
+    {
+      "name": "sleep",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 42,
+      "signature": "fn(u64) void",
+      "keywords": ["sleep", "function"]
+    },
+    {
+      "name": "timestamp",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 51,
+      "signature": "fn() i64",
+      "keywords": ["timestamp", "function"]
+    },
+    {
+      "name": "milliTimestamp",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 60,
+      "signature": "fn() i64",
+      "keywords": ["milliTimestamp", "function"]
+    },
+    {
+      "name": "shouldDisableColors",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 77,
+      "signature": "fn() bool",
+      "keywords": ["shouldDisableColors", "function"]
+    },
+    {
+      "name": "Color",
+      "type": "struct",
+      "file": "src/root.zig",
+      "line": 92,
+      "keywords": ["Color", "struct"]
+    },
+    {
+      "name": "printSuccess",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 116,
+      "signature": "fn(args: anytype) void",
+      "keywords": ["printSuccess", "function"]
+    },
+    {
+      "name": "printError",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 122,
+      "signature": "fn(args: anytype) void",
+      "keywords": ["printError", "function"]
+    },
+    {
+      "name": "printWarning",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 128,
+      "signature": "fn(args: anytype) void",
+      "keywords": ["printWarning", "function"]
+    },
+    {
+      "name": "printInfo",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 134,
+      "signature": "fn(args: anytype) void",
+      "keywords": ["printInfo", "function"]
+    },
+    {
+      "name": "printHeader",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 140,
+      "signature": "fn() void",
+      "keywords": ["printHeader", "function"]
+    },
+    {
+      "name": "enhanced_config",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 151,
+      "keywords": ["enhanced_config", "variable"]
+    },
+    {
+      "name": "package_registry",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 152,
+      "keywords": ["package_registry", "variable"]
+    },
+    {
+      "name": "registry_manager",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 153,
+      "keywords": ["registry_manager", "variable"]
+    },
+    {
+      "name": "security",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 154,
+      "keywords": ["security", "variable"]
+    },
+    {
+      "name": "parallel_downloader",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 155,
+      "keywords": ["parallel_downloader", "variable"]
+    },
+    {
+      "name": "zeke_client",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 158,
+      "keywords": ["zeke_client", "variable"]
+    },
+    {
+      "name": "enhanced_add_zeke",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 159,
+      "keywords": ["enhanced_add_zeke", "variable"]
+    },
+    {
+      "name": "config",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 162,
+      "keywords": ["config", "variable"]
+    },
+    {
+      "name": "registry",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 163,
+      "keywords": ["registry", "variable"]
+    },
+    {
+      "name": "downloader",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 164,
+      "keywords": ["downloader", "variable"]
+    },
+    {
+      "name": "hash_conversion",
+      "type": "variable",
+      "file": "src/root.zig",
+      "line": 165,
+      "keywords": ["hash_conversion", "variable"]
+    },
+    {
+      "name": "advancedPrint",
+      "type": "function",
+      "file": "src/root.zig",
+      "line": 168,
+      "signature": "fn() void",
+      "keywords": ["advancedPrint", "function"]
+    }
+  ]
+}

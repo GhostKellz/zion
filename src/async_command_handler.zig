@@ -14,7 +14,7 @@ const http_client = @import("http_client.zig");
 
 const Allocator = std.mem.Allocator;
 
-/// Enhanced async command handler using zsync v0.5.4 features
+/// Enhanced async command handler using zsync
 pub const AsyncCommandHandler = struct {
     allocator: Allocator,
     runtime: *zsync.Runtime,
@@ -76,10 +76,11 @@ pub const AsyncCommandHandler = struct {
 
     /// Enhanced add command with vectorized downloads and error handling
     pub fn addAsync(self: *Self, package_ref: []const u8, options: commands.AddOptions) !void {
-        std.debug.print("🚀 Adding package: {s} (using zsync v0.5.4)\n", .{package_ref});
+        std.debug.print("🚀 Adding package: {s}\n", .{package_ref});
 
         // Use racing registry to find package info
         const package_info = try self.racing_registry.getPackageRace(package_ref);
+        defer package_info.deinit(self.allocator);
         std.debug.print("✅ Found package from {s} in {d}ms\n", .{ package_info.source_registry, package_info.response_time_ms });
 
         // For now, fall back to standard add logic
@@ -91,6 +92,7 @@ pub const AsyncCommandHandler = struct {
         std.debug.print("🔍 Racing search across registries for: {s}\n", .{query});
 
         const search_result = try self.racing_registry.searchRace(query);
+        defer search_result.deinit(self.allocator);
 
         std.debug.print("🏆 Fastest result from {s} in {d}ms\n", .{ search_result.source_registry, search_result.response_time_ms });
 
@@ -145,7 +147,8 @@ pub const AsyncCommandHandler = struct {
         const start_time = zion.milliTimestamp();
 
         // Test racing registry
-        _ = try self.racing_registry.searchRace("test");
+        const benchmark_search_result = try self.racing_registry.searchRace("test");
+        defer benchmark_search_result.deinit(self.allocator);
         const registry_time = zion.milliTimestamp() - start_time;
 
         // Test timeout client

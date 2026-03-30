@@ -25,6 +25,12 @@ pub const RacingRegistry = struct {
         description: []const u8,
         source_registry: []const u8,
         response_time_ms: u64,
+
+        pub fn deinit(self: *const PackageInfo, allocator: Allocator) void {
+            allocator.free(self.name);
+            allocator.free(self.version);
+            allocator.free(self.description);
+        }
     };
 
     pub const SearchResult = struct {
@@ -32,6 +38,14 @@ pub const RacingRegistry = struct {
         source_registry: []const u8,
         response_time_ms: u64,
         faster_than: []const u8, // Which registries we beat
+
+        pub fn deinit(self: *const SearchResult, allocator: Allocator) void {
+            for (self.packages) |*pkg| {
+                pkg.deinit(allocator);
+            }
+            allocator.free(self.packages);
+            allocator.free(self.faster_than);
+        }
     };
 
     /// Initialize with multiple registry endpoints

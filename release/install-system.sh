@@ -22,7 +22,7 @@ fi
 echo -e "${BLUE}Checking for Zig installation...${NC}"
 if ! command -v zig &> /dev/null; then
   echo -e "${RED}Error: Zig is not installed or not in PATH${NC}"
-  echo -e "Please install Zig from https://ziglang.org/download/"
+  echo -e "Please install Zig 0.16.0+ from https://ziglang.org/download/"
   exit 1
 fi
 
@@ -61,8 +61,16 @@ install -Dm755 "zig-out/bin/zion" "/usr/local/bin/zion"
 echo -e "${BLUE}Installing documentation...${NC}"
 install -d "/usr/local/share/doc/zion"
 install -Dm644 "README.md" "/usr/local/share/doc/zion/README.md"
-install -Dm644 "COMMANDS.md" "/usr/local/share/doc/zion/COMMANDS.md"
-install -Dm644 "DOCS.md" "/usr/local/share/doc/zion/DOCS.md"
+install -Dm644 "docs/COMMANDS.md" "/usr/local/share/doc/zion/COMMANDS.md"
+install -Dm644 "docs/INSTALL.md" "/usr/local/share/doc/zion/INSTALL.md"
+
+# Install man page
+install -Dm644 "release/man/zion.1" "/usr/local/share/man/man1/zion.1"
+
+# Install shell completions
+install -Dm644 "release/completions/zion.bash" "/usr/local/share/bash-completion/completions/zion"
+install -Dm644 "release/completions/zion.zsh" "/usr/local/share/zsh/site-functions/_zion"
+install -Dm644 "release/completions/zion.fish" "/usr/local/share/fish/vendor_completions.d/zion.fish"
 
 # Install license if exists
 if [ -f "LICENSE" ]; then

@@ -5,11 +5,12 @@ const commands = @import("mod.zig");
 const Io = std.Io;
 const File = Io.File;
 
-/// Simple but functional TUI for Zion v1.0.6
+/// Simple but functional TUI for Zion
 pub fn tui(allocator: Allocator, args: []const [:0]const u8) !void {
-    _ = args;
-
     std.debug.print("\x1b[2J\x1b[H", .{}); // Clear screen and move to top
+
+    // Keep args for help command
+    const tui_args = args;
 
     const io = try zion_root.getIo();
     var running = true;
@@ -31,7 +32,7 @@ pub fn tui(allocator: Allocator, args: []const [:0]const u8) !void {
                     '2' => current_screen = .list_dependencies,
                     '3' => current_screen = .settings,
                     '4' => {
-                        try commands.help(allocator);
+                        try commands.help(allocator, tui_args);
                         try waitForKeypress(io, stdin_file, &stdin_buffer);
                         std.debug.print("\x1b[2J\x1b[H", .{});
                     },
@@ -91,7 +92,7 @@ const Screen = enum {
 
 fn drawMainMenu() !void {
     std.debug.print("┌─────────────────────────────────────────┐\n", .{});
-    std.debug.print("│          🚀 ZION v1.0.6 TUI           │\n", .{});
+    std.debug.print("│             🚀 ZION TUI               │\n", .{});
     std.debug.print("│        The Cargo for Zig               │\n", .{});
     std.debug.print("└─────────────────────────────────────────┘\n\n", .{});
 

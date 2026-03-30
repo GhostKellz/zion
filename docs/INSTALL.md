@@ -43,7 +43,7 @@ sudo cp zig-out/bin/zion /usr/local/bin/
 #### Using PKGBUILD
 
 ```bash
-git clone https://github.com/yourusername/zion.git
+git clone https://github.com/ghostkellz/zion.git
 cd zion/release/arch
 makepkg -si
 ```
@@ -61,7 +61,7 @@ paru -S zion
 ### Debian/Ubuntu
 
 ```bash
-git clone https://github.com/yourusername/zion.git
+git clone https://github.com/ghostkellz/zion.git
 cd zion/release/debian
 ./build-deb.sh
 sudo dpkg -i debian/packages/zion_*.deb
@@ -70,7 +70,7 @@ sudo dpkg -i debian/packages/zion_*.deb
 ### Fedora/RHEL/CentOS
 
 ```bash
-git clone https://github.com/yourusername/zion.git
+git clone https://github.com/ghostkellz/zion.git
 cd zion/release/rpm
 ./build-rpm.sh
 sudo dnf install rpm/packages/zion-*.rpm

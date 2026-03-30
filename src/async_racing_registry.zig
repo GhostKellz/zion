@@ -4,7 +4,7 @@ const zion_root = @import("root.zig");
 
 const Allocator = std.mem.Allocator;
 
-/// High-performance racing registry using proper zsync v0.5.4 patterns
+/// High-performance racing registry using zsync
 pub const AsyncRacingRegistry = struct {
     allocator: Allocator,
     registries: []const RegistryEndpoint,

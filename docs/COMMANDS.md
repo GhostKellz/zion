@@ -163,11 +163,19 @@ zion pin <package>@<version>
 
 ### `zion unpin`
 
-Unpin a dependency to track latest.
+Unpin a dependency to track latest version or default branch.
 
 ```bash
-zion unpin <package>
+zion unpin <package>             # Update to latest release/tag
+zion unpin <package> --to-main   # Track default branch (main/master)
+zion unpin <package> -m          # Short form
 ```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--to-main`, `-m` | Track the repository's default branch instead of releases |
 
 ---
 
@@ -233,11 +241,25 @@ zion check
 
 ### `zion tree`
 
-Display dependency tree.
+Display dependency tree with optional cycle detection.
 
 ```bash
-zion tree
+zion tree                    # Show dependency tree
+zion tree --check-cycles     # Check for circular dependencies
+zion tree -c                 # Short form
+zion tree --depth=2          # Limit tree depth
+zion tree --duplicates       # Highlight duplicate dependencies
+zion tree --no-versions      # Hide version info
 ```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--check-cycles`, `-c` | Detect circular dependencies |
+| `--depth=N` | Limit tree display depth |
+| `--duplicates` | Show duplicate dependency info |
+| `--no-versions` | Hide version numbers |
 
 ### `zion status`
 

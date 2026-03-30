@@ -9,7 +9,6 @@ const zion_root = @import("root.zig");
 pub const Dependency = struct {
     url: []const u8,
     hash: []const u8,
-    // v0.7.0 enhanced fields
     version: ?[]const u8 = null,
     registry: ?[]const u8 = null,
     resolved_from: ?[]const u8 = null,
@@ -28,10 +27,18 @@ pub const Dependency = struct {
 
 /// Represents the build.zig.zon manifest file
 pub const ZonFile = struct {
+    const DepRange = struct {
+        start: usize,
+        end: usize,
+    };
+
     name: []const u8,
     version: []const u8,
+    dependencies_prefix: ?[]const u8,
+    dependencies_body_leading: ?[]const u8,
+    dependencies_body_trailing: ?[]const u8,
+    dependencies_suffix: ?[]const u8,
     dependencies: std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
-    // v0.7.0 enhanced fields
     dev_dependencies: std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
     comments: std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
     allocator: Allocator,
@@ -41,6 +48,10 @@ pub const ZonFile = struct {
         return ZonFile{
             .name = try allocator.dupe(u8, name),
             .version = try allocator.dupe(u8, version),
+            .dependencies_prefix = null,
+            .dependencies_body_leading = null,
+            .dependencies_body_trailing = null,
+            .dependencies_suffix = null,
             .dependencies = std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .dev_dependencies = std.HashMap([]const u8, Dependency, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .comments = std.HashMap([]const u8, []const u8, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
@@ -52,6 +63,10 @@ pub const ZonFile = struct {
     pub fn deinit(self: *ZonFile) void {
         self.allocator.free(self.name);
         self.allocator.free(self.version);
+        if (self.dependencies_prefix) |prefix| self.allocator.free(prefix);
+        if (self.dependencies_body_leading) |leading| self.allocator.free(leading);
+        if (self.dependencies_body_trailing) |trailing| self.allocator.free(trailing);
+        if (self.dependencies_suffix) |suffix| self.allocator.free(suffix);
 
         var it = self.dependencies.iterator();
         while (it.next()) |entry| {
@@ -121,8 +136,27 @@ pub const ZonFile = struct {
         var zon_file = try ZonFile.init(allocator, project_name, project_version);
         errdefer zon_file.deinit();
 
-        // Parse dependencies with improved parser
-        try parseDependencies(allocator, content, &zon_file);
+        if (findDependenciesBlockRange(content)) |dep_block| {
+            const closing_line_start = findLineStart(content, dep_block.body_end);
+            zon_file.dependencies_prefix = try allocator.dupe(u8, content[0..dep_block.body_start]);
+            zon_file.dependencies_suffix = try allocator.dupe(u8, content[closing_line_start..]);
+
+            var parsed_ranges = try parseDependenciesWithRanges(allocator, content, &zon_file, dep_block.body_start, closing_line_start);
+            defer parsed_ranges.deinit(allocator);
+
+            if (parsed_ranges.items.len > 0) {
+                const first = parsed_ranges.items[0];
+                const last = parsed_ranges.items[parsed_ranges.items.len - 1];
+                zon_file.dependencies_body_leading = try allocator.dupe(u8, content[dep_block.body_start..first.start]);
+                zon_file.dependencies_body_trailing = try allocator.dupe(u8, content[last.end..closing_line_start]);
+            } else {
+                zon_file.dependencies_body_leading = try allocator.dupe(u8, content[dep_block.body_start..closing_line_start]);
+                zon_file.dependencies_body_trailing = try allocator.dupe(u8, "");
+            }
+        } else {
+            // Parse dependencies with improved parser for non-standard files.
+            try parseDependencies(allocator, content, &zon_file);
+        }
 
         return zon_file;
     }
@@ -173,15 +207,17 @@ pub const ZonFile = struct {
 
     /// Parse dependencies section from ZON content
     fn parseDependencies(allocator: Allocator, content: []const u8, zon_file: *ZonFile) !void {
-        const deps_start = ".dependencies = .{";
-        const deps_start_pos = std.mem.indexOf(u8, content, deps_start) orelse return;
+        const dep_block = findDependenciesBlockRange(content) orelse return;
 
-        var pos = deps_start_pos + deps_start.len;
-        var brace_depth: u32 = 1;
-
-        while (pos < content.len and brace_depth > 0) {
+        var pos = dep_block.body_start;
+        var brace_depth: u32 = 0;
+        while (pos < dep_block.body_end) {
             const c = content[pos];
-            if (c == '{') brace_depth += 1 else if (c == '}') brace_depth -= 1 else if (c == '.' and brace_depth == 1) {
+            if (c == '{') {
+                brace_depth += 1;
+            } else if (c == '}') {
+                if (brace_depth > 0) brace_depth -= 1;
+            } else if (c == '.' and brace_depth == 0 and isDependencyEntryStart(content, pos)) {
                 // Found a dependency entry
                 if (parseDependencyEntry(allocator, content[pos..])) |dep_entry| {
                     try zon_file.addDependency(dep_entry.name, dep_entry.url, dep_entry.hash);
@@ -194,8 +230,92 @@ pub const ZonFile = struct {
         }
     }
 
+    fn parseDependenciesWithRanges(
+        allocator: Allocator,
+        content: []const u8,
+        zon_file: *ZonFile,
+        body_start: usize,
+        body_end_exclusive: usize,
+    ) !std.ArrayList(DepRange) {
+        var ranges: std.ArrayList(DepRange) = .empty;
+
+        var pos = body_start;
+        var brace_depth: u32 = 0;
+        while (pos < body_end_exclusive) {
+            const c = content[pos];
+            if (c == '{') {
+                brace_depth += 1;
+                pos += 1;
+                continue;
+            }
+            if (c == '}') {
+                if (brace_depth > 0) brace_depth -= 1;
+                pos += 1;
+                continue;
+            }
+
+            if (c == '.' and brace_depth == 0 and isDependencyEntryStart(content, pos)) {
+                if (parseDependencyEntry(allocator, content[pos..])) |dep_entry| {
+                    defer allocator.free(dep_entry.name);
+                    defer allocator.free(dep_entry.url);
+                    defer allocator.free(dep_entry.hash);
+
+                    try zon_file.addDependency(dep_entry.name, dep_entry.url, dep_entry.hash);
+
+                    const entry_start = findLineStart(content, pos);
+                    var entry_end = pos + dep_entry.bytes_consumed;
+
+                    while (entry_end < body_end_exclusive and (content[entry_end] == ' ' or content[entry_end] == '\t')) {
+                        entry_end += 1;
+                    }
+                    if (entry_end < body_end_exclusive and content[entry_end] == ',') {
+                        entry_end += 1;
+                    }
+                    if (entry_end < body_end_exclusive and content[entry_end] == '\r') {
+                        entry_end += 1;
+                    }
+                    if (entry_end < body_end_exclusive and content[entry_end] == '\n') {
+                        entry_end += 1;
+                    }
+
+                    try ranges.append(allocator, .{ .start = entry_start, .end = entry_end });
+                    pos = entry_end;
+                    continue;
+                }
+            }
+
+            pos += 1;
+        }
+
+        return ranges;
+    }
+
+    fn findDependenciesBlockRange(content: []const u8) ?struct { body_start: usize, body_end: usize } {
+        const deps_start = ".dependencies = .{";
+        const deps_start_pos = std.mem.indexOf(u8, content, deps_start) orelse return null;
+
+        const body_start = deps_start_pos + deps_start.len;
+        var pos = body_start;
+        var brace_depth: u32 = 1;
+
+        while (pos < content.len) {
+            const c = content[pos];
+            if (c == '{') {
+                brace_depth += 1;
+            } else if (c == '}') {
+                brace_depth -= 1;
+                if (brace_depth == 0) {
+                    return .{ .body_start = body_start, .body_end = pos };
+                }
+            }
+            pos += 1;
+        }
+
+        return null;
+    }
+
     /// Parse a single dependency entry
-    fn parseDependencyEntry(allocator: Allocator, content: []const u8) ?struct { name: []const u8, url: []const u8, hash: []const u8 } {
+    fn parseDependencyEntry(allocator: Allocator, content: []const u8) ?struct { name: []const u8, url: []const u8, hash: []const u8, bytes_consumed: usize } {
         // Look for pattern: .name = .{ .url = "...", .hash = "...", }
         if (!std.mem.startsWith(u8, content, ".")) return null;
 
@@ -235,7 +355,25 @@ pub const ZonFile = struct {
             .name = allocator.dupe(u8, dep_name) catch return null,
             .url = allocator.dupe(u8, url) catch return null,
             .hash = allocator.dupe(u8, hash) catch return null,
+            .bytes_consumed = block_end,
         };
+    }
+
+    fn findLineStart(content: []const u8, pos: usize) usize {
+        if (pos == 0) return 0;
+        var i = pos;
+        while (i > 0) {
+            if (content[i - 1] == '\n') return i;
+            i -= 1;
+        }
+        return 0;
+    }
+
+    fn isDependencyEntryStart(content: []const u8, pos: usize) bool {
+        const line_start = findLineStart(content, pos);
+        var i = line_start;
+        while (i < pos and (content[i] == ' ' or content[i] == '\t')) : (i += 1) {}
+        return i == pos;
     }
 
     /// Save ZON file to disk with proper Zig identifier format
@@ -245,18 +383,25 @@ pub const ZonFile = struct {
         const file = try cwd.createFile(io, file_path, .{ .truncate = true });
         defer file.close(io);
 
-        // Write ZON format with proper identifier syntax
-        try file.writeStreamingAll(io, ".{\n");
+        if (self.dependencies_prefix) |prefix| {
+            try file.writeStreamingAll(io, prefix);
+            if (self.dependencies_body_leading) |leading| {
+                try file.writeStreamingAll(io, leading);
+            }
+        } else {
+            // Fallback when we do not have source template context.
+            try file.writeStreamingAll(io, ".{\n");
 
-        const name_line = try std.fmt.allocPrint(self.allocator, "    .name = .{s},\n", .{self.name});
-        defer self.allocator.free(name_line);
-        try file.writeStreamingAll(io, name_line);
+            const name_line = try std.fmt.allocPrint(self.allocator, "    .name = .{s},\n", .{self.name});
+            defer self.allocator.free(name_line);
+            try file.writeStreamingAll(io, name_line);
 
-        const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{self.version});
-        defer self.allocator.free(version_line);
-        try file.writeStreamingAll(io, version_line);
+            const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{self.version});
+            defer self.allocator.free(version_line);
+            try file.writeStreamingAll(io, version_line);
 
-        try file.writeStreamingAll(io, "    .dependencies = .{\n");
+            try file.writeStreamingAll(io, "    .dependencies = .{");
+        }
 
         var it = self.dependencies.iterator();
         while (it.next()) |entry| {
@@ -275,6 +420,15 @@ pub const ZonFile = struct {
             try file.writeStreamingAll(io, dep_hash_line);
 
             try file.writeStreamingAll(io, "        },\n");
+        }
+
+        if (self.dependencies_body_trailing) |trailing| {
+            try file.writeStreamingAll(io, trailing);
+        }
+
+        if (self.dependencies_suffix) |suffix| {
+            try file.writeStreamingAll(io, suffix);
+            return;
         }
 
         try file.writeStreamingAll(io, "    },\n");

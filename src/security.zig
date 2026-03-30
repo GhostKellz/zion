@@ -76,34 +76,21 @@ pub const SecurityManager = struct {
     }
 
     /// Generate a new Ed25519 key pair for signing
+    /// Uses Zig's standard library Ed25519 implementation
     pub fn generateKeyPair(_: *SecurityManager) !struct { public_key: [PUBLIC_KEY_SIZE]u8, private_key: [PRIVATE_KEY_SIZE]u8 } {
         const io = try zion_root.getIo();
 
-        // Generate a random 32-byte seed for the private key
-        var seed: [32]u8 = undefined;
-        io.random(&seed);
-
-        // For Ed25519, we'll use a simplified approach
-        // Create 64-byte private key (32 bytes seed + 32 bytes derived)
-        var private_key: [64]u8 = undefined;
-        var public_key: [32]u8 = undefined;
-
-        // Copy seed to first 32 bytes of private key
-        @memcpy(private_key[0..32], &seed);
-
-        // Generate the actual keypair using the crypto library
-        // For now, use placeholder values - in a full implementation,
-        // you'd use the actual Ed25519 key derivation
-        io.random(private_key[32..64]);
-        io.random(&public_key);
+        // Generate a proper Ed25519 key pair using Zig's crypto library
+        const keypair = crypto.sign.Ed25519.KeyPair.generate(io);
 
         return .{
-            .public_key = public_key,
-            .private_key = private_key,
+            .public_key = keypair.public_key.toBytes(),
+            .private_key = keypair.secret_key.toBytes(),
         };
     }
 
     /// Sign a package file with Ed25519
+    /// Uses real Ed25519 cryptographic signatures
     pub fn signPackage(self: *SecurityManager, package_path: []const u8, private_key: [PRIVATE_KEY_SIZE]u8, signer_id: []const u8) !PackageSignature {
         const io = try zion_root.getIo();
         const cwd = std.Io.Dir.cwd();
@@ -123,30 +110,23 @@ pub const SecurityManager = struct {
         }
         const content = content_list.items;
 
-        // For now, create a mock signature using hash of content + private key
-        // In a full implementation, you'd use proper Ed25519 signing
-        var hasher = crypto.hash.sha2.Sha256.init(.{});
-        hasher.update(content);
-        hasher.update(&private_key);
+        // Reconstruct the key pair from the secret key bytes
+        const secret_key = try crypto.sign.Ed25519.SecretKey.fromBytes(private_key);
+        const keypair = try crypto.sign.Ed25519.KeyPair.fromSecretKey(secret_key);
 
-        var signature: [SIGNATURE_SIZE]u8 = undefined;
-        var hash: [32]u8 = undefined;
-        hasher.final(&hash);
-
-        // Pad the hash to signature size
-        @memcpy(signature[0..32], &hash);
-        @memset(signature[32..], 0);
+        // Sign the content with real Ed25519 (deterministic signature, no noise)
+        const sig = try keypair.sign(content, null);
 
         return PackageSignature{
-            .signature = signature,
-            .public_key = private_key[32..64].*, // Use second half as mock public key
+            .signature = sig.toBytes(),
+            .public_key = keypair.public_key.toBytes(),
             .timestamp = zion_root.timestamp(),
             .signer_id = try self.allocator.dupe(u8, signer_id),
             .algorithm = try self.allocator.dupe(u8, "Ed25519"),
         };
     }
 
-    /// Verify a package signature
+    /// Verify a package signature using real Ed25519 verification
     pub fn verifyPackage(self: *SecurityManager, package_path: []const u8, signature: PackageSignature) !bool {
         const io = try zion_root.getIo();
         const cwd = std.Io.Dir.cwd();
@@ -166,17 +146,13 @@ pub const SecurityManager = struct {
         }
         const content = content_list.items;
 
-        // For now, implement mock verification
-        // In a full implementation, you'd use proper Ed25519 verification
-        var hasher = crypto.hash.sha2.Sha256.init(.{});
-        hasher.update(content);
-        hasher.update(&signature.public_key);
+        // Reconstruct the public key and signature for verification
+        const public_key = crypto.sign.Ed25519.PublicKey.fromBytes(signature.public_key) catch return false;
+        const sig = crypto.sign.Ed25519.Signature.fromBytes(signature.signature);
 
-        var expected_hash: [32]u8 = undefined;
-        hasher.final(&expected_hash);
-
-        // Compare first 32 bytes of signature with expected hash
-        return std.mem.eql(u8, signature.signature[0..32], &expected_hash);
+        // Verify the signature cryptographically
+        sig.verify(content, public_key) catch return false;
+        return true;
     }
 
     /// Add a signer to the trust store
@@ -210,7 +186,9 @@ pub const SecurityManager = struct {
     }
 };
 
-/// Verify package signature (v0.7.0 compatibility function)
+/// Verify package signature
+/// Note: This requires a .sig file alongside the package with the signature data.
+/// Returns valid=false if no signature is present (unsigned package).
 pub fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, package_name: []const u8) !struct {
     valid: bool,
     message: []const u8,
@@ -221,14 +199,108 @@ pub fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, pa
         // Messages are static strings, no need to free
     }
 } {
-    _ = allocator;
-    _ = package_path;
     _ = package_name;
 
-    // For v0.7.0, return a mock verification result
+    const io = zion_root.getIo() catch {
+        return .{
+            .valid = false,
+            .message = "Failed to initialize I/O for verification",
+            .signer = "unknown",
+        };
+    };
+    const cwd = std.Io.Dir.cwd();
+
+    // Look for signature file (.sig extension)
+    var sig_path_buf: [512]u8 = undefined;
+    const sig_path = std.fmt.bufPrint(&sig_path_buf, "{s}.sig", .{package_path}) catch {
+        return .{
+            .valid = false,
+            .message = "Package path too long",
+            .signer = "unknown",
+        };
+    };
+
+    // Check if signature file exists
+    const sig_file = cwd.openFile(io, sig_path, .{}) catch {
+        // No signature file = unsigned package
+        return .{
+            .valid = false,
+            .message = "Package is unsigned (no .sig file found)",
+            .signer = "none",
+        };
+    };
+    defer sig_file.close(io);
+
+    // Read signature data (public_key:32 + signature:64 = 96 bytes minimum)
+    var sig_data: [128]u8 = undefined;
+    const bytes_read = sig_file.readStreaming(io, &.{sig_data[0..]}) catch {
+        return .{
+            .valid = false,
+            .message = "Failed to read signature file",
+            .signer = "unknown",
+        };
+    };
+
+    if (bytes_read < 96) {
+        return .{
+            .valid = false,
+            .message = "Invalid signature file format",
+            .signer = "unknown",
+        };
+    }
+
+    // Parse signature components
+    const public_key_bytes: [32]u8 = sig_data[0..32].*;
+    const signature_bytes: [64]u8 = sig_data[32..96].*;
+
+    // Open and read the package file
+    const pkg_file = cwd.openFile(io, package_path, .{}) catch {
+        return .{
+            .valid = false,
+            .message = "Failed to open package file",
+            .signer = "unknown",
+        };
+    };
+    defer pkg_file.close(io);
+
+    var content_list: std.ArrayList(u8) = .empty;
+    defer content_list.deinit(allocator);
+
+    var buffer: [8192]u8 = undefined;
+    while (true) {
+        const read_bytes = pkg_file.readStreaming(io, &.{buffer[0..]}) catch break;
+        if (read_bytes == 0) break;
+        content_list.appendSlice(allocator, buffer[0..read_bytes]) catch {
+            return .{
+                .valid = false,
+                .message = "Memory allocation failed during verification",
+                .signer = "unknown",
+            };
+        };
+    }
+
+    // Verify the Ed25519 signature
+    const public_key = crypto.sign.Ed25519.PublicKey.fromBytes(public_key_bytes) catch {
+        return .{
+            .valid = false,
+            .message = "Invalid public key in signature",
+            .signer = "unknown",
+        };
+    };
+
+    const sig = crypto.sign.Ed25519.Signature.fromBytes(signature_bytes);
+
+    sig.verify(content_list.items, public_key) catch {
+        return .{
+            .valid = false,
+            .message = "Signature verification failed - content may have been tampered",
+            .signer = "unknown",
+        };
+    };
+
     return .{
         .valid = true,
         .message = "Package signature verified successfully",
-        .signer = "Zion Package Manager",
+        .signer = "verified",
     };
 }

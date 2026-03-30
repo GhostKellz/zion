@@ -8,7 +8,7 @@ pub const semver = @import("semver.zig");
 pub const version_resolver = @import("version_resolver.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "0.1.4";
+pub const ZION_VERSION = "1.0.8";
 
 /// Application context passed through from main to commands
 /// Contains std.Io for filesystem and network operations (required by Zig 0.16.0)
@@ -69,7 +69,7 @@ pub fn milliTimestamp() i64 {
 }
 
 // ============================================================================
-// Accessibility Features (v0.1.2)
+// Accessibility Features
 // ============================================================================
 
 /// Check if colors should be disabled (NO_COLOR standard)
@@ -142,7 +142,11 @@ pub fn printHeader(title: []const u8) void {
         std.debug.print("\n=== {s} ===\n\n", .{title});
     } else {
         std.debug.print("\n{s}{s}{s} {s} {s}{s}\n\n", .{
-            Color.bold, Color.cyan, "━━━", title, "━━━", Color.reset,
+            Color.bold,  Color.cyan,
+            "━━━",
+            title,
+            "━━━",
+            Color.reset,
         });
     }
 }
@@ -155,8 +159,7 @@ pub const security = @import("security.zig");
 pub const parallel_downloader = @import("parallel_downloader.zig");
 
 // AI Integration
-pub const zeke_client = @import("zeke_client_simple.zig");
-pub const enhanced_add_zeke = @import("commands/enhanced_add_zeke.zig").enhancedAdd;
+// AI integration removed
 
 // Core modules
 pub const config = @import("config.zig");
@@ -167,5 +170,4 @@ pub const hash_conversion = @import("hash_conversion.zig");
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {
     std.debug.print("Zion v{s} package manager is ready!\n", .{ZION_VERSION});
-    std.debug.print("New in v0.1.4: Hash automation & lock enhancements for better dependency management!\n", .{});
 }

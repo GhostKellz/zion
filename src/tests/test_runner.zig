@@ -170,7 +170,7 @@ test "Concurrency: race condition detection" {
 
 // Test runner entry point
 pub fn main() !void {
-    std.debug.print("\n🧪 Running Zion v1.0.3 Comprehensive Test Suite\n", .{});
+    std.debug.print("\n🧪 Running Zion Comprehensive Test Suite\n", .{});
     std.debug.print("=" ** 50 ++ "\n\n", .{});
 
     // Run all tests
@@ -188,5 +188,5 @@ pub fn main() !void {
     std.debug.print("  • Integration Tests: PASSED\n", .{});
     std.debug.print("  • Performance Tests: PASSED\n", .{});
     std.debug.print("  • Stability Tests: PASSED\n", .{});
-    std.debug.print("\n🎉 Zion v1.0.3 is stable and ready!\n", .{});
+    std.debug.print("\n🎉 Zion is stable and ready!\n", .{});
 }

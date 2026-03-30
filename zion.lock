@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "packages": [
+    {
+      "name": "libxev",
+      "url": "https://github.com/mitchellh/libxev/archive/refs/heads/main.tar.gz",
+      "hash": "167fd0d866540e40486e8b18b1ea7376c60ebf307328c78499263188ac820e46",
+      "timestamp": 1774874418,
+      "version": "latest",
+      "registry": "github",
+      "resolved_from": "mitchellh/libxev",
+      "integrity": "167fd0d866540e40486e8b18b1ea7376c60ebf307328c78499263188ac820e46",
+      "version_constraint": "latest",
+      "last_checked": 1774874418
+    },
+    {
+      "name": "zig",
+      "url": "https://github.com/ziglang/zig/archive/refs/heads/main.tar.gz",
+      "hash": "beed4bc981543c7aa52612c48a0964ac5137311342af17279fcd6652c76f9fe0",
+      "timestamp": 1774880034,
+      "version": "latest",
+      "registry": "github",
+      "resolved_from": "ziglang/zig",
+      "integrity": "beed4bc981543c7aa52612c48a0964ac5137311342af17279fcd6652c76f9fe0",
+      "version_constraint": "latest",
+      "last_checked": 1774880034
+    }
+  ]
+}

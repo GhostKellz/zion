@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
 
-/// Quality of Life Enhancements for Zion v1.0.6
+/// Quality of Life Enhancements for Zion
 /// Focuses on CLI improvements, smart suggestions, and user experience
 /// Smart command suggestions system
 pub const CommandSuggester = struct {
@@ -458,7 +458,7 @@ pub fn enhanceCommand(allocator: Allocator, args: []const []const u8, unknown_co
 pub fn showQoLHelp() void {
     var formatter = OutputFormatter.init();
 
-    formatter.heading("Quality of Life Features in Zion v1.0.6");
+    formatter.heading("Quality of Life Features in Zion");
 
     formatter.info("Smart Command Suggestions:");
     std.debug.print("  🎯 Typo correction: 'zion ad' → suggests 'zion add'\n", .{});

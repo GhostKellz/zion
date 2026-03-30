@@ -506,3 +506,56 @@ fn fetchJsonWithCurl(allocator: Allocator, url: []const u8) ![]const u8 {
 
     return stdout;
 }
+
+/// Get the default branch for a GitHub repository
+/// Returns "main" or "master" or custom default branch name
+pub fn getDefaultBranch(allocator: Allocator, package_ref: []const u8) ![]const u8 {
+    const slash_index = std.mem.indexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
+    const owner = package_ref[0..slash_index];
+    const repo = package_ref[slash_index + 1 ..];
+
+    return getDefaultBranchForRepo(allocator, owner, repo);
+}
+
+/// Get the default branch for a GitHub repository by owner/repo
+pub fn getDefaultBranchForRepo(allocator: Allocator, owner: []const u8, repo: []const u8) ![]const u8 {
+    const url = try std.fmt.allocPrint(allocator, "https://api.github.com/repos/{s}/{s}", .{ owner, repo });
+    defer allocator.free(url);
+
+    const json_data = fetchJsonWithCurl(allocator, url) catch |err| {
+        std.debug.print("GitHub API error fetching repo info for {s}/{s}: {}\n", .{ owner, repo, err });
+        // Fall back to "main" if we can't determine
+        return try allocator.dupe(u8, "main");
+    };
+    defer allocator.free(json_data);
+
+    if (json_data.len == 0) {
+        return try allocator.dupe(u8, "main");
+    }
+
+    var parsed = json.parseFromSlice(json.Value, allocator, json_data, .{}) catch {
+        return try allocator.dupe(u8, "main");
+    };
+    defer parsed.deinit();
+
+    // Extract default_branch field
+    switch (parsed.value) {
+        .object => |obj| {
+            if (getJsonString(obj, "default_branch")) |branch| {
+                return try allocator.dupe(u8, branch);
+            } else |_| {
+                return try allocator.dupe(u8, "main");
+            }
+        },
+        else => return try allocator.dupe(u8, "main"),
+    }
+}
+
+/// Generate tarball URL for the default branch of a repository
+pub fn generateDefaultBranchTarballUrl(allocator: Allocator, package_ref: []const u8) !struct { url: []const u8, branch: []const u8 } {
+    const branch = try getDefaultBranch(allocator, package_ref);
+    errdefer allocator.free(branch);
+
+    const url = try generateTarballUrl(allocator, package_ref, branch);
+    return .{ .url = url, .branch = branch };
+}

@@ -8,7 +8,7 @@ const Package = @import("registry_client.zig").Package;
 const Release = @import("registry_client.zig").Release;
 const zion_root = @import("root.zig");
 
-/// Unified Registry Manager v1.0.3 - Consolidates all registry operations
+/// Unified Registry Manager - Consolidates all registry operations
 /// with optimized async patterns, connection pooling, and enhanced performance
 pub const UnifiedRegistryManager = struct {
     allocator: Allocator,

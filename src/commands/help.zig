@@ -1,8 +1,192 @@
 const std = @import("std");
 
+/// Per-command help texts
+const command_help = struct {
+    const unpin =
+        \\Unpin a dependency to track the latest version
+        \\
+        \\USAGE:
+        \\    zion unpin <package> [OPTIONS]
+        \\
+        \\OPTIONS:
+        \\    --to-main, -m    Track the repository's default branch instead of releases
+        \\
+        \\EXAMPLES:
+        \\    zion unpin libxev              # Update to latest release/tag
+        \\    zion unpin libxev --to-main    # Track default branch directly
+        \\
+    ;
+
+    const pin =
+        \\Pin a dependency to a specific version
+        \\
+        \\USAGE:
+        \\    zion pin <package>@<version>
+        \\
+        \\EXAMPLES:
+        \\    zion pin libxev@0.1.5          # Pin to specific version
+        \\    zion pin httpz@1.0.0           # Pin httpz to 1.0.0
+        \\
+    ;
+
+    const add =
+        \\Add a dependency to your project
+        \\
+        \\USAGE:
+        \\    zion add <package> [<package2> ...]
+        \\
+        \\EXAMPLES:
+        \\    zion add mitchellh/libxev              # Add from GitHub
+        \\    zion add mitchellh/libxev karlseguin/httpz  # Add multiple
+        \\
+    ;
+
+    const remove =
+        \\Remove a dependency from your project
+        \\
+        \\USAGE:
+        \\    zion remove <package>
+        \\    zion rm <package>
+        \\
+        \\EXAMPLES:
+        \\    zion remove libxev             # Remove libxev
+        \\    zion rm httpz                  # Remove httpz (alias)
+        \\
+    ;
+
+    const tree =
+        \\Show dependency tree visualization
+        \\
+        \\USAGE:
+        \\    zion tree [OPTIONS]
+        \\
+        \\OPTIONS:
+        \\    --check-cycles, -c    Detect circular dependencies
+        \\    --depth=N             Limit tree display depth
+        \\    --duplicates          Highlight duplicate dependencies
+        \\    --no-versions         Hide version information
+        \\
+        \\EXAMPLES:
+        \\    zion tree                      # Show full tree
+        \\    zion tree --check-cycles       # Check for circular deps
+        \\    zion tree --depth=2            # Limit to 2 levels
+        \\
+    ;
+
+    const hash =
+        \\Generate, verify, and manage package hashes
+        \\
+        \\USAGE:
+        \\    zion hash <subcommand> [OPTIONS]
+        \\
+        \\SUBCOMMANDS:
+        \\    update <package>       Re-download and update hash
+        \\    update --all           Update all dependency hashes
+        \\    check                  Verify cached packages match ZON hashes
+        \\
+        \\EXAMPLES:
+        \\    zion hash update libxev        # Update hash for libxev
+        \\    zion hash update --all         # Update all hashes
+        \\    zion hash check                # Verify all hashes
+        \\
+    ;
+
+    const search =
+        \\Search for Zig packages
+        \\
+        \\USAGE:
+        \\    zion search <query>
+        \\
+        \\EXAMPLES:
+        \\    zion search http               # Search for HTTP packages
+        \\    zion search json               # Search for JSON packages
+        \\
+    ;
+
+    const zig =
+        \\Zig version manager
+        \\
+        \\USAGE:
+        \\    zion zig <subcommand> [VERSION]
+        \\
+        \\SUBCOMMANDS:
+        \\    install <version>      Install a Zig version
+        \\    use <version>          Switch to a Zig version
+        \\    use system             Use system-installed Zig
+        \\    list                   List installed versions
+        \\    list --remote          List available versions
+        \\    current                Show current version
+        \\
+        \\EXAMPLES:
+        \\    zion zig install 0.14.1        # Install stable
+        \\    zion zig use system            # Use pacman Zig
+        \\
+    ;
+
+    const zls =
+        \\ZLS (Zig Language Server) integration
+        \\
+        \\USAGE:
+        \\    zion zls <subcommand>
+        \\
+        \\SUBCOMMANDS:
+        \\    install                Installation guidance
+        \\    update                 Update ZLS
+        \\    doctor                 Health check and diagnostics
+        \\    config                 Generate optimal configuration
+        \\
+        \\EXAMPLES:
+        \\    zion zls doctor                # Check ZLS health
+        \\    zion zls config                # Generate config
+        \\
+    ;
+
+    const clean =
+        \\Clean build artifacts and caches
+        \\
+        \\USAGE:
+        \\    zion clean [OPTIONS]
+        \\
+        \\OPTIONS:
+        \\    --all                  Remove everything including lock file
+        \\    --cache                Remove only cached files
+        \\
+        \\EXAMPLES:
+        \\    zion clean                     # Clean build artifacts
+        \\    zion clean --all               # Full cleanup
+        \\
+    ;
+};
+
+/// Get help text for a specific command
+fn getCommandHelp(cmd: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, cmd, "unpin")) return command_help.unpin;
+    if (std.mem.eql(u8, cmd, "pin")) return command_help.pin;
+    if (std.mem.eql(u8, cmd, "add")) return command_help.add;
+    if (std.mem.eql(u8, cmd, "remove") or std.mem.eql(u8, cmd, "rm")) return command_help.remove;
+    if (std.mem.eql(u8, cmd, "tree")) return command_help.tree;
+    if (std.mem.eql(u8, cmd, "hash")) return command_help.hash;
+    if (std.mem.eql(u8, cmd, "search")) return command_help.search;
+    if (std.mem.eql(u8, cmd, "zig")) return command_help.zig;
+    if (std.mem.eql(u8, cmd, "zls")) return command_help.zls;
+    if (std.mem.eql(u8, cmd, "clean")) return command_help.clean;
+    return null;
+}
+
 /// Display help information
-pub fn help(allocator: std.mem.Allocator) !void {
-    _ = allocator; // unused but required for API consistency
+pub fn help(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
+    _ = allocator;
+
+    // Check for per-command help: zion help <command>
+    if (args.len >= 3) {
+        const cmd = args[2];
+        if (getCommandHelp(cmd)) |cmd_help| {
+            std.debug.print("{s}\n", .{cmd_help});
+            return;
+        } else {
+            std.debug.print("No detailed help for '{s}'. Showing general help.\n\n", .{cmd});
+        }
+    }
 
     const help_text =
         \\Zion - A Modern Zig Package Manager

@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 
-// Integration test for v1.0.3 optimizations
-test "v1.0.3: Basic build verification" {
+// Integration test for optimizations
+test "Basic build verification" {
     const allocator = testing.allocator;
 
     // Test that basic memory allocation works
@@ -14,7 +14,7 @@ test "v1.0.3: Basic build verification" {
     try testing.expect(data[1023] == 0xFF);
 }
 
-test "v1.0.3: Concurrent operations simulation" {
+test " Concurrent operations simulation" {
     // Simulate concurrent operations
     var counter: u32 = 0;
     var mutex = std.Thread.Mutex{};
@@ -41,7 +41,7 @@ test "v1.0.3: Concurrent operations simulation" {
     try testing.expect(counter == thread_count * 1000);
 }
 
-test "v1.0.3: HTTP client structure validation" {
+test " HTTP client structure validation" {
     // Test that HTTP response handling is structured correctly
     const HttpResponse = struct {
         status_code: u16,
@@ -82,7 +82,7 @@ test "v1.0.3: HTTP client structure validation" {
     try testing.expect(!error_response.isServerError());
 }
 
-test "v1.0.3: Circuit breaker pattern" {
+test " Circuit breaker pattern" {
     const CircuitBreaker = struct {
         failure_threshold: u32,
         failure_count: u32,
@@ -143,7 +143,7 @@ test "v1.0.3: Circuit breaker pattern" {
     try testing.expect(breaker.canExecute()); // Back to closed
 }
 
-test "v1.0.3: Connection pooling simulation" {
+test " Connection pooling simulation" {
     const allocator = testing.allocator;
 
     const ConnectionPool = struct {
@@ -224,7 +224,7 @@ test "v1.0.3: Connection pooling simulation" {
     try testing.expect(pool.available.items.len == 5);
 }
 
-test "v1.0.3: Request batching simulation" {
+test " Request batching simulation" {
     const allocator = testing.allocator;
 
     const RequestBatch = struct {
@@ -276,7 +276,7 @@ test "v1.0.3: Request batching simulation" {
     try testing.expect(batch.shouldExecute()); // Batch full
 }
 
-test "v1.0.3: Performance metrics" {
+test " Performance metrics" {
     const start_time = std.time.milliTimestamp();
 
     // Simulate some work
@@ -296,7 +296,7 @@ test "v1.0.3: Performance metrics" {
     try testing.expect(sum > 0);
 }
 
-test "v1.0.3: Memory management verification" {
+test " Memory management verification" {
     const allocator = testing.allocator;
 
     // Test allocation patterns
@@ -319,11 +319,11 @@ test "v1.0.3: Memory management verification" {
 }
 
 pub fn main() !void {
-    std.debug.print("\n🧪 Zion v1.0.3 Integration Tests\n", .{});
+    std.debug.print("\n🧪 Zion Integration Tests\n", .{});
     std.debug.print("=" ** 40 ++ "\n\n", .{});
 
     // Run all tests
     testing.refAllDecls(@This());
 
-    std.debug.print("\n✅ All v1.0.3 integration tests passed!\n", .{});
+    std.debug.print("\n✅ All integration tests passed!\n", .{});
 }

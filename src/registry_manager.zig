@@ -11,7 +11,7 @@ const SearchFilters = package_registry.SearchFilters;
 const RegistryHealth = package_registry.RegistryHealth;
 const zion_root = @import("root.zig");
 
-/// Registry Manager for v0.7.0 - coordinates multiple registries
+/// Registry Manager - coordinates multiple registries
 pub const RegistryManager = struct {
     allocator: std.mem.Allocator,
     config: *ZionConfig,
@@ -209,14 +209,37 @@ pub const RegistryManager = struct {
             }
 
             // Find matching version
-            for (releases) |release| {
-                if (std.mem.eql(u8, release.tag_name, version)) {
+            // Handle "latest" specially - return the first (most recent) release
+            if (std.mem.eql(u8, version, "latest")) {
+                if (releases.len > 0) {
                     return DownloadInfo{
-                        .url = try self.allocator.dupe(u8, release.tarball_url),
-                        .sha256_hash = null, // Would be in release assets or headers
+                        .url = try self.allocator.dupe(u8, releases[0].tarball_url),
+                        .sha256_hash = null,
                         .registry_name = try self.allocator.dupe(u8, client.config.name),
-                        .size = 0, // Would be in release assets
+                        .size = 0,
                     };
+                }
+            } else {
+                for (releases) |release| {
+                    // Match exact version or with 'v' prefix
+                    const tag = release.tag_name;
+                    if (std.mem.eql(u8, tag, version)) {
+                        return DownloadInfo{
+                            .url = try self.allocator.dupe(u8, release.tarball_url),
+                            .sha256_hash = null,
+                            .registry_name = try self.allocator.dupe(u8, client.config.name),
+                            .size = 0,
+                        };
+                    }
+                    // Also try matching without 'v' prefix
+                    if (std.mem.startsWith(u8, tag, "v") and std.mem.eql(u8, tag[1..], version)) {
+                        return DownloadInfo{
+                            .url = try self.allocator.dupe(u8, release.tarball_url),
+                            .sha256_hash = null,
+                            .registry_name = try self.allocator.dupe(u8, client.config.name),
+                            .size = 0,
+                        };
+                    }
                 }
             }
         }

@@ -1,4 +1,4 @@
-.TH ZION 1 "2024" "Zion 0.2.0-dev" "User Commands"
+.TH ZION 1 "March 2026" "Zion 1.0.8" "User Commands"
 
 .SH NAME
 zion \- A modern, cargo-inspired package manager for the Zig programming language
@@ -14,45 +14,157 @@ is a modern package manager for the Zig programming language that provides seaml
 
 .SH COMMANDS
 
+.SS Project Management
+
 .TP
 .B init
 Initialize a new Zig project with necessary file structure
-
-.TP
-.B add \fIPACKAGE\fR
-Add a dependency to your project. PACKAGE should be in the format "username/repo"
-
-.TP
-.B remove \fIPACKAGE\fR, rm \fIPACKAGE\fR
-Remove a dependency from your project with complete cleanup
-
-.TP
-.B update
-Update all dependencies to their latest versions
-
-.TP
-.B list, ls
-List all dependencies in the project with their installation status
-
-.TP
-.B info \fIPACKAGE\fR
-Show detailed information about a specific package dependency
-
-.TP
-.B fetch
-Fetch all dependencies specified in your build.zig.zon file
 
 .TP
 .B build
 Build the project using the Zig build system
 
 .TP
-.B clean
-Remove build artifacts and caches. Use --all to remove everything including lock files
+.B run
+Build and run the project
+
+.TP
+.B test
+Run project tests
+
+.TP
+.B clean \fR[\fI--all\fR] [\fI--cache\fR]
+Remove build artifacts and caches. Use --all to remove everything including lock files, --cache to clear only cache
+
+.TP
+.B fmt
+Format project source files
+
+.TP
+.B check
+Check project for issues without building
+
+.SS Dependency Management
+
+.TP
+.B add \fIPACKAGE\fR
+Add a dependency to your project. PACKAGE should be in the format "username/repo" or a package name
+
+.TP
+.B remove \fIPACKAGE\fR, rm \fIPACKAGE\fR
+Remove a dependency from your project with complete cleanup
+
+.TP
+.B update \fR[\fIPACKAGE\fR]
+Update all dependencies or a specific package to their latest versions
+
+.TP
+.B fetch
+Fetch all dependencies specified in your build.zig.zon file
+
+.TP
+.B list, ls \fR[\fI--json\fR]
+List all dependencies in the project with their installation status. Use --json for machine-readable output
+
+.TP
+.B info \fIPACKAGE\fR
+Show detailed information about a specific package dependency
+
+.TP
+.B search \fIQUERY\fR
+Search for packages matching the query
+
+.TP
+.B outdated
+Check for outdated dependencies
+
+.TP
+.B tree \fR[\fI--check-cycles\fR] [\fI--depth=N\fR] [\fI--duplicates\fR] [\fI--no-versions\fR]
+Display dependency tree. Use --check-cycles to detect circular dependencies, --depth to limit depth, --duplicates to show duplicate packages, --no-versions to hide version info
+
+.SS Version Pinning
+
+.TP
+.B pin \fIPACKAGE\fR \fIVERSION\fR
+Pin a dependency to a specific version
+
+.TP
+.B unpin \fIPACKAGE\fR \fR[\fI--to-main\fR]
+Unpin a dependency to allow updates. Use --to-main to track the default branch
 
 .TP
 .B lock
 Update or create the lock file based on your build.zig.zon dependencies
+
+.SS Package Integrity
+
+.TP
+.B hash \fR[\fIupdate\fR] [\fIPACKAGE\fR] [\fI--branch=NAME\fR]
+Manage package hashes. Use "hash update" to refresh hashes, --branch to specify branch
+
+.TP
+.B sign \fIPACKAGE\fR
+Sign a package with Ed25519 cryptographic signature
+
+.TP
+.B keyring \fR[\fIadd\fR|\fIlist\fR|\fIremove\fR]
+Manage trusted public keys for package verification
+
+.SS Zig Toolchain
+
+.TP
+.B zig \fR[\fIinstall\fR|\fIlist\fR|\fIuse\fR] [\fIVERSION\fR]
+Manage Zig versions. Install, list, or switch between Zig versions
+
+.TP
+.B zls \fR[\fIinstall\fR|\fIupdate\fR]
+Install or update the Zig Language Server
+
+.SS Registry & Publishing
+
+.TP
+.B registry \fR[\fIlist\fR|\fIadd\fR|\fIremove\fR|\fIhealth\fR]
+Manage package registries
+
+.TP
+.B publish
+Publish a package to a registry
+
+.SS Project Tools
+
+.TP
+.B doc
+Generate documentation for the project
+
+.TP
+.B template \fR[\fIlist\fR|\fIcreate\fR|\fIapply\fR]
+Manage project templates
+
+.TP
+.B workspace \fR[\fIinit\fR|\fIadd\fR|\fIlist\fR]
+Manage multi-project workspaces
+
+.TP
+.B config \fR[\fIget\fR|\fIset\fR|\fIlist\fR]
+View or modify Zion configuration
+
+.TP
+.B cache \fR[\fIclean\fR|\fIinfo\fR]
+Manage package cache
+
+.SS Utilities
+
+.TP
+.B status
+Show project status summary
+
+.TP
+.B repair
+Attempt to repair project issues
+
+.TP
+.B analyze
+Analyze project dependencies and structure
 
 .TP
 .B version
@@ -66,11 +178,39 @@ Display help information about available commands
 
 .TP
 .B --json
-When used with the list command, outputs machine-readable JSON format
+When used with list command, outputs machine-readable JSON format
 
 .TP
 .B --all
-When used with the clean command, removes all build artifacts including lock files
+When used with clean command, removes all build artifacts including lock files
+
+.TP
+.B --cache
+When used with clean command, removes only cached files
+
+.TP
+.B --check-cycles, -c
+When used with tree command, detect circular dependencies
+
+.TP
+.B --depth=N
+When used with tree command, limit tree display depth
+
+.TP
+.B --duplicates
+When used with tree command, show duplicate dependencies
+
+.TP
+.B --no-versions
+When used with tree command, hide version information
+
+.TP
+.B --to-main
+When used with unpin command, track the repository's default branch
+
+.TP
+.B --branch=NAME
+When used with hash update, specify branch to use
 
 .SH EXAMPLES
 
@@ -95,12 +235,36 @@ Update all dependencies:
 .B zion update
 
 .TP
+Show dependency tree:
+.B zion tree
+
+.TP
+Check for circular dependencies:
+.B zion tree --check-cycles
+
+.TP
+Update package hash:
+.B zion hash update libxev
+
+.TP
+Pin to default branch:
+.B zion unpin libxev --to-main
+
+.TP
 Clean build artifacts:
 .B zion clean
 
 .TP
 Complete cleanup:
 .B zion clean --all
+
+.TP
+Install specific Zig version:
+.B zion zig install 0.16.0
+
+.TP
+Search for packages:
+.B zion search http
 
 .SH FILES
 
@@ -122,7 +286,11 @@ Directory containing extracted package sources
 
 .SH ENVIRONMENT
 
-Zion doesn't currently use any environment variables.
+Zion respects the following environment variables:
+
+.TP
+.B ZIG_PATH
+Override the path to the Zig executable
 
 .SH EXIT STATUS
 
@@ -145,7 +313,7 @@ Invalid command usage
 .SH REQUIREMENTS
 
 .TP
-- Zig 0.15.0 or newer
+- Zig 0.16.0 or newer
 .TP
 - curl (for downloading packages)
 .TP
@@ -154,13 +322,13 @@ Invalid command usage
 - git (for some operations)
 
 .SH AUTHOR
-Written by the Zion development team.
+Written by Christopher Kelley <ckelley@ghostkellz.sh>
 
 .SH REPORTING BUGS
 Report bugs to: https://github.com/ghostkellz/zion/issues
 
 .SH COPYRIGHT
-This is free software; see the source for copying conditions.
+MIT License. See LICENSE file for details.
 
 .SH SEE ALSO
 .BR zig (1)

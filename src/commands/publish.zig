@@ -11,7 +11,7 @@ const package_registry = @import("../package_registry.zig");
 const security = @import("../security.zig");
 const ZonFile = @import("../manifest.zig").ZonFile;
 
-/// Enhanced publish command for v0.7.0 with multi-registry support
+/// Enhanced publish command with multi-registry support
 pub fn publish(allocator: Allocator, args: []const []const u8) !void {
     // Parse publish options
     var options = PublishOptions{};

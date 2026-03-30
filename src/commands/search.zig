@@ -29,7 +29,7 @@ fn printSearchHelp() void {
     std.debug.print("  • zion search game\n", .{});
 }
 
-/// Enhanced search command for v0.7.0 with multi-registry support
+/// Enhanced search command with multi-registry support
 pub fn search(allocator: Allocator, args: []const []const u8) !void {
     // Check for help first
     if (args.len >= 3 and (std.mem.eql(u8, args[2], "--help") or std.mem.eql(u8, args[2], "-h"))) {

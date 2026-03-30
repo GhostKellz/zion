@@ -42,7 +42,7 @@ pub fn enhanced_zig_manager(allocator: Allocator, args: [][:0]u8) !void {
 
 fn printEnhancedZigHelp() !void {
     print(
-        \\🔧 Zion Enhanced Zig Version Manager (v1.1.0)
+        \\🔧 Zion Enhanced Zig Version Manager
         \\
         \\Complete Zig version lifecycle management with cross-platform support.
         \\

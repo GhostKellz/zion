@@ -4,7 +4,7 @@ const registry_manager = @import("../registry_manager.zig");
 const package_registry = @import("../package_registry.zig");
 const zion_root = @import("../root.zig");
 
-/// Enhanced registry command for v0.7.0 with comprehensive registry management
+/// Enhanced registry command with comprehensive registry management
 pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         try showRegistryHelp();
@@ -65,7 +65,7 @@ pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8)
 
 fn showRegistryHelp() !void {
     std.debug.print(
-        \\🌐 Zion Registry Management v0.7.0
+        \\🌐 Zion Registry Management
         \\
         \\COMMANDS:
         \\  list                            List all configured registries

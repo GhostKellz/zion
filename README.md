@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/zion-logo.png" alt="Zion Logo" width="200"/>
+  <img src="assets/logo/zion-transparent.png" alt="Zion Logo" width="200"/>
 </div>
 
 # Zion - The Complete Zig Development Tool
@@ -7,20 +7,18 @@
 [![Made with Zig](https://img.shields.io/badge/Made%20with-Zig-orange.svg)](https://ziglang.org)
 [![Zig 0.16+](https://img.shields.io/badge/Zig-0.16%2B-blue.svg)](https://ziglang.org/download)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-0.1.4-brightgreen.svg)](https://github.com/ghostkellz/zion/releases)
+[![Releases](https://img.shields.io/github/v/release/ghostkellz/zion?color=brightgreen)](https://github.com/ghostkellz/zion/releases)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
-[![Arch Linux](https://img.shields.io/badge/Arch%20Linux-First%20Class-blue.svg)](https://archlinux.org)
+[![Arch Linux](https://img.shields.io/badge/Arch%20Linux-Supported-blue.svg)](https://archlinux.org)
 
 
-Zion is the **definitive development tool** for the [Zig programming language](https://ziglang.org) - combining the best of Cargo's package management with rustup's version management, plus comprehensive tooling that goes beyond both. From zero to productive Zig development in one command.
+Zion is a development tool for the [Zig programming language](https://ziglang.org) that combines package management (like Cargo) with version management (like rustup). Get a complete Zig development environment running quickly.
 
-## 🚀 One Nation Under Zig
-
-**Complete Zig development setup in 30 seconds:**
+## 🚀 Quick Start
 
 ```bash
 # Install Zion
-curl -fsSL https://raw.githubusercontent.com/ghostkellz/zion/main/install.sh | bash
+curl -fsSL https://zion.cktech.sh | sudo bash
 
 # Complete development environment setup
 zion setup all
@@ -31,13 +29,9 @@ zion add mitchellh/libxev
 zion build
 ```
 
-**🏗️ Arch Linux First-Class Support** - Optimized for the Arch Linux ecosystem with seamless integration of system packages.
-
 ## ✨ Features
 
-**v0.1.4 - Complete Development Environment**
-
-### 🔧 Zig Version Management (`anyzig`-like)
+### 🔧 Zig Version Management
 - **Complete version lifecycle** - Install, switch, and manage multiple Zig versions
 - **System integration** - Seamless detection of Arch Linux package manager installations
 - **Real downloads** - Official binaries from ziglang.org for x86_64-linux
@@ -64,12 +58,12 @@ zion zls config                      # Generate optimal config
 zion zls install                     # Installation guidance
 ```
 
-### 🎯 "One Nation Under Zig" Setup System
-- **Zero-to-hero setup** - Complete development environment in one command
-- **Modular components** - Install only what you need
+### 🎯 Environment Setup
+- **Complete setup** - Full development environment in one command
+- **Modular** - Install only what you need
 - **Interactive wizard** - Guided configuration with smart defaults
 - **Shell integration** - PATH, completions, profiles automatically configured
-- **Verification system** - Ensure everything works together
+- **Verification** - `zion setup verify` confirms everything works
 
 ```bash
 zion setup all                       # Complete environment
@@ -89,30 +83,29 @@ zion workspace add mylib             # Add library package
 zion workspace build                 # Build all packages
 ```
 
-### 📦 Advanced Package Management
+### 📦 Package Management
 - **Multi-registry support** - GitHub, Zigistry, Zeppelin registries
 - **Cryptographic security** - Ed25519 package signing and verification
-- **Smart caching** - TTL-based cache with 85%+ hit rates
+- **Smart caching** - TTL-based cache for faster repeated fetches
 - **Parallel downloads** - Connection pooling and batch processing
-- **Transitive dependencies** - Handles dependency chains automatically
+- **Dependency tree** - Visualize and detect circular dependencies
 
 ### 🏗️ Arch Linux Integration
-- **First-class support** - Optimized for Arch Linux ecosystem
-- **Package manager respect** - Works with `pacman`-installed tools
+- **Arch-aware** - Detects and works with `pacman`-installed Zig/ZLS
 - **System PATH integration** - Honors filesystem hierarchy
-- **AUR compatibility** - Ready for AUR packaging
+- **AUR-ready** - PKGBUILD included for packaging
 
-### 🛡️ Security & Trust
-- **Package verification** - Cryptographic integrity checking
-- **Trust management** - Signer reputation and trust levels
-- **Secure downloads** - Checksum validation for all operations
-- **Key management** - Built-in cryptographic key generation
+### 🛡️ Security
+- **Package signing** - Ed25519 cryptographic signatures
+- **Hash verification** - Integrity checking on all downloads
+- **Trust store** - Manage trusted signers with `zion security trust`
+- **Key generation** - Built-in key pair generation
 
-### 🚀 Performance & Developer Experience
-- **Sub-second response** - <100ms for all commands
-- **Memory optimized** - 25% reduction from v0.7.0
+### 🚀 Developer Experience
+- **Fast** - Optimized for quick command execution
+- **Helpful errors** - "Did you mean?" suggestions with Levenshtein matching
 - **Intelligent defaults** - Minimal configuration required
-- **Comprehensive diagnostics** - Detailed troubleshooting and guidance
+- **Diagnostics** - Detailed troubleshooting with `zion debug` and `zion check`
 
 ## Installation
 
@@ -194,9 +187,9 @@ Your dependencies are now fully integrated and ready to use!
 
 ## Documentation
 
-For detailed documentation on commands and usage, see [COMMANDS.md](COMMANDS.md).
-
-For advanced usage, configuration options, and architecture details, see [DOCS.md](DOCS.md).
+See the [docs/](docs/) folder for detailed documentation:
+- [Installation Guide](docs/INSTALL.md)
+- [Commands Reference](docs/COMMANDS.md)
 
 ## Contributing
 

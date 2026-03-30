@@ -41,7 +41,7 @@ pub fn enhanced_zls(allocator: Allocator, args: [][:0]u8) !void {
 
 fn showEnhancedZlsHelp() !void {
     print(
-        \\🧞 Enhanced ZLS Integration (v1.1.0)
+        \\🧞 Enhanced ZLS Integration
         \\
         \\Deep integration with Zig Language Server for modern development.
         \\

@@ -7,7 +7,7 @@ const RegistryClient = @import("registry_client.zig").RegistryClient;
 const Package = @import("registry_client.zig").Package;
 const Release = @import("registry_client.zig").Release;
 
-/// Enhanced Registry Manager with zsync async support for v1.1.0
+/// Enhanced Registry Manager with zsync async support for
 pub const RegistryManager = struct {
     allocator: Allocator,
     config: *ZionConfig,

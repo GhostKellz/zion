@@ -21,21 +21,22 @@ done
 
 # Create package directory structure
 PKG_DIR="packages"
-DEB_DIR="$PKG_DIR/zion_0.2.0-dev_amd64"
+DEB_DIR="$PKG_DIR/zion_1.0.8_amd64"
 
 rm -rf "$PKG_DIR"
 mkdir -p "$DEB_DIR"/{DEBIAN,usr/bin,usr/share/doc/zion,usr/share/man/man1}
 mkdir -p "$DEB_DIR"/usr/share/{bash-completion/completions,zsh/site-functions,fish/vendor_completions.d}
+mkdir -p "$DEB_DIR"/usr/share/licenses/zion
 
 # Create control file
 cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: zion
-Version: 0.2.0-dev
+Version: 1.0.8
 Section: devel
 Priority: optional
 Architecture: amd64
-Depends: zig, curl, tar, git
-Maintainer: Zion Team <maintainer@example.com>
+Depends: zig (>= 0.16.0), curl, tar, git
+Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
 Description: A modern, cargo-inspired package manager for Zig
  Zion is a modern package manager for the Zig programming language that
  provides seamless dependency management with automatic build integration.
@@ -53,12 +54,13 @@ zig build -Doptimize=ReleaseSafe
 cd release/debian
 cp "../../zig-out/bin/zion" "$DEB_DIR/usr/bin/"
 cp "../../README.md" "$DEB_DIR/usr/share/doc/zion/"
-cp "../../COMMANDS.md" "$DEB_DIR/usr/share/doc/zion/"
-cp "../../DOCS.md" "$DEB_DIR/usr/share/doc/zion/"
+cp "../../docs/COMMANDS.md" "$DEB_DIR/usr/share/doc/zion/"
+cp "../../docs/INSTALL.md" "$DEB_DIR/usr/share/doc/zion/"
 cp "../man/zion.1" "$DEB_DIR/usr/share/man/man1/"
 cp "../completions/zion.bash" "$DEB_DIR/usr/share/bash-completion/completions/zion"
 cp "../completions/zion.zsh" "$DEB_DIR/usr/share/zsh/site-functions/_zion"
 cp "../completions/zion.fish" "$DEB_DIR/usr/share/fish/vendor_completions.d/zion.fish"
+cp "../../LICENSE" "$DEB_DIR/usr/share/licenses/zion/"
 
 # Set permissions
 chmod 755 "$DEB_DIR/usr/bin/zion"
@@ -69,5 +71,5 @@ chmod 644 "$DEB_DIR/usr/share/man/man1/zion.1"
 echo -e "${BLUE}Creating Debian package...${NC}"
 fakeroot dpkg-deb --build "$DEB_DIR"
 
-echo -e "${GREEN}Debian package created: $PKG_DIR/zion_0.2.0-dev_amd64.deb${NC}"
-echo "Install with: sudo dpkg -i $PKG_DIR/zion_0.2.0-dev_amd64.deb"
+echo -e "${GREEN}Debian package created: $PKG_DIR/zion_1.0.8_amd64.deb${NC}"
+echo "Install with: sudo dpkg -i $PKG_DIR/zion_1.0.8_amd64.deb"

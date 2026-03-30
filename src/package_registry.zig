@@ -8,7 +8,7 @@ const enhanced_config = @import("enhanced_config.zig");
 const RegistryConfig = enhanced_config.RegistryConfig;
 const zion_root = @import("root.zig");
 
-/// Package structure with enhanced metadata for v0.7.0
+/// Package structure with enhanced metadata
 pub const Package = struct {
     name: []const u8,
     full_name: []const u8,
@@ -19,7 +19,7 @@ pub const Package = struct {
     published_at: []const u8,
     registry_name: []const u8,
 
-    // Enhanced metadata for v0.7.0
+    // Enhanced metadata
     license: ?[]const u8 = null,
     homepage: ?[]const u8 = null,
     repository_url: ?[]const u8 = null,
@@ -176,7 +176,7 @@ pub const RegistryHealth = struct {
     };
 };
 
-/// Enhanced Registry Client with v0.7.0 features
+/// Enhanced Registry Client
 pub const RegistryClient = struct {
     allocator: Allocator,
     config: RegistryConfig,
@@ -337,14 +337,16 @@ pub const RegistryClient = struct {
         };
         defer self.allocator.free(response);
 
-        // For now, return a mock release
+        // For mock, return a release pointing to main branch (always exists)
+        // Real HTTP implementation should fetch actual releases from GitHub API
         var releases = try self.allocator.alloc(Release, 1);
+        const tarball_url = try std.fmt.allocPrint(self.allocator, "https://github.com/{s}/{s}/archive/refs/heads/main.tar.gz", .{ owner, repo });
         releases[0] = Release{
-            .tag_name = try self.allocator.dupe(u8, "v1.0.0"),
-            .name = try self.allocator.dupe(u8, "Release 1.0.0"),
+            .tag_name = try self.allocator.dupe(u8, "main"),
+            .name = try self.allocator.dupe(u8, "Main Branch"),
             .published_at = try self.allocator.dupe(u8, "2024-01-01"),
             .prerelease = false,
-            .tarball_url = try self.allocator.dupe(u8, ""),
+            .tarball_url = tarball_url,
             .zipball_url = null,
         };
         return releases;
@@ -386,7 +388,7 @@ pub const RegistryClient = struct {
     }
 
     fn makeRequestInternal(self: *RegistryClient, method: []const u8, url: []const u8, body: ?[]const u8) !struct { success: bool, data: []const u8 } {
-        // For v0.7.0, we'll use a simplified HTTP approach
+        // Simplified HTTP approach
         // In a real implementation, you would use proper HTTP client with headers
         _ = method;
         _ = body;

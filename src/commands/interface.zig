@@ -6,7 +6,7 @@ const ZigLibsIntegration = @import("../ziglibs_integration.zig").ZigLibsIntegrat
 
 /// Launch enhanced ecosystem interface for GhostLibs and ZigLibs management
 pub fn interface(allocator: std.mem.Allocator) !void {
-    std.log.info("🚀 Launching Zion v1.0.1 - GhostLibs & ZigLibs Ecosystem Manager", .{});
+    std.log.info("🚀 Launching Zion - GhostLibs & ZigLibs Ecosystem Manager", .{});
 
     // Initialize ecosystems for demonstration
     var ghostkellz = GhostKellzEcosystem.init(allocator) catch |err| {
@@ -94,7 +94,7 @@ pub fn interface(allocator: std.mem.Allocator) !void {
     }
 
     std.log.info("", .{});
-    std.log.info("🎯 Interactive TUI Coming Soon! (phantom v0.3.0 integration)", .{});
+    std.log.info("🎯 Interactive TUI Coming Soon!", .{});
     std.log.info("💡 For now, use: zion search <package> | zion add <package>", .{});
     std.log.info("🔍 Search both ecosystems with: zion search --all <query>", .{});
 }

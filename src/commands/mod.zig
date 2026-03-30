@@ -53,36 +53,27 @@ pub const nvim = @import("nvim.zig").nvim;
 pub const search = @import("search.zig").search;
 pub const registry = @import("registry.zig").registryCommand;
 pub const publish = @import("publish.zig").publish;
-pub const setup = @import("setup_simple.zig").setup; // v0.8.0: Simplified setup system
-pub const zls = @import("zls.zig").zls; // v0.8.0: ZLS integration commands
-pub const workspace = @import("workspace.zig").workspace; // v0.8.0: Cargo-style workspace management
-pub const ghostspec = @import("ghostspec.zig").ghostspec; // v0.8.0: GhostSpec integration commands
+pub const setup = @import("setup_simple.zig").setup;
+pub const zls = @import("zls.zig").zls;
+pub const workspace = @import("workspace.zig").workspace;
+pub const ghostspec = @import("ghostspec.zig").ghostspec;
 
-// NEW v1.0.5: Production-ready features
 pub const signature_verify = @import("signature_verify.zig").verify;
 pub const cache = @import("cache.zig").cache;
 pub const tui = @import("tui.zig").tui;
 
-// NEW v1.0.1: Enhanced TUI and HTTP3/2/1 Integration Commands
-pub const interface = @import("interface.zig").interface; // v1.0.1: Phantom TUI with standard HTTP client
-pub const search_interactive = interface; // v1.0.1: Alias for TUI interface
+pub const interface = @import("interface.zig").interface;
+pub const search_interactive = interface;
 
-// NEW v1.1.0: Community Integration Commands
-pub const ziglibs = @import("ziglibs.zig").ziglibs; // v1.1.0: Enhanced Ziglibs integration
-pub const zigistry = @import("zigistry.zig").zigistry; // v1.1.0: Advanced Zigistry features
-pub const enhanced_add = @import("enhanced_add.zig").enhanced_add; // v1.1.0: Multi-registry add
-pub const enhanced_zls = @import("enhanced_zls.zig").enhanced_zls; // v1.1.0: Deep ZLS integration
-pub const enhanced_zig_manager = @import("enhanced_zig_manager.zig").enhanced_zig_manager; // v1.1.0: Enhanced Zig manager
+pub const ziglibs = @import("ziglibs.zig").ziglibs;
+pub const zigistry = @import("zigistry.zig").zigistry;
+pub const enhanced_add = @import("enhanced_add.zig").enhanced_add;
+pub const enhanced_zls = @import("enhanced_zls.zig").enhanced_zls;
+pub const enhanced_zig_manager = @import("enhanced_zig_manager.zig").enhanced_zig_manager;
 
-// NEW v1.2.0: Zeke AI Integration Commands
-pub const enhanced_add_zeke = @import("enhanced_add_zeke.zig").enhancedAdd; // v1.2.0: AI-powered add command
-pub const status = @import("status.zig").status; // v1.2.0: Project status with AI analysis
-pub const ai_search = @import("ai_search.zig").aiSearch; // v1.2.0: AI-powered package search
-pub const ai_chat = @import("ai_search.zig").aiChat; // v1.2.0: Interactive AI assistant
+pub const status = @import("status.zig").status;
 
-// NEW v1.3.0: Enhanced Security & GPG Integration
-pub const keyring = @import("keyring.zig").keyring; // v1.3.0: GPG keyring management with Arch Linux support
-
+pub const keyring = @import("keyring.zig").keyring;
 
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {

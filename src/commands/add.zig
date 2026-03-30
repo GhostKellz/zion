@@ -15,7 +15,7 @@ const security = @import("../security.zig");
 const semver = @import("../semver.zig");
 const version_resolver = @import("../version_resolver.zig");
 
-/// Enhanced add command for v0.7.0 with multi-registry support
+/// Enhanced add command with multi-registry support
 pub fn add(allocator: Allocator, package_ref: []const u8, options: AddOptions) !void {
     // Load enhanced configuration
     var config = try enhanced_config.ZionConfig.load(allocator);
@@ -66,7 +66,7 @@ pub const AddOptions = struct {
     dry_run: bool = false,
 };
 
-/// Add a single dependency with enhanced v0.7.0 features
+/// Add a single dependency with enhanced features
 fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *enhanced_config.ZionConfig, options: AddOptions) !void {
     std.debug.print("🔍 Resolving package: {s}\n", .{package_ref});
 
@@ -78,6 +78,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // Determine version constraint to use
     var effective_version: ?[]const u8 = options.version;
     var version_constraint: ?[]const u8 = null;
+    var owns_version_constraint = false;
     var resolved_via_constraint = false;
 
     // If version_range is provided, resolve the constraint to find the best version
@@ -109,6 +110,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
             // Fall back to registry resolution without version constraint
         }
     }
+    defer if (resolved_via_constraint and effective_version != null) allocator.free(effective_version.?);
 
     // Resolve package across registries
     const package = try manager.resolvePackage(package_ref, effective_version) orelse {
@@ -140,7 +142,9 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // If no constraint was provided, infer one from the resolved version
     if (version_constraint == null and package.version.len > 0) {
         version_constraint = semver.inferConstraint(package.version, allocator) catch null;
+        owns_version_constraint = version_constraint != null;
     }
+    defer if (owns_version_constraint and version_constraint != null) allocator.free(version_constraint.?);
 
     // Display package information
     std.debug.print("\n📦 Found package: {s}\n", .{package.full_name});
@@ -493,7 +497,7 @@ fn extractTarball(allocator: Allocator, tarball_path: []const u8, dest_path: []c
     }
 }
 
-/// Enhanced build.zig modification for v0.7.0
+/// Enhanced build.zig modification
 fn modifyBuildZigV2(allocator: Allocator, package_name: []const u8, deps_path: []const u8, dev_only: bool) !void {
     _ = allocator;
     _ = package_name;

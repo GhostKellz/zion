@@ -33,7 +33,7 @@ pub const RegistryConfig = struct {
     }
 };
 
-/// Enhanced Zion configuration for v1.1.0 registry abstraction
+/// Enhanced Zion configuration for registry abstraction
 pub const ZionConfig = struct {
     allocator: Allocator,
     registries: std.ArrayList(RegistryConfig),

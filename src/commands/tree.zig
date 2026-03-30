@@ -5,12 +5,14 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const zion_root = @import("../root.zig");
+const cycle_detection = @import("../cycle_detection.zig");
 
 /// Display dependency tree
 pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
     var max_depth: ?u32 = null;
     var show_duplicates = false;
     var show_versions = true;
+    var check_cycles = false;
 
     // Parse arguments
     var i: usize = 2; // Skip "zion" and "tree"
@@ -20,6 +22,8 @@ pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
             show_duplicates = true;
         } else if (std.mem.eql(u8, arg, "--no-versions")) {
             show_versions = false;
+        } else if (std.mem.eql(u8, arg, "--check-cycles") or std.mem.eql(u8, arg, "-c")) {
+            check_cycles = true;
         } else if (std.mem.startsWith(u8, arg, "--depth=")) {
             const depth_str = arg[8..]; // Skip "--depth="
             max_depth = std.fmt.parseInt(u32, depth_str, 10) catch {
@@ -57,6 +61,31 @@ pub fn tree(allocator: Allocator, args: []const [:0]const u8) !void {
     if (zon_file.dependencies.count() == 0) {
         std.debug.print("└── (no dependencies)\n", .{});
         return;
+    }
+
+    // Check for cycles if requested
+    if (check_cycles) {
+        std.debug.print("\n🔍 Checking for circular dependencies...\n", .{});
+
+        var graph = cycle_detection.DependencyGraph.init(allocator);
+        defer graph.deinit();
+
+        // Build graph from direct dependencies
+        // Note: For full cycle detection, we'd need to download and parse
+        // each dependency's build.zig.zon, which is expensive
+        var dep_it = zon_file.dependencies.iterator();
+        while (dep_it.next()) |entry| {
+            try graph.addEdge(zon_file.name, entry.key_ptr.*);
+        }
+
+        // Check if root project name appears in any dependency (simple self-reference)
+        if (zon_file.dependencies.contains(zon_file.name)) {
+            std.debug.print("\n⚠️  Self-dependency detected: {s} depends on itself!\n", .{zon_file.name});
+            std.debug.print("   This will cause build failures.\n\n", .{});
+        } else {
+            std.debug.print("✅ No circular dependencies detected in direct dependencies.\n", .{});
+            std.debug.print("   Note: Full transitive cycle detection requires downloading all dependencies.\n\n", .{});
+        }
     }
 
     // Track visited packages to detect duplicates
@@ -109,8 +138,9 @@ fn printDependency(
     visited: *std.StringHashMap(u32),
 ) !void {
     // Track visits for duplicate detection
+    // Note: name is owned by zon_file which outlives visited, so no dupe needed
     const visit_count = visited.get(name) orelse 0;
-    try visited.put(try allocator.dupe(u8, name), visit_count + 1);
+    try visited.put(name, visit_count + 1);
 
     // Extract version from URL if possible
     var version_info: []const u8 = "";

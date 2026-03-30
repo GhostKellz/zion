@@ -215,14 +215,6 @@ pub const GhostKellzEcosystem = struct {
                 .maturity = .alpha,
             },
             .{
-                .name = "zeke",
-                .description = "Advanced system monitoring and profiling toolkit",
-                .category = .system_tools,
-                .features = &[_][]const u8{ "Real-time metrics", "Memory profiling", "CPU analysis", "Network monitoring" },
-                .deps = &[_][]const u8{ "phantom", "zsync" },
-                .maturity = .beta,
-            },
-            .{
                 .name = "wraith",
                 .description = "Stealth debugging and reverse engineering framework",
                 .category = .security,
@@ -259,7 +251,7 @@ pub const GhostKellzEcosystem = struct {
                 .description = "Resource management and cleanup automation",
                 .category = .system_tools,
                 .features = &[_][]const u8{ "Automatic cleanup", "Resource tracking", "Policy engine", "Audit logging" },
-                .deps = &[_][]const u8{ "zsync", "zeke" },
+                .deps = &[_][]const u8{"zsync"},
                 .maturity = .stable,
             },
             .{

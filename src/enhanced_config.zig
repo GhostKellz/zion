@@ -23,7 +23,7 @@ fn getEnvVarDynamic(name: []const u8) ?[]const u8 {
     return std.mem.sliceTo(ptr, 0);
 }
 
-/// Registry configuration for v0.7.0 multi-registry support
+/// Registry configuration for multi-registry support
 pub const RegistryConfig = struct {
     name: []const u8,
     base_url: []const u8,
@@ -34,6 +34,10 @@ pub const RegistryConfig = struct {
     timeout_ms: u32 = 30000,
 
     pub fn getApiUrl(self: RegistryConfig, allocator: std.mem.Allocator) ![]const u8 {
+        // Handle GitHub's special case (no /api/v1 prefix)
+        if (std.mem.eql(u8, self.name, "github")) {
+            return try allocator.dupe(u8, self.base_url);
+        }
         return std.fmt.allocPrint(allocator, "{s}/api/{s}", .{ std.mem.trimEnd(u8, self.base_url, "/"), self.api_version });
     }
 };
@@ -73,7 +77,7 @@ pub const ZionConfig = struct {
     registry_retries: u32 = 3,
     prefer_registry_over_github: bool = true,
 
-    // Enhanced registry configuration for v0.7.0
+    // Enhanced registry configuration for
     registries: std.ArrayList(RegistryConfig),
     registry_auth_tokens: std.StringHashMap([]const u8),
 
@@ -221,7 +225,7 @@ pub const ZionConfig = struct {
             self.concurrent_downloads = std.fmt.parseInt(u32, val, 10) catch self.concurrent_downloads;
         }
 
-        // Enhanced v0.7.0 Registry configuration
+        // Enhanced Registry configuration
         // Primary registry from environment
         if (getEnvVar("ZION_REGISTRY_URL")) |registry_url| {
             self.registry_url = try self.allocator.dupe(u8, registry_url);

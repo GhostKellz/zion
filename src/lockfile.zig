@@ -16,13 +16,13 @@ pub const LockedPackage = struct {
     hash: []const u8,
     version: ?[]const u8,
     timestamp: i64,
-    // v0.7.0 enhanced fields
+    // enhanced fields
     registry: ?[]const u8 = null,
     resolved_from: ?[]const u8 = null,
     integrity: ?[]const u8 = null,
     dependencies: ?[][]const u8 = null,
     dev_only: bool = false,
-    // v0.8.0 version constraint fields
+    // version constraint fields
     version_constraint: ?[]const u8 = null, // Original constraint like "^1.0.0"
     pinned: bool = false, // If true, skip auto-updates
     pinned_ref: ?[]const u8 = null, // Git ref if pinned (tag or commit)
@@ -77,7 +77,23 @@ pub const LockFile = struct {
         return self.addPackageWithMetadata(name, url, hash, .{ .version = version });
     }
 
-    /// Enhanced metadata structure for v0.7.0+
+    /// Add a package with branch/ref tracking (for main branch unpinning)
+    pub fn addPackageWithRef(
+        self: *LockFile,
+        name: []const u8,
+        url: []const u8,
+        hash: []const u8,
+        version: ?[]const u8,
+        ref: []const u8,
+    ) !void {
+        return self.addPackageWithMetadata(name, url, hash, .{
+            .version = version,
+            .pinned = false, // Tracking a branch, not pinned to specific version
+            .pinned_ref = ref, // Store the branch name (e.g., "main", "master", "develop")
+        });
+    }
+
+    /// Enhanced metadata structure for+
     pub const PackageMetadata = struct {
         version: ?[]const u8 = null,
         registry: ?[]const u8 = null,
@@ -85,13 +101,13 @@ pub const LockFile = struct {
         integrity: ?[]const u8 = null,
         dependencies: ?[][]const u8 = null,
         dev_only: bool = false,
-        // v0.8.0 constraint fields
+        // constraint fields
         version_constraint: ?[]const u8 = null,
         pinned: bool = false,
         pinned_ref: ?[]const u8 = null,
     };
 
-    /// Add a package with enhanced metadata (v0.7.0)
+    /// Add a package with enhanced metadata
     pub fn addPackageWithMetadata(
         self: *LockFile,
         name: []const u8,
@@ -224,7 +240,7 @@ pub const LockFile = struct {
                             else
                                 zion_root.timestamp();
 
-                            // v0.7.0 enhanced fields
+                            // enhanced fields
                             const registry = if (pkg_obj.get("registry")) |r|
                                 if (r == .string) r.string else null
                             else
@@ -261,7 +277,7 @@ pub const LockFile = struct {
                                 break :blk null;
                             } else null;
 
-                            // v0.8.0 constraint fields
+                            // constraint fields
                             const version_constraint = if (pkg_obj.get("version_constraint")) |vc|
                                 if (vc == .string) vc.string else null
                             else
@@ -282,7 +298,7 @@ pub const LockFile = struct {
                             else
                                 null;
 
-                            try lock_file.packages.append(allocator, LockedPackage{
+                            var loaded_pkg = LockedPackage{
                                 .name = try allocator.dupe(u8, name),
                                 .url = try allocator.dupe(u8, url),
                                 .hash = try allocator.dupe(u8, hash),
@@ -297,7 +313,10 @@ pub const LockFile = struct {
                                 .pinned_ref = if (pinned_ref) |pr| try allocator.dupe(u8, pr) else null,
                                 .last_checked = last_checked,
                                 .timestamp = timestamp,
-                            });
+                            };
+                            errdefer loaded_pkg.deinit(allocator);
+
+                            try lock_file.packages.append(allocator, loaded_pkg);
                         }
                     }
                 }
@@ -346,7 +365,7 @@ pub const LockFile = struct {
                 try file.writeStreamingAll(io, version_line);
             }
 
-            // v0.7.0 enhanced fields
+            // enhanced fields
             if (pkg.registry) |registry| {
                 const registry_line = try std.fmt.allocPrint(self.allocator, ",\n      \"registry\": \"{s}\"", .{registry});
                 defer self.allocator.free(registry_line);
@@ -384,7 +403,7 @@ pub const LockFile = struct {
                 try file.writeStreamingAll(io, dev_only_line);
             }
 
-            // v0.8.0 constraint fields
+            // constraint fields
             if (pkg.version_constraint) |vc| {
                 const vc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version_constraint\": \"{s}\"", .{vc});
                 defer self.allocator.free(vc_line);

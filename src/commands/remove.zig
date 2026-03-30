@@ -121,13 +121,8 @@ fn removeFromLockFile(lock_file: *LockFile, package_name: []const u8) !void {
     while (i < lock_file.packages.items.len) {
         const pkg = &lock_file.packages.items[i];
         if (std.mem.eql(u8, pkg.name, package_name)) {
-            // Free the memory for this package
-            lock_file.allocator.free(pkg.name);
-            lock_file.allocator.free(pkg.url);
-            lock_file.allocator.free(pkg.hash);
-            if (pkg.version) |version| {
-                lock_file.allocator.free(version);
-            }
+            // Free all allocated fields for this package
+            pkg.deinit(lock_file.allocator);
 
             // Remove from the list
             _ = lock_file.packages.swapRemove(i);
