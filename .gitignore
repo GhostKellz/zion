@@ -9,3 +9,9 @@ TODO.md
 ROADMAP.md
 .zig-cache/
 ghostspec-integration/
+tasks/
+tasks/lessons.md
+archive/
+.zion/cache/
+.zion/deps/
+.zion/keys/
