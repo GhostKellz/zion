@@ -1,15 +1,25 @@
-<div align="center">
+<p align="center">
   <img src="assets/logo/zion-transparent.png" alt="Zion Logo" width="200"/>
-</div>
+</p>
 
-# Zion - The Complete Zig Development Tool
+<h1 align="center">Zion</h1>
 
-[![Made with Zig](https://img.shields.io/badge/Made%20with-Zig-orange.svg)](https://ziglang.org)
-[![Zig 0.16+](https://img.shields.io/badge/Zig-0.16%2B-blue.svg)](https://ziglang.org/download)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Releases](https://img.shields.io/github/v/release/ghostkellz/zion?color=brightgreen)](https://github.com/ghostkellz/zion/releases)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](https://github.com/ghostkellz/zion)
-[![Arch Linux](https://img.shields.io/badge/Arch%20Linux-Supported-blue.svg)](https://archlinux.org)
+<p align="center">
+  <strong>A Modern Package Manager for the Zig Programming Language</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Zig-F7A41D?style=for-the-badge&logo=zig&logoColor=white" alt="Zig">
+  <img src="https://img.shields.io/badge/0.16.0--dev-F7A41D?style=for-the-badge&logo=zig&logoColor=white" alt="Zig 0.16.0-dev">
+  <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux">
+  <img src="https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Ed25519_Signing-8B5CF6?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="Ed25519 Signing">
+  <img src="https://img.shields.io/badge/Package_Manager-10B981?style=for-the-badge" alt="Package Manager">
+  <img src="https://img.shields.io/badge/Version_Manager-3B82F6?style=for-the-badge" alt="Version Manager">
+</p>
 
 
 Zion is a development tool for the [Zig programming language](https://ziglang.org) that combines package management (like Cargo) with version management (like rustup). Get a complete Zig development environment running quickly.
