@@ -24,7 +24,7 @@ mkdir -p "$RPMBUILD_DIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 # Create spec file
 cat > "$RPMBUILD_DIR/SPECS/zion.spec" << 'EOF'
 Name: zion
-Version: 0.2.0
+Version: 1.1.0
 Release: dev%{?dist}
 Summary: A modern, cargo-inspired package manager for Zig
 License: MIT
@@ -55,8 +55,9 @@ install -Dm755 zig-out/bin/zion %{buildroot}%{_bindir}/zion
 
 # Install documentation
 install -Dm644 README.md %{buildroot}%{_docdir}/zion/README.md
-install -Dm644 COMMANDS.md %{buildroot}%{_docdir}/zion/COMMANDS.md
-install -Dm644 DOCS.md %{buildroot}%{_docdir}/zion/DOCS.md
+install -Dm644 docs/README.md %{buildroot}%{_docdir}/zion/README.md
+install -Dm644 docs/getting-started/installation.md %{buildroot}%{_docdir}/zion/installation.md
+install -Dm644 docs/reference/commands.md %{buildroot}%{_docdir}/zion/commands.md
 
 # Install man page
 install -Dm644 release/man/zion.1 %{buildroot}%{_mandir}/man1/zion.1
@@ -75,18 +76,18 @@ install -Dm644 release/completions/zion.fish %{buildroot}%{_datadir}/fish/vendor
 %{_datadir}/fish/vendor_completions.d/zion.fish
 
 %changelog
-* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - 0.2.0-dev
-- Initial RPM package
+* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - 1.1.0-1
+- Zion-native runtime, testing, docs, and packaging refresh
 EOF
 
 # Create source tarball
 cd ../..
 PKG_DIR="packages"
 mkdir -p "$PKG_DIR"
-TARBALL="$PKG_DIR/zion-0.2.0.tar.gz"
+TARBALL="$PKG_DIR/zion-1.1.0.tar.gz"
 
 echo -e "${BLUE}Creating source tarball...${NC}"
-git archive --format=tar.gz --prefix=zion-0.2.0/ HEAD > "$TARBALL"
+git archive --format=tar.gz --prefix=zion-1.1.0/ HEAD > "$TARBALL"
 cp "$TARBALL" "$RPMBUILD_DIR/SOURCES/"
 
 # Build RPM

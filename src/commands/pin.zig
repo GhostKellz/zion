@@ -10,6 +10,7 @@ const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const github = @import("../github.zig");
 const zion_root = @import("../root.zig");
+const tar_extract = @import("../tar_extract.zig");
 
 /// Pin a dependency to a specific version
 pub fn pin(allocator: Allocator, args: []const [:0]const u8) !void {
@@ -131,7 +132,7 @@ pub fn pin(allocator: Allocator, args: []const [:0]const u8) !void {
     defer allocator.free(deps_path);
 
     std.debug.print("📁 Extracting to {s}...\n", .{deps_path});
-    try extractTarball(allocator, cache_path, deps_path);
+    try tar_extract.extractPackage(allocator, cache_path, deps_path);
 
     std.debug.print("🎉 Successfully pinned {s} to version {s}\n", .{ package_name, version_info.version });
     std.debug.print("   URL: {s}\n", .{version_info.url});

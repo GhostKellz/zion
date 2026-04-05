@@ -1,5 +1,5 @@
 Name:           zion
-Version:        1.0.8
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        A modern package manager for Zig
 
@@ -43,8 +43,9 @@ install -Dm755 zig-out/bin/zion %{buildroot}%{_bindir}/zion
 
 # Install documentation
 install -Dm644 README.md %{buildroot}%{_docdir}/%{name}/README.md
-install -Dm644 docs/COMMANDS.md %{buildroot}%{_docdir}/%{name}/COMMANDS.md
-install -Dm644 docs/INSTALL.md %{buildroot}%{_docdir}/%{name}/INSTALL.md
+install -Dm644 docs/README.md %{buildroot}%{_docdir}/%{name}/README.md
+install -Dm644 docs/getting-started/installation.md %{buildroot}%{_docdir}/%{name}/installation.md
+install -Dm644 docs/reference/commands.md %{buildroot}%{_docdir}/%{name}/commands.md
 
 # Install license
 install -Dm644 LICENSE %{buildroot}%{_docdir}/%{name}/LICENSE
@@ -54,9 +55,5 @@ install -Dm644 LICENSE %{buildroot}%{_docdir}/%{name}/LICENSE
 %{_docdir}/%{name}
 
 %changelog
-* Sun Mar 30 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.0.8-1
-- Cycle detection and branch tracking release
-- Add zion unpin --to-main for default branch tracking
-- Add zion tree --check-cycles for dependency cycle detection
-- Real Ed25519 cryptographic signing
-- Registry resilience improvements
+* Sat Apr 04 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.1.0-1
+- Zion-native runtime, testing, docs, and release surface refresh

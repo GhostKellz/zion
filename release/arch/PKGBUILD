@@ -1,6 +1,6 @@
 # Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
 pkgname=zion
-pkgver=1.0.8
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="A modern, cargo-inspired package manager for the Zig programming language"
 arch=('x86_64' 'aarch64')
@@ -24,8 +24,9 @@ package() {
 
     # Install documentation
     install -Dm644 "README.md" "$pkgdir/usr/share/doc/zion/README.md"
-    install -Dm644 "docs/COMMANDS.md" "$pkgdir/usr/share/doc/zion/COMMANDS.md"
-    install -Dm644 "docs/INSTALL.md" "$pkgdir/usr/share/doc/zion/INSTALL.md"
+    install -Dm644 "docs/README.md" "$pkgdir/usr/share/doc/zion/docs-index.md"
+    install -Dm644 "docs/getting-started/installation.md" "$pkgdir/usr/share/doc/zion/installation.md"
+    install -Dm644 "docs/reference/commands.md" "$pkgdir/usr/share/doc/zion/commands.md"
 
     # Install man page
     install -Dm644 "release/man/zion.1" "$pkgdir/usr/share/man/man1/zion.1"

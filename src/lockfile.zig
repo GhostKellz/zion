@@ -5,6 +5,7 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const json = std.json;
 const zion_root = @import("root.zig");
+const json_escape = @import("json_escape.zig");
 
 /// Lock file format version
 pub const LOCK_FILE_VERSION: u32 = 2;
@@ -27,6 +28,13 @@ pub const LockedPackage = struct {
     pinned: bool = false, // If true, skip auto-updates
     pinned_ref: ?[]const u8 = null, // Git ref if pinned (tag or commit)
     last_checked: ?i64 = null, // When we last checked for updates
+    // provenance tracking fields (from Babylon)
+    origin_url: ?[]const u8 = null, // Original fetch URL before any redirects
+    content_size: ?u64 = null, // Downloaded archive size in bytes
+    fetched_at: ?i64 = null, // Unix timestamp of actual download
+    fetch_duration_ms: ?u32 = null, // How long the download took
+    checksum_sha256: ?[]const u8 = null, // SHA256 of downloaded content
+    checksum_verified: bool = false, // Whether checksum was verified during download
 
     pub fn deinit(self: *LockedPackage, allocator: Allocator) void {
         allocator.free(self.name);
@@ -42,6 +50,9 @@ pub const LockedPackage = struct {
         }
         if (self.version_constraint) |vc| allocator.free(vc);
         if (self.pinned_ref) |pr| allocator.free(pr);
+        // provenance fields
+        if (self.origin_url) |ou| allocator.free(ou);
+        if (self.checksum_sha256) |cs| allocator.free(cs);
     }
 };
 
@@ -93,7 +104,7 @@ pub const LockFile = struct {
         });
     }
 
-    /// Enhanced metadata structure for+
+    /// Enhanced metadata structure for package entries
     pub const PackageMetadata = struct {
         version: ?[]const u8 = null,
         registry: ?[]const u8 = null,
@@ -105,6 +116,13 @@ pub const LockFile = struct {
         version_constraint: ?[]const u8 = null,
         pinned: bool = false,
         pinned_ref: ?[]const u8 = null,
+        // provenance fields
+        origin_url: ?[]const u8 = null,
+        content_size: ?u64 = null,
+        fetched_at: ?i64 = null,
+        fetch_duration_ms: ?u32 = null,
+        checksum_sha256: ?[]const u8 = null,
+        checksum_verified: bool = false,
     };
 
     /// Add a package with enhanced metadata
@@ -141,6 +159,13 @@ pub const LockFile = struct {
                     .pinned_ref = if (metadata.pinned_ref) |pr| try self.allocator.dupe(u8, pr) else null,
                     .last_checked = zion_root.timestamp(),
                     .timestamp = zion_root.timestamp(),
+                    // provenance fields
+                    .origin_url = if (metadata.origin_url) |ou| try self.allocator.dupe(u8, ou) else null,
+                    .content_size = metadata.content_size,
+                    .fetched_at = metadata.fetched_at orelse zion_root.timestamp(),
+                    .fetch_duration_ms = metadata.fetch_duration_ms,
+                    .checksum_sha256 = if (metadata.checksum_sha256) |cs| try self.allocator.dupe(u8, cs) else null,
+                    .checksum_verified = metadata.checksum_verified,
                 };
                 return;
             }
@@ -168,6 +193,13 @@ pub const LockFile = struct {
             .pinned_ref = if (metadata.pinned_ref) |pr| try self.allocator.dupe(u8, pr) else null,
             .last_checked = zion_root.timestamp(),
             .timestamp = zion_root.timestamp(),
+            // provenance fields
+            .origin_url = if (metadata.origin_url) |ou| try self.allocator.dupe(u8, ou) else null,
+            .content_size = metadata.content_size,
+            .fetched_at = metadata.fetched_at orelse zion_root.timestamp(),
+            .fetch_duration_ms = metadata.fetch_duration_ms,
+            .checksum_sha256 = if (metadata.checksum_sha256) |cs| try self.allocator.dupe(u8, cs) else null,
+            .checksum_verified = metadata.checksum_verified,
         };
 
         try self.packages.append(self.allocator, new_pkg);
@@ -298,6 +330,37 @@ pub const LockFile = struct {
                             else
                                 null;
 
+                            // provenance fields
+                            const origin_url = if (pkg_obj.get("origin_url")) |ou|
+                                if (ou == .string) ou.string else null
+                            else
+                                null;
+
+                            const content_size: ?u64 = if (pkg_obj.get("content_size")) |cs|
+                                if (cs == .integer) @intCast(cs.integer) else null
+                            else
+                                null;
+
+                            const fetched_at = if (pkg_obj.get("fetched_at")) |fa|
+                                if (fa == .integer) fa.integer else null
+                            else
+                                null;
+
+                            const fetch_duration_ms: ?u32 = if (pkg_obj.get("fetch_duration_ms")) |fdm|
+                                if (fdm == .integer) @intCast(fdm.integer) else null
+                            else
+                                null;
+
+                            const checksum_sha256 = if (pkg_obj.get("checksum_sha256")) |cs256|
+                                if (cs256 == .string) cs256.string else null
+                            else
+                                null;
+
+                            const checksum_verified = if (pkg_obj.get("checksum_verified")) |cv|
+                                if (cv == .bool) cv.bool else false
+                            else
+                                false;
+
                             var loaded_pkg = LockedPackage{
                                 .name = try allocator.dupe(u8, name),
                                 .url = try allocator.dupe(u8, url),
@@ -313,6 +376,13 @@ pub const LockFile = struct {
                                 .pinned_ref = if (pinned_ref) |pr| try allocator.dupe(u8, pr) else null,
                                 .last_checked = last_checked,
                                 .timestamp = timestamp,
+                                // provenance fields
+                                .origin_url = if (origin_url) |ou| try allocator.dupe(u8, ou) else null,
+                                .content_size = content_size,
+                                .fetched_at = fetched_at,
+                                .fetch_duration_ms = fetch_duration_ms,
+                                .checksum_sha256 = if (checksum_sha256) |cs256| try allocator.dupe(u8, cs256) else null,
+                                .checksum_verified = checksum_verified,
                             };
                             errdefer loaded_pkg.deinit(allocator);
 
@@ -343,15 +413,23 @@ pub const LockFile = struct {
 
         for (self.packages.items, 0..) |pkg, i| {
             try file.writeStreamingAll(io, "    {\n");
-            const name_line = try std.fmt.allocPrint(self.allocator, "      \"name\": \"{s}\",\n", .{pkg.name});
+
+            // Escape string values for JSON safety
+            const escaped_name = try json_escape.escapeJsonString(self.allocator, pkg.name);
+            defer self.allocator.free(escaped_name);
+            const name_line = try std.fmt.allocPrint(self.allocator, "      \"name\": \"{s}\",\n", .{escaped_name});
             defer self.allocator.free(name_line);
             try file.writeStreamingAll(io, name_line);
 
-            const url_line = try std.fmt.allocPrint(self.allocator, "      \"url\": \"{s}\",\n", .{pkg.url});
+            const escaped_url = try json_escape.escapeJsonString(self.allocator, pkg.url);
+            defer self.allocator.free(escaped_url);
+            const url_line = try std.fmt.allocPrint(self.allocator, "      \"url\": \"{s}\",\n", .{escaped_url});
             defer self.allocator.free(url_line);
             try file.writeStreamingAll(io, url_line);
 
-            const hash_line = try std.fmt.allocPrint(self.allocator, "      \"hash\": \"{s}\",\n", .{pkg.hash});
+            const escaped_hash = try json_escape.escapeJsonString(self.allocator, pkg.hash);
+            defer self.allocator.free(escaped_hash);
+            const hash_line = try std.fmt.allocPrint(self.allocator, "      \"hash\": \"{s}\",\n", .{escaped_hash});
             defer self.allocator.free(hash_line);
             try file.writeStreamingAll(io, hash_line);
 
@@ -360,26 +438,34 @@ pub const LockFile = struct {
             try file.writeStreamingAll(io, timestamp_line);
 
             if (pkg.version) |version| {
-                const version_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version\": \"{s}\"", .{version});
+                const escaped_version = try json_escape.escapeJsonString(self.allocator, version);
+                defer self.allocator.free(escaped_version);
+                const version_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version\": \"{s}\"", .{escaped_version});
                 defer self.allocator.free(version_line);
                 try file.writeStreamingAll(io, version_line);
             }
 
             // enhanced fields
             if (pkg.registry) |registry| {
-                const registry_line = try std.fmt.allocPrint(self.allocator, ",\n      \"registry\": \"{s}\"", .{registry});
+                const escaped_registry = try json_escape.escapeJsonString(self.allocator, registry);
+                defer self.allocator.free(escaped_registry);
+                const registry_line = try std.fmt.allocPrint(self.allocator, ",\n      \"registry\": \"{s}\"", .{escaped_registry});
                 defer self.allocator.free(registry_line);
                 try file.writeStreamingAll(io, registry_line);
             }
 
             if (pkg.resolved_from) |resolved_from| {
-                const resolved_from_line = try std.fmt.allocPrint(self.allocator, ",\n      \"resolved_from\": \"{s}\"", .{resolved_from});
+                const escaped_resolved_from = try json_escape.escapeJsonString(self.allocator, resolved_from);
+                defer self.allocator.free(escaped_resolved_from);
+                const resolved_from_line = try std.fmt.allocPrint(self.allocator, ",\n      \"resolved_from\": \"{s}\"", .{escaped_resolved_from});
                 defer self.allocator.free(resolved_from_line);
                 try file.writeStreamingAll(io, resolved_from_line);
             }
 
             if (pkg.integrity) |integrity| {
-                const integrity_line = try std.fmt.allocPrint(self.allocator, ",\n      \"integrity\": \"{s}\"", .{integrity});
+                const escaped_integrity = try json_escape.escapeJsonString(self.allocator, integrity);
+                defer self.allocator.free(escaped_integrity);
+                const integrity_line = try std.fmt.allocPrint(self.allocator, ",\n      \"integrity\": \"{s}\"", .{escaped_integrity});
                 defer self.allocator.free(integrity_line);
                 try file.writeStreamingAll(io, integrity_line);
             }
@@ -387,7 +473,9 @@ pub const LockFile = struct {
             if (pkg.dependencies) |dependencies| {
                 try file.writeStreamingAll(io, ",\n      \"dependencies\": [");
                 for (dependencies, 0..) |dep, dep_i| {
-                    const dep_line = try std.fmt.allocPrint(self.allocator, "\"{s}\"", .{dep});
+                    const escaped_dep = try json_escape.escapeJsonString(self.allocator, dep);
+                    defer self.allocator.free(escaped_dep);
+                    const dep_line = try std.fmt.allocPrint(self.allocator, "\"{s}\"", .{escaped_dep});
                     defer self.allocator.free(dep_line);
                     try file.writeStreamingAll(io, dep_line);
                     if (dep_i < dependencies.len - 1) {
@@ -405,7 +493,9 @@ pub const LockFile = struct {
 
             // constraint fields
             if (pkg.version_constraint) |vc| {
-                const vc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version_constraint\": \"{s}\"", .{vc});
+                const escaped_vc = try json_escape.escapeJsonString(self.allocator, vc);
+                defer self.allocator.free(escaped_vc);
+                const vc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"version_constraint\": \"{s}\"", .{escaped_vc});
                 defer self.allocator.free(vc_line);
                 try file.writeStreamingAll(io, vc_line);
             }
@@ -415,7 +505,9 @@ pub const LockFile = struct {
             }
 
             if (pkg.pinned_ref) |pr| {
-                const pr_line = try std.fmt.allocPrint(self.allocator, ",\n      \"pinned_ref\": \"{s}\"", .{pr});
+                const escaped_pr = try json_escape.escapeJsonString(self.allocator, pr);
+                defer self.allocator.free(escaped_pr);
+                const pr_line = try std.fmt.allocPrint(self.allocator, ",\n      \"pinned_ref\": \"{s}\"", .{escaped_pr});
                 defer self.allocator.free(pr_line);
                 try file.writeStreamingAll(io, pr_line);
             }
@@ -424,6 +516,45 @@ pub const LockFile = struct {
                 const lc_line = try std.fmt.allocPrint(self.allocator, ",\n      \"last_checked\": {d}", .{lc});
                 defer self.allocator.free(lc_line);
                 try file.writeStreamingAll(io, lc_line);
+            }
+
+            // provenance fields
+            if (pkg.origin_url) |ou| {
+                const escaped_ou = try json_escape.escapeJsonString(self.allocator, ou);
+                defer self.allocator.free(escaped_ou);
+                const ou_line = try std.fmt.allocPrint(self.allocator, ",\n      \"origin_url\": \"{s}\"", .{escaped_ou});
+                defer self.allocator.free(ou_line);
+                try file.writeStreamingAll(io, ou_line);
+            }
+
+            if (pkg.content_size) |cs| {
+                const cs_line = try std.fmt.allocPrint(self.allocator, ",\n      \"content_size\": {d}", .{cs});
+                defer self.allocator.free(cs_line);
+                try file.writeStreamingAll(io, cs_line);
+            }
+
+            if (pkg.fetched_at) |fa| {
+                const fa_line = try std.fmt.allocPrint(self.allocator, ",\n      \"fetched_at\": {d}", .{fa});
+                defer self.allocator.free(fa_line);
+                try file.writeStreamingAll(io, fa_line);
+            }
+
+            if (pkg.fetch_duration_ms) |fdm| {
+                const fdm_line = try std.fmt.allocPrint(self.allocator, ",\n      \"fetch_duration_ms\": {d}", .{fdm});
+                defer self.allocator.free(fdm_line);
+                try file.writeStreamingAll(io, fdm_line);
+            }
+
+            if (pkg.checksum_sha256) |cs256| {
+                const escaped_cs256 = try json_escape.escapeJsonString(self.allocator, cs256);
+                defer self.allocator.free(escaped_cs256);
+                const cs256_line = try std.fmt.allocPrint(self.allocator, ",\n      \"checksum_sha256\": \"{s}\"", .{escaped_cs256});
+                defer self.allocator.free(cs256_line);
+                try file.writeStreamingAll(io, cs256_line);
+            }
+
+            if (pkg.checksum_verified) {
+                try file.writeStreamingAll(io, ",\n      \"checksum_verified\": true");
             }
 
             try file.writeStreamingAll(io, "\n    }");

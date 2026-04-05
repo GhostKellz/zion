@@ -1,36 +1,11 @@
 const std = @import("std");
-const zsync = @import("zsync");
 const zion = @import("zion");
 const commands = zion.commands;
 const qol = zion.qol_enhancements;
-const AsyncCommandHandler = @import("async_command_handler.zig").AsyncCommandHandler;
+const Runtime = zion.runtime.Runtime;
 
 // Re-export AppContext from zion module for convenience
 const AppContext = zion.AppContext;
-
-/// Async wrapper for add command to leverage zsync performance
-fn addAsync(allocator: std.mem.Allocator, io: zsync.Io, package_ref: []const u8, options: commands.AddOptions) !void {
-    _ = io; // For future async operations
-    try commands.add(allocator, package_ref, options);
-}
-
-/// Async wrapper for multiple package add to leverage zsync performance
-fn addMultipleAsync(allocator: std.mem.Allocator, io: zsync.Io, packages: []const []const u8, options: commands.AddOptions) !void {
-    _ = io; // For future async operations
-    try commands.addMultiple(allocator, packages, options);
-}
-
-/// Async wrapper for search command to leverage zsync performance
-fn searchAsync(allocator: std.mem.Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
-    _ = io; // For future async operations
-    try commands.search(allocator, args);
-}
-
-/// Async wrapper for registry operations to leverage zsync performance
-fn registryAsync(allocator: std.mem.Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
-    _ = io; // For future async operations
-    try commands.registry(allocator, args);
-}
 
 /// Resolve command aliases to full command names
 fn resolveCommandAlias(command: []const u8) []const u8 {
@@ -47,43 +22,37 @@ fn resolveCommandAlias(command: []const u8) []const u8 {
     if (std.mem.eql(u8, command, "h")) return "help";
     if (std.mem.eql(u8, command, "v")) return "version";
     if (std.mem.eql(u8, command, "f")) return "fetch";
-    if (std.mem.eql(u8, command, "gs")) return "ghostspec";
     if (std.mem.eql(u8, command, "si")) return "search-interactive";
     if (std.mem.eql(u8, command, "reg")) return "registry";
     if (std.mem.eql(u8, command, "cfg")) return "config";
     if (std.mem.eql(u8, command, "sec")) return "security";
     if (std.mem.eql(u8, command, "perf")) return "performance";
     if (std.mem.eql(u8, command, "dbg")) return "debug";
-    if (std.mem.eql(u8, command, "tui")) return "interface";
+    if (std.mem.eql(u8, command, "tui")) return "tui";
     if (std.mem.eql(u8, command, "ui")) return "interface";
     if (std.mem.eql(u8, command, "kr")) return "keyring";
     if (std.mem.eql(u8, command, "key")) return "keyring";
     if (std.mem.eql(u8, command, "archver")) return "archver";
 
-    // aliases
+    // New command aliases (v1.1.0)
+    if (std.mem.eql(u8, command, "w")) return "why";
+    if (std.mem.eql(u8, command, "pol")) return "policy";
+    if (std.mem.eql(u8, command, "tgt")) return "target";
+
+    // Compatibility aliases for placeholder commands
     if (std.mem.eql(u8, command, "hc")) return "health";
     if (std.mem.eql(u8, command, "bench")) return "benchmark";
-    if (std.mem.eql(u8, command, "perf")) return "benchmark";
 
-    // Return original command if no alias found
     return command;
 }
 
 /// Main entry point - accepts std.process.Init for Zig 0.16.0 compatibility
-/// This provides access to:
-///   - init.gpa: General purpose allocator
-///   - init.io: std.Io for standard library operations
-///   - init.minimal.args: Command line arguments
-///   - init.environ_map: Environment variables
 pub fn main(init: std.process.Init) !void {
-    // Convert args to slice using the provided arena allocator
     const args = init.minimal.args.toSlice(init.arena.allocator()) catch |err| {
         std.debug.print("Failed to get command line arguments: {}\n", .{err});
         return;
     };
 
-    // Set up application context for passing through to zionMain
-    // This is stored in the zion module so all commands can access it
     const context = AppContext{
         .allocator = init.gpa,
         .std_io = init.io,
@@ -93,28 +62,14 @@ pub fn main(init: std.process.Init) !void {
     zion.app_context = &context;
     defer zion.app_context = null;
 
-    // Create zsync runtime using the allocator from Init
-    // This properly integrates zsync with Zig 0.16's allocation model
-    const runtime = zsync.createOptimalRuntime(init.gpa) catch |err| {
-        std.debug.print("Failed to create async runtime: {}, falling back to sync\n", .{err});
-        // Fallback to synchronous execution
-        try zionMainSync(&context);
-        return;
-    };
-    defer runtime.deinit();
-
-    // Run the main application logic with async support
-    // zsync's runtime provides the Io interface to the callback
-    runtime.run(zionMain, .{}) catch |err| {
-        std.debug.print("Runtime error: {}, falling back to sync\n", .{err});
-        try zionMainSync(&context);
-    };
+    try zionMain(&context);
 }
 
-/// Synchronous fallback when async runtime is unavailable
-fn zionMainSync(ctx: *const AppContext) !void {
+fn zionMain(ctx: *const AppContext) !void {
     const allocator = ctx.allocator;
     const args = ctx.args;
+    const runtime = Runtime.init(allocator, ctx.std_io);
+    _ = runtime;
 
     zion.logger.init();
 
@@ -124,127 +79,7 @@ fn zionMainSync(ctx: *const AppContext) !void {
     }
 
     const raw_command = args[1];
-    const command = resolveCommandAlias(raw_command);
 
-    // Handle all commands synchronously - must mirror zionMain
-    if (std.mem.eql(u8, command, "version") or std.mem.eql(u8, raw_command, "--version") or std.mem.eql(u8, raw_command, "-V")) {
-        try commands.version(allocator);
-    } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, raw_command, "--help") or std.mem.eql(u8, raw_command, "-h")) {
-        try commands.help(allocator, args);
-    } else if (std.mem.eql(u8, command, "init")) {
-        try commands.init(allocator);
-    } else if (std.mem.eql(u8, command, "add")) {
-        if (args.len < 3) {
-            std.debug.print("Error: 'zion add' requires a package name\n", .{});
-            std.debug.print("Usage: zion add <package>\n", .{});
-            return;
-        }
-        const options = commands.AddOptions{};
-        try commands.add(allocator, args[2], options);
-    } else if (std.mem.eql(u8, command, "remove") or std.mem.eql(u8, command, "rm")) {
-        if (args.len < 3) {
-            std.debug.print("Error: 'zion remove' requires a package name\n", .{});
-            return;
-        }
-        try commands.remove(allocator, args[2]);
-    } else if (std.mem.eql(u8, command, "list") or std.mem.eql(u8, command, "ls")) {
-        const json_mode = args.len > 2 and std.mem.eql(u8, args[2], "--json");
-        try commands.list(allocator, json_mode);
-    } else if (std.mem.eql(u8, command, "tree")) {
-        try commands.tree(allocator, args);
-    } else if (std.mem.eql(u8, command, "update")) {
-        try commands.update(allocator, args);
-    } else if (std.mem.eql(u8, command, "fetch")) {
-        try commands.fetch(allocator, args);
-    } else if (std.mem.eql(u8, command, "build")) {
-        try commands.build(allocator);
-    } else if (std.mem.eql(u8, command, "clean")) {
-        const clean_all = args.len > 2 and std.mem.eql(u8, args[2], "--all");
-        try commands.clean(allocator, clean_all);
-    } else if (std.mem.eql(u8, command, "search")) {
-        try commands.search(allocator, args);
-    } else if (std.mem.eql(u8, command, "info")) {
-        if (args.len < 3) {
-            std.debug.print("Error: 'zion info' requires a package name\n", .{});
-            return;
-        }
-        try commands.info(allocator, args[2]);
-    } else if (std.mem.eql(u8, command, "pin")) {
-        try commands.pin(allocator, args);
-    } else if (std.mem.eql(u8, command, "unpin")) {
-        try commands.unpin(allocator, args);
-    } else if (std.mem.eql(u8, command, "hash")) {
-        try commands.hash(allocator, args);
-    } else if (std.mem.eql(u8, command, "lock")) {
-        try commands.lock(allocator, args);
-    } else if (std.mem.eql(u8, command, "check")) {
-        try commands.check(allocator);
-    } else if (std.mem.eql(u8, command, "repair")) {
-        try commands.repair(allocator);
-    } else if (std.mem.eql(u8, command, "run")) {
-        try commands.run(allocator, args);
-    } else if (std.mem.eql(u8, command, "test")) {
-        try commands.test_command(allocator, args);
-    } else if (std.mem.eql(u8, command, "zig")) {
-        try commands.zig_manager(allocator, args);
-    } else if (std.mem.eql(u8, command, "zls")) {
-        try commands.zls(allocator, args);
-    } else if (std.mem.eql(u8, command, "keyring")) {
-        try commands.keyring(allocator, args);
-    } else if (std.mem.eql(u8, command, "registry")) {
-        try commands.registry(allocator, args);
-    } else {
-        std.debug.print("❌ Unknown command: '{s}'\n", .{raw_command});
-        std.debug.print("Run 'zion help' for available commands.\n", .{});
-    }
-}
-
-fn zionMain(io: zsync.Io) !void {
-    // Get the application context from thread-local storage in zion module
-    const ctx = zion.app_context orelse {
-        std.debug.print("Error: Application context not available\n", .{});
-        return;
-    };
-
-    const allocator = ctx.allocator;
-    const args = ctx.args;
-
-    // Initialize logging system
-    zion.logger.init();
-
-    // Initialize async command handler for features
-    var async_handler = AsyncCommandHandler.init(allocator, io) catch |err| {
-        std.debug.print("⚠️  Async features unavailable: {}\n", .{err});
-        std.debug.print("   Falling back to synchronous operations\n", .{});
-
-        if (args.len < 2) {
-            try commands.help(allocator, args);
-            return;
-        }
-
-        const raw_command = args[1];
-        const command = resolveCommandAlias(raw_command);
-
-        // Handle basic commands synchronously
-        if (std.mem.eql(u8, command, "version")) {
-            try commands.version(allocator);
-        } else if (std.mem.eql(u8, command, "help")) {
-            try commands.help(allocator, args);
-        } else {
-            try commands.help(allocator, args);
-        }
-        return;
-    };
-    defer async_handler.deinit();
-
-    if (args.len < 2) {
-        try commands.help(allocator, args);
-        return;
-    }
-
-    const raw_command = args[1];
-
-    // Handle standard flags first
     if (std.mem.eql(u8, raw_command, "--help") or std.mem.eql(u8, raw_command, "-h")) {
         try commands.help(allocator, args);
         return;
@@ -257,7 +92,11 @@ fn zionMain(io: zsync.Io) !void {
 
     const command = resolveCommandAlias(raw_command);
 
-    if (std.mem.eql(u8, command, "init")) {
+    if (std.mem.eql(u8, command, "version")) {
+        try commands.version(allocator);
+    } else if (std.mem.eql(u8, command, "help")) {
+        try commands.help(allocator, args);
+    } else if (std.mem.eql(u8, command, "init")) {
         try commands.init(allocator);
     } else if (std.mem.eql(u8, command, "add")) {
         if (args.len < 3) {
@@ -273,17 +112,9 @@ fn zionMain(io: zsync.Io) !void {
         const options = commands.AddOptions{};
 
         if (packages.len == 1) {
-            // Use enhanced async add for single package
-            async_handler.addAsync(packages[0], options) catch |err| {
-                std.debug.print("❌ Async add failed: {}, falling back to sync\n", .{err});
-                try addAsync(allocator, io, packages[0], options);
-            };
+            try commands.add(allocator, packages[0], options);
         } else {
-            // Use enhanced batch add for multiple packages
-            async_handler.addMultipleAsync(packages, options) catch |err| {
-                std.debug.print("❌ Async batch add failed: {}, falling back to sync\n", .{err});
-                try addMultipleAsync(allocator, io, packages, options);
-            };
+            try commands.addMultiple(allocator, packages, options);
         }
     } else if (std.mem.eql(u8, command, "remove") or std.mem.eql(u8, command, "rm")) {
         if (args.len < 3) {
@@ -317,14 +148,12 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "check")) {
         try commands.check(allocator);
     } else if (std.mem.eql(u8, command, "build")) {
-        try commands.build(allocator);
+        try commands.build(allocator, args);
     } else if (std.mem.eql(u8, command, "clean")) {
         const clean_all = args.len > 2 and std.mem.eql(u8, args[2], "--all");
         try commands.clean(allocator, clean_all);
     } else if (std.mem.eql(u8, command, "lock")) {
         try commands.lock(allocator, args);
-    } else if (std.mem.eql(u8, command, "version")) {
-        try commands.version(allocator);
     } else if (std.mem.eql(u8, command, "hash")) {
         try commands.hash(allocator, args);
     } else if (std.mem.eql(u8, command, "run")) {
@@ -333,6 +162,12 @@ fn zionMain(io: zsync.Io) !void {
         try commands.test_command(allocator, args);
     } else if (std.mem.eql(u8, command, "tree")) {
         try commands.tree(allocator, args);
+    } else if (std.mem.eql(u8, command, "why")) {
+        try commands.why(allocator, args);
+    } else if (std.mem.eql(u8, command, "policy")) {
+        try commands.policy(allocator, args);
+    } else if (std.mem.eql(u8, command, "target")) {
+        try commands.target(allocator, args);
     } else if (std.mem.eql(u8, command, "doc")) {
         try commands.doc(allocator, args);
     } else if (std.mem.eql(u8, command, "outdated")) {
@@ -341,8 +176,6 @@ fn zionMain(io: zsync.Io) !void {
         try commands.nvim(allocator, args);
     } else if (std.mem.eql(u8, command, "config")) {
         try commands.config(allocator, args);
-    } else if (std.mem.eql(u8, command, "help")) {
-        try commands.help(allocator, args);
     } else if (std.mem.eql(u8, command, "security")) {
         try commands.security(allocator, args);
     } else if (std.mem.eql(u8, command, "performance")) {
@@ -358,40 +191,24 @@ fn zionMain(io: zsync.Io) !void {
             std.debug.print("Example: zion search http\n", .{});
             return;
         }
-
-        // Use enhanced racing search
-        async_handler.searchAsync(args[2]) catch |err| {
-            std.debug.print("❌ Async search failed: {}, falling back to sync\n", .{err});
-            try searchAsync(allocator, io, args);
-        };
+        try commands.search(allocator, args);
     } else if (std.mem.eql(u8, command, "registry")) {
-        try registryAsync(allocator, io, args);
+        try commands.registry(allocator, args);
     } else if (std.mem.eql(u8, command, "template")) {
         try commands.template(allocator, args);
-    } else if (std.mem.eql(u8, command, "debug")) {
-        try commands.debug(allocator, args);
     } else if (std.mem.eql(u8, command, "fmt")) {
         try commands.fmt(allocator, args);
     } else if (std.mem.eql(u8, command, "analyze")) {
         try commands.analyze(allocator, args);
-
-        // Enhanced Commands (zsync powered)
-    } else if (std.mem.eql(u8, command, "health")) {
-        // Registry health check using racing queries
-        try async_handler.healthCheckRegistries();
-    } else if (std.mem.eql(u8, command, "benchmark")) {
-        // Performance benchmark for new features
-        try async_handler.benchmarkPerformance();
-
-        // Enhanced Commands
+    } else if (std.mem.eql(u8, command, "health") or std.mem.eql(u8, command, "benchmark")) {
+        std.debug.print("⚠️  '{s}' is not part of the shipped v1.1.0 runtime surface.\n", .{command});
+        std.debug.print("   Phase 3 removed the old zsync-backed runtime path; no Zion-specific std-based implementation exists yet.\n", .{});
     } else if (std.mem.eql(u8, command, "publish")) {
         try commands.publish(allocator, args);
     } else if (std.mem.eql(u8, command, "search-interactive")) {
         try commands.search_interactive(allocator);
     } else if (std.mem.eql(u8, command, "interface")) {
         try commands.interface(allocator);
-
-        // Production-ready Features
     } else if (std.mem.eql(u8, command, "verify")) {
         try commands.signature_verify(allocator, args);
     } else if (std.mem.eql(u8, command, "cache")) {
@@ -399,17 +216,13 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "tui") or std.mem.eql(u8, command, "interactive")) {
         try commands.tui(allocator, args);
     } else if (std.mem.eql(u8, command, "status")) {
-        try commands.status(allocator, io, args);
-
-        // New Commands
+        try commands.status(allocator, args);
     } else if (std.mem.eql(u8, command, "setup")) {
         try commands.setup(allocator, args);
     } else if (std.mem.eql(u8, command, "zls")) {
         try commands.zls(allocator, args);
     } else if (std.mem.eql(u8, command, "workspace")) {
         try commands.workspace(allocator, args);
-    } else if (std.mem.eql(u8, command, "ghostspec")) {
-        try commands.ghostspec(allocator, args);
     } else if (std.mem.eql(u8, command, "ziglibs")) {
         try commands.ziglibs(allocator, args[2..]);
     } else if (std.mem.eql(u8, command, "zigistry")) {
@@ -417,7 +230,6 @@ fn zionMain(io: zsync.Io) !void {
     } else if (std.mem.eql(u8, command, "keyring")) {
         try commands.keyring(allocator, args);
     } else if (std.mem.eql(u8, command, "archver")) {
-        // Standalone Arch verification command - same as keyring archver
         const archver_str = try allocator.dupeZ(u8, "archver");
         defer allocator.free(archver_str);
         var archver_args = [_][:0]const u8{ args[0], args[1], archver_str };
@@ -425,12 +237,10 @@ fn zionMain(io: zsync.Io) !void {
     } else {
         std.debug.print("❌ Unknown command: '{s}'\n\n", .{raw_command});
 
-        // Use smart command suggestions
         const suggester = qol.CommandSuggester.init();
         if (suggester.suggestCommand(raw_command)) |suggestion| {
             std.debug.print("💡 Did you mean: 'zion {s}'?\n\n", .{suggestion});
         } else {
-            // Try multiple suggestions
             const suggestions = suggester.suggestCommands(allocator, raw_command) catch &[_][]const u8{};
             defer allocator.free(suggestions);
 

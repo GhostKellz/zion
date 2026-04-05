@@ -7,7 +7,7 @@ pub var zig_manager_override: ?fn (Allocator, [][:0]u8) anyerror!void = null;
 pub var check_command_override: ?fn ([]const u8) bool = null;
 
 /// One Nation Under Zig - Complete development environment setup
-pub fn setup(allocator: Allocator, args: [][:0]u8) !void {
+pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printSetupHelp();
         return;
@@ -94,7 +94,7 @@ fn setupAll(allocator: Allocator) !void {
 }
 
 /// Setup Zig version management
-fn setupZig(allocator: Allocator, args: [][:0]u8) !void {
+fn setupZig(allocator: Allocator, args: []const [:0]const u8) !void {
     var install_latest = true;
     var version: []const u8 = "0.12.0"; // Default to stable
 
@@ -155,7 +155,7 @@ fn setupZig(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Setup ZLS (Zig Language Server)
-fn setupZLS(allocator: Allocator, args: [][:0]u8) !void {
+fn setupZLS(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
 
     std.debug.print("🧠 Setting up ZLS (Zig Language Server)...\n", .{});
@@ -182,7 +182,7 @@ fn setupZLS(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Setup shell integration
-fn setupShell(allocator: Allocator, args: [][:0]u8) !void {
+fn setupShell(allocator: Allocator, args: []const [:0]const u8) !void {
     var shell_type: ?[]const u8 = null;
 
     // Parse arguments
@@ -212,7 +212,7 @@ fn setupShell(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Setup Neovim integration
-fn setupNvim(allocator: Allocator, args: [][:0]u8) !void {
+fn setupNvim(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
 
     std.debug.print("🔥 Setting up Neovim integration...\n", .{});
@@ -242,7 +242,7 @@ fn setupNvim(allocator: Allocator, args: [][:0]u8) !void {
 }
 
 /// Setup development tools
-fn setupTools(allocator: Allocator, args: [][:0]u8) !void {
+fn setupTools(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args;
 
     std.debug.print("🛠️  Setting up development tools...\n", .{});

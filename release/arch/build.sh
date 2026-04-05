@@ -79,7 +79,7 @@ case $INSTALL_CHOICE in
             fi
         fi
         
-        echo -e "${GREEN}Zag installed to ~/.local/bin/zion${NC}"
+        echo -e "${GREEN}Zion installed to ~/.local/bin/zion${NC}"
         
         # Install ZSH completion for user
         ZSH_USER_DIR="$HOME/.zsh/completions"
@@ -96,11 +96,11 @@ case $INSTALL_CHOICE in
         echo -e "${BLUE}Installing system-wide...${NC}"
         if command -v sudo &> /dev/null; then
             sudo cp "$REPO_ROOT/zig-out/bin/zion" "/usr/local/bin/"
-            echo -e "${GREEN}Zag installed to /usr/local/bin/zion${NC}"
+                echo -e "${GREEN}Zion installed to /usr/local/bin/zion${NC}"
         else
             echo -e "${YELLOW}sudo not available, trying with su...${NC}"
             su -c "cp '$REPO_ROOT/zig-out/bin/zion' '/usr/local/bin/'"
-            echo -e "${GREEN}Zag installed to /usr/local/bin/zion${NC}"
+                echo -e "${GREEN}Zion installed to /usr/local/bin/zion${NC}"
         fi
         
         # Install ZSH completion systemwide

@@ -23,7 +23,6 @@ pub fn interface(allocator: std.mem.Allocator) !void {
 
     // Display available ecosystems
     std.log.info("👻 GhostLibs Ecosystem ({d} packages available):", .{ghostkellz.packages.items.len});
-    std.log.info("  • phantom - Advanced TUI framework", .{});
     std.log.info("  • http_client - Standard HTTP client (replaced ghostnet)", .{});
     std.log.info("  • zcrypto - Quantum-resistant cryptography", .{});
     std.log.info("  • zquic - Ultra-fast QUIC/HTTP3 implementation", .{});
@@ -44,7 +43,6 @@ pub fn interface(allocator: std.mem.Allocator) !void {
     // Display available repositories
     std.log.info("📦 Available GhostLibs repositories (all main archive branch):", .{});
     const ghostlibs = [_][]const u8{
-        "github.com/ghostkellz/phantom",
         // "github.com/ghostkellz/ghostnet", // removed - using standard HTTP client
         "github.com/ghostkellz/zcrypto",
         "github.com/ghostkellz/zquic",
@@ -72,11 +70,6 @@ pub fn interface(allocator: std.mem.Allocator) !void {
 
     // GhostLibs examples
     std.log.info("👻 Install GhostLibs packages:", .{});
-    if (ghostkellz.findPackage("phantom")) |pkg| {
-        const cmd = try pkg.getZigFetchCommand(allocator);
-        defer allocator.free(cmd);
-        std.log.info("  {s}", .{cmd});
-    }
     // ghostnet removed - using standard HTTP client now
     std.log.info("  # ghostnet removed - using standard HTTP client", .{});
 

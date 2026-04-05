@@ -131,9 +131,10 @@ const command_help = struct {
         \\
         \\SUBCOMMANDS:
         \\    install                Installation guidance
-        \\    update                 Update ZLS
         \\    doctor                 Health check and diagnostics
         \\    config                 Generate optimal configuration
+        \\    which                  Show detected ZLS binary
+        \\    version                Show detected ZLS version
         \\
         \\EXAMPLES:
         \\    zion zls doctor                # Check ZLS health
@@ -156,6 +157,70 @@ const command_help = struct {
         \\    zion clean --all               # Full cleanup
         \\
     ;
+
+    const why =
+        \\Explain why a package is in your dependency tree
+        \\
+        \\USAGE:
+        \\    zion why <package>
+        \\
+        \\DESCRIPTION:
+        \\    Shows the dependency chain from direct dependencies to the target
+        \\    package. Helps understand transitive dependencies.
+        \\
+        \\EXAMPLES:
+        \\    zion why libxev                # Trace dependency chain
+        \\    zion why libxev                # Trace dependency chain
+        \\
+    ;
+
+    const policy =
+        \\Manage package trust policies
+        \\
+        \\USAGE:
+        \\    zion policy <subcommand> [OPTIONS]
+        \\
+        \\SUBCOMMANDS:
+        \\    init                   Create default policy file
+        \\    audit                  Check lockfile against policy
+        \\    show                   Display current policy
+        \\    add-allow <pattern>    Add allow pattern
+        \\    add-deny <pattern>     Add deny pattern
+        \\
+        \\OPTIONS:
+        \\    --json                 Output in JSON format (audit)
+        \\
+        \\EXAMPLES:
+        \\    zion policy init               # Create zion.policy.json
+        \\    zion policy audit --json       # CI-friendly output
+        \\    zion policy add-allow github.com/*
+        \\
+    ;
+
+    const target =
+        \\Manage cross-compilation targets
+        \\
+        \\USAGE:
+        \\    zion target [subcommand] [target-triple]
+        \\
+        \\SUBCOMMANDS:
+        \\    list                   List configured targets (default)
+        \\    add <triple>           Add compilation target
+        \\    remove <triple>        Remove compilation target
+        \\    available              Show common target triples
+        \\
+        \\COMMON TARGETS:
+        \\    x86_64-linux-gnu       64-bit Linux (glibc)
+        \\    aarch64-linux-gnu      64-bit ARM Linux
+        \\    x86_64-macos           Intel Mac
+        \\    aarch64-macos          Apple Silicon Mac
+        \\    wasm32-wasi            WebAssembly (WASI)
+        \\
+        \\EXAMPLES:
+        \\    zion target add wasm32-wasi    # Add WebAssembly target
+        \\    zion target list               # Show configured targets
+        \\
+    ;
 };
 
 /// Get help text for a specific command
@@ -170,6 +235,9 @@ fn getCommandHelp(cmd: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, cmd, "zig")) return command_help.zig;
     if (std.mem.eql(u8, cmd, "zls")) return command_help.zls;
     if (std.mem.eql(u8, cmd, "clean")) return command_help.clean;
+    if (std.mem.eql(u8, cmd, "why")) return command_help.why;
+    if (std.mem.eql(u8, cmd, "policy")) return command_help.policy;
+    if (std.mem.eql(u8, cmd, "target")) return command_help.target;
     return null;
 }
 
@@ -210,28 +278,35 @@ pub fn help(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
         \\    clean       Clean build artifacts and caches
         \\    lock        Update the lock file
         \\    run         Run the project executable
-        \\    test        Run project tests with filtering
+        \\    test        Run tests or use the Zion-native test workflow surface
         \\    doc         Generate and open documentation
         \\    tree        Show dependency tree visualization
+        \\    why         Explain why a package is in your dependency tree
         \\    outdated    Check for outdated dependencies
         \\    hash        Generate, verify, and manage package hashes
+        \\    policy      Manage package trust policies (allow/deny lists)
+        \\    target      Manage cross-compilation targets
         \\    config      Configuration management (env vars, Lua, JSON)
         \\    nvim        Neovim integration setup and management
         \\    security    Package signing, verification, and trust management
         \\    performance Performance monitoring and optimization
-        \\    ghostspec   GhostSpec testing workflows (install, run, report)
         \\    search      Search for Zig packages
         \\    registry    Manage package registries and test connectivity
-        \\    template    Create projects from templates
+        \\    template    Preview-only placeholder (not shipped in v1.1.0)
         \\    debug       Debug build errors and analyze project
-        \\    fmt         Format code with enhanced project-wide features
-        \\    analyze     Analyze dependencies and project structure
+        \\    fmt         Reserved placeholder; use `zig fmt` for now
+        \\    analyze     Reserved placeholder; use tree/why/check for now
         \\    version     Show version information
         \\    zig         Zig version manager (install, list, use, etc.)
         \\    zls         ZLS (Zig Language Server) integration
         \\    workspace   Cargo-style workspace management
-        \\    setup       One Nation Under Zig - complete setup wizard
+        \\    setup       Lightweight onboarding and verification flow
         \\    keyring     GPG keyring management and signature verification
+        \\    status      Show current project status
+        \\    cache       Cache management helpers
+        \\    verify      Signature verification helpers
+        \\    search-interactive  Interactive package search mode
+        \\    tui         Terminal UI for common workflows
         \\    help        Show this help message
         \\
         \\EXAMPLES:
@@ -251,9 +326,19 @@ pub fn help(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
         \\    zion run --bin mytool       # Run specific binary
         \\    zion test                   # Run all tests
         \\    zion test --filter "json"   # Run tests matching filter
+        \\    zion test bootstrap         # Scaffold the Zion-native test workflow
+        \\    zion test run --seed 123 --cases 32 --include property   # Execute filtered workflow suite
+        \\    zion test bench --cases 50 --time-budget 250             # Run benchmark-focused workflow slice
+        \\    zion test ci --ci-profile hardened                       # Run hardened CI profile
+        \\    zion test run --failed-only                              # Re-run previously failed workflow cases
         \\    zion doc --open             # Generate and open docs
         \\    zion tree --depth 2         # Show dependency tree (max depth 2)
+        \\    zion why libxev             # Explain why a package is included
         \\    zion outdated               # Check for outdated dependencies
+        \\    zion policy init            # Create policy file
+        \\    zion policy audit --json    # Check compliance (CI-friendly)
+        \\    zion target add wasm32-wasi # Add WebAssembly target
+        \\    zion add gh/owner/repo@v1.0 # GitHub shorthand with version
         \\    zion hash generate file.tar.gz # Generate hash for file
         \\    zion hash verify file.tar.gz abc123... # Verify file hash
         \\    zion config init --lua      # Create Lua config for Neovim
@@ -261,14 +346,11 @@ pub fn help(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
         \\    zion nvim setup             # Setup Neovim integration
         \\    zion zig install 0.12.0     # Install Zig version 0.12.0
         \\    zion zig use 0.12.0         # Switch to Zig version 0.12.0
-        \\    zion setup all              # Complete development environment setup
-        \\    zion setup zig              # Install and configure Zig
+        \\    zion setup all              # Show setup guidance
         \\    zion setup verify           # Verify setup completion
         \\    zion zls install            # Get ZLS installation guidance
         \\    zion zls doctor             # Check ZLS health and setup
         \\    zion zls config             # Create optimal ZLS configuration
-        \\    zion ghostspec bootstrap    # Install and wire GhostSpec into the project
-        \\    zion ghostspec run          # Execute GhostSpec suites
         \\    zion workspace init         # Initialize Cargo-style workspace
         \\    zion workspace add mylib    # Add package to workspace
         \\    zion workspace build        # Build all workspace packages
@@ -285,20 +367,14 @@ pub fn help(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
         \\    zion registry add https://my-reg.com       # Add custom registry
         \\    zion registry health                       # Check registry health
         \\
-        \\ZIGISTRY EXAMPLES:
-        \\    zion zigistry search json           # Search Zigistry packages
-        \\    zion zigistry trending              # Show trending packages
-        \\    zion zigistry info zig-clap         # Package details
-        \\    zion add zig-clap --registry zigistry  # Add from Zigistry
-        \\    zion search http --registry zigistry   # Search Zigistry only
-        \\
         \\COMMAND ALIASES:
         \\    s -> search          i -> info         a -> add
         \\    r -> remove          u -> update       l -> list
         \\    c -> check           b -> build        t -> test
         \\    h -> help            v -> version      f -> fetch
-        \\    gs -> ghostspec      si -> interface   reg -> registry
-        \\    kr -> keyring        tui -> interface
+        \\    si -> search-interactive  reg -> registry
+        \\    kr -> keyring        tui -> tui         w -> why
+        \\    pol -> policy        tgt -> target
         \\
         \\ENVIRONMENT VARIABLES:
         \\    NO_COLOR=1           Disable colored output (accessibility)

@@ -10,6 +10,7 @@ const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const github = @import("../github.zig");
 const zion_root = @import("../root.zig");
+const tar_extract = @import("../tar_extract.zig");
 
 /// Print help for unpin command
 fn printHelp() void {
@@ -188,7 +189,7 @@ pub fn unpin(allocator: Allocator, args: []const [:0]const u8) !void {
     defer allocator.free(deps_path);
 
     std.debug.print("📁 Extracting to {s}...\n", .{deps_path});
-    try extractTarball(allocator, cache_path, deps_path);
+    try tar_extract.extractPackage(allocator, cache_path, deps_path);
 
     std.debug.print("🎉 Successfully unpinned {s} - now tracking latest ({s})\n", .{ package_name, latest_version.version });
     std.debug.print("   URL: {s}\n", .{latest_version.url});
@@ -247,7 +248,7 @@ fn updateToDefaultBranch(allocator: Allocator, zon_file: *ZonFile, zon_path: []c
     defer allocator.free(deps_path);
 
     std.debug.print("📁 Extracting to {s}...\n", .{deps_path});
-    try extractTarball(allocator, cache_path, deps_path);
+    try tar_extract.extractPackage(allocator, cache_path, deps_path);
 
     std.debug.print("🎉 Successfully unpinned {s} - now tracking {s} branch\n", .{ package_name, branch_name });
     std.debug.print("   URL: {s}\n", .{branch_url});

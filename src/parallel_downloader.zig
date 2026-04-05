@@ -308,8 +308,7 @@ pub fn downloadSingleWithProgress(
     const is_url = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
 
     if (is_url) {
-        // For direct URLs, use the enhanced downloader directly with a fallback
-        return enhancedDownloadFromUrl(allocator, url, package_name);
+        return downloader.downloadFromUrl(allocator, url, package_name);
     } else {
         // For package references, use the existing downloader
         return downloader.downloadAndHashPackage(allocator, url);

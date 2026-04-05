@@ -8,6 +8,7 @@ const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const zion_root = @import("../root.zig");
+const tar_extract = @import("../tar_extract.zig");
 
 /// Print help information for the update command
 fn printUpdateHelp() void {
@@ -129,11 +130,8 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
 
         std.debug.print("\n📦 Checking {s}...\n", .{pkg_name});
 
-        // Re-download and compute new hash
-        const package_ref = try extractPackageRefFromUrl(allocator, current_dep.url);
-        defer allocator.free(package_ref);
-
-        const download_result = try downloader.downloadAndHashPackage(allocator, package_ref);
+        // Re-download using the exact artifact URL stored in the manifest.
+        const download_result = try downloader.downloadFromUrl(allocator, current_dep.url, pkg_name);
         defer {
             allocator.free(download_result.url);
             allocator.free(download_result.hash);
@@ -173,7 +171,7 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
                 defer allocator.free(deps_path);
 
                 std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
-                try extractTarball(allocator, download_result.cache_path, deps_path);
+                try tar_extract.extractPackage(allocator, download_result.cache_path, deps_path);
 
                 try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
             }
@@ -221,24 +219,6 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
     } else {
         std.debug.print("\n🚀 Updated {d} package(s). Run 'zig build' to use the latest versions.\n", .{updated_packages.items.len});
     }
-}
-
-/// Extract package reference (user/repo) from GitHub URL
-fn extractPackageRefFromUrl(allocator: Allocator, url: []const u8) ![]const u8 {
-    // Expected format: https://github.com/user/repo/archive/refs/heads/main.tar.gz
-    const github_prefix = "https://github.com/";
-    const archive_suffix = "/archive/refs/heads/";
-
-    if (!std.mem.startsWith(u8, url, github_prefix)) {
-        return error.UnsupportedUrl;
-    }
-
-    const after_prefix = url[github_prefix.len..];
-    if (std.mem.indexOf(u8, after_prefix, archive_suffix)) |suffix_pos| {
-        return allocator.dupe(u8, after_prefix[0..suffix_pos]);
-    }
-
-    return error.InvalidGitHubUrl;
 }
 
 /// Ensure the .zion/deps directory exists

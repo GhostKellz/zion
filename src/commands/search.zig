@@ -335,14 +335,15 @@ pub fn interactiveSearch(allocator: Allocator) !void {
     std.debug.print("🔍 Zion Interactive Package Search\n", .{});
     std.debug.print("Type 'help' for search tips, 'exit' to quit\n\n", .{});
 
-    const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
-    const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
+    const io = try @import("../root.zig").getIo();
+    const stdin = std.Io.File.stdin();
+    const stdout = std.Io.File.stdout();
 
     while (true) {
-        try stdout.writeAll("search> ");
+        try stdout.writeStreamingAll(io, "search> ");
 
         var buf: [1024]u8 = undefined;
-        const bytes_read = try stdin.readAll(&buf);
+        const bytes_read = try stdin.readStreaming(io, &.{buf[0..]});
         if (bytes_read == 0) break; // EOF
 
         const input = buf[0..bytes_read];
@@ -354,7 +355,7 @@ pub fn interactiveSearch(allocator: Allocator) !void {
             try printInteractiveHelp();
         } else if (trimmed.len > 0) {
             // Parse the search command
-            var args = std.ArrayList([]const u8).init(allocator);
+            var args: std.ArrayList([]const u8) = .empty;
             defer args.deinit(allocator);
 
             try args.append(allocator, "zion");

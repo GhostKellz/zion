@@ -56,30 +56,40 @@ pub const publish = @import("publish.zig").publish;
 pub const setup = @import("setup_simple.zig").setup;
 pub const zls = @import("zls.zig").zls;
 pub const workspace = @import("workspace.zig").workspace;
-pub const ghostspec = @import("ghostspec.zig").ghostspec;
+pub const test_workflow = @import("test_workflow.zig").testingWorkflow;
 
 pub const signature_verify = @import("signature_verify.zig").verify;
 pub const cache = @import("cache.zig").cache;
 pub const tui = @import("tui.zig").tui;
 
 pub const interface = @import("interface.zig").interface;
-pub const search_interactive = interface;
+pub const search_interactive = @import("search.zig").interactiveSearch;
 
 pub const ziglibs = @import("ziglibs.zig").ziglibs;
 pub const zigistry = @import("zigistry.zig").zigistry;
-pub const enhanced_add = @import("enhanced_add.zig").enhanced_add;
-pub const enhanced_zls = @import("enhanced_zls.zig").enhanced_zls;
-pub const enhanced_zig_manager = @import("enhanced_zig_manager.zig").enhanced_zig_manager;
 
 pub const status = @import("status.zig").status;
+pub const statusMinimal = @import("status.zig").statusMinimal;
 
 pub const keyring = @import("keyring.zig").keyring;
+
+pub const why = @import("why.zig").why;
+
+pub const policy = @import("policy.zig").policy;
+
+pub const target = @import("target.zig").target;
 
 // Alias for the old zig function - now use zig_manager
 pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
     // Convert args to the format expected by zig_manager
-    var zig_args = try std.ArrayList([:0]u8).initCapacity(allocator, args.len + 2);
-    defer zig_args.deinit(allocator);
+    var zig_args: std.ArrayListUnmanaged([:0]u8) = .empty;
+    defer {
+        // Free all duplicated strings to prevent memory leak
+        for (zig_args.items) |arg| {
+            allocator.free(arg);
+        }
+        zig_args.deinit(allocator);
+    }
 
     try zig_args.append(allocator, try allocator.dupeZ(u8, "zion"));
     try zig_args.append(allocator, try allocator.dupeZ(u8, "zig"));
@@ -94,32 +104,23 @@ pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
 // Search function is now imported from search.zig
 
-pub fn template(allocator: std.mem.Allocator, args: []const []const u8) !void {
+pub fn template(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     _ = allocator;
     _ = args;
-    std.debug.print("📋 Project templates (coming soon)\n", .{});
-    std.debug.print("This feature will allow you to:\n", .{});
-    std.debug.print("  • Create projects from templates\n", .{});
-    std.debug.print("  • Browse available templates\n", .{});
-    std.debug.print("  • Scaffold common project types\n", .{});
+    std.debug.print("📋 'zion template' is not part of the shipped v1.1.0 surface yet.\n", .{});
+    std.debug.print("   The implementation needs Zig 0.16 compatibility work before it is safe to expose.\n", .{});
 }
 
-pub fn fmt(allocator: std.mem.Allocator, args: []const []const u8) !void {
+pub fn fmt(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     _ = allocator;
     _ = args;
-    std.debug.print("🎨 Enhanced code formatting (coming soon)\n", .{});
-    std.debug.print("This feature will provide:\n", .{});
-    std.debug.print("  • Project-wide formatting\n", .{});
-    std.debug.print("  • Custom formatting rules\n", .{});
-    std.debug.print("  • Integration with build system\n", .{});
+    std.debug.print("🎨 'zion fmt' is reserved for a future Zion-managed formatter workflow.\n", .{});
+    std.debug.print("   Use 'zig fmt' directly for now.\n", .{});
 }
 
-pub fn analyze(allocator: std.mem.Allocator, args: []const []const u8) !void {
+pub fn analyze(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     _ = allocator;
     _ = args;
-    std.debug.print("📊 Project analysis (coming soon)\n", .{});
-    std.debug.print("This feature will provide:\n", .{});
-    std.debug.print("  • Dependency tree analysis\n", .{});
-    std.debug.print("  • Code metrics and statistics\n", .{});
-    std.debug.print("  • Build optimization suggestions\n", .{});
+    std.debug.print("📊 'zion analyze' is not shipped as a stable v1.1.0 command yet.\n", .{});
+    std.debug.print("   Use 'zion tree', 'zion why', and 'zion check' for current project insight.\n", .{});
 }

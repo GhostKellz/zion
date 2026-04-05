@@ -3,7 +3,7 @@ const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("../root.zig");
 
-/// Simple setup command for testing
+/// Simplified setup command for the current v1.1.0 shipped surface.
 pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printSetupHelp();
@@ -24,9 +24,14 @@ pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
 
 fn setupAll(allocator: Allocator) !void {
     _ = allocator;
-    std.debug.print("Welcome to Zion Setup!\n", .{});
-    std.debug.print("This is a simplified setup for testing.\n", .{});
-    std.debug.print("Full implementation coming soon!\n", .{});
+    std.debug.print("Zion setup currently ships a lightweight onboarding flow.\n", .{});
+    std.debug.print("\nWhat it covers in v1.1.0:\n", .{});
+    std.debug.print("  1. Verify the core tools you need are installed\n", .{});
+    std.debug.print("  2. Point you at the follow-up commands for Zig and ZLS\n", .{});
+    std.debug.print("\nRecommended next steps:\n", .{});
+    std.debug.print("  • zion setup verify\n", .{});
+    std.debug.print("  • zion zig current\n", .{});
+    std.debug.print("  • zion zls doctor\n", .{});
 }
 
 fn verifySetup(allocator: Allocator) !void {
@@ -66,13 +71,13 @@ fn checkCommand(command: []const u8) bool {
 }
 
 fn printSetupHelp() void {
-    std.debug.print("Zion Setup - Simple Version\n\n", .{});
+    std.debug.print("Zion Setup\n\n", .{});
     std.debug.print("USAGE:\n", .{});
     std.debug.print("    zion setup <SUBCOMMAND>\n\n", .{});
     std.debug.print("SUBCOMMANDS:\n", .{});
-    std.debug.print("    all                     Complete setup (simplified)\n", .{});
-    std.debug.print("    verify                  Verify setup completion\n\n", .{});
+    std.debug.print("    all                     Show the current onboarding flow\n", .{});
+    std.debug.print("    verify                  Verify core tools are available\n\n", .{});
     std.debug.print("EXAMPLES:\n", .{});
-    std.debug.print("    zion setup all          # Run simplified setup\n", .{});
+    std.debug.print("    zion setup all          # Show setup guidance\n", .{});
     std.debug.print("    zion setup verify       # Check if tools are available\n", .{});
 }

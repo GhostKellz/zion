@@ -6,9 +6,11 @@ pub const progress = @import("progress.zig");
 pub const qol_enhancements = @import("qol_enhancements.zig");
 pub const semver = @import("semver.zig");
 pub const version_resolver = @import("version_resolver.zig");
+pub const runtime = @import("runtime.zig");
+pub const testing = @import("testing/mod.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "1.0.8";
+pub const ZION_VERSION = "1.1.0";
 
 /// Application context passed through from main to commands
 /// Contains std.Io for filesystem and network operations (required by Zig 0.16.0)

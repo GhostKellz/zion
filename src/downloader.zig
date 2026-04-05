@@ -15,12 +15,23 @@ pub const DownloadResult = struct {
     hash: []const u8,
     cache_path: []const u8,
 
-    pub fn deinit(self: *DownloadResult, allocator: Allocator) void {
+    pub fn deinit(self: *const DownloadResult, allocator: Allocator) void {
         allocator.free(self.url);
         allocator.free(self.hash);
         allocator.free(self.cache_path);
     }
 };
+
+pub fn cachePathForUrl(allocator: Allocator, package_name: []const u8, url: []const u8) ![]const u8 {
+    var url_hash: [crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+    crypto.hash.sha2.Sha256.hash(url, &url_hash, .{});
+    const url_hash_hex = std.fmt.bytesToHex(url_hash[0..8], .lower);
+
+    const sanitized_name = try sanitizePackageRef(allocator, package_name);
+    defer allocator.free(sanitized_name);
+
+    return std.fmt.allocPrint(allocator, ".zion/cache/{s}-{s}.tar.gz", .{ sanitized_name, url_hash_hex });
+}
 
 /// Sanitizes a package reference for use as a filename
 fn sanitizePackageRef(allocator: Allocator, package_ref: []const u8) ![]const u8 {
@@ -89,128 +100,21 @@ fn testUrlExists(_: Allocator, url: []const u8) bool {
 
 /// Downloads a package tarball for a specific version from GitHub API
 pub fn downloadAndHashPackageVersion(allocator: Allocator, package_ref: []const u8, version: []const u8) !DownloadResult {
-    // Create cache directory if it doesn't exist
-    try ensureCacheDir(allocator);
-
     // Get the specific version from GitHub API
     var version_info = try github.findVersion(allocator, package_ref, version);
     defer version_info.deinit(allocator);
 
-    // Generate a unique cache path for this package version
-    const sanitized_ref = try sanitizePackageRef(allocator, package_ref);
-    defer allocator.free(sanitized_ref);
-    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-{s}.tar.gz", .{ sanitized_ref, version_info.version });
-    errdefer allocator.free(cache_path);
-
-    // Check if we already have this cached
-    const io = try zion_root.getIo();
-    const cwd = Dir.cwd();
-    const cached_file_exists = blk: {
-        cwd.access(io, cache_path, .{}) catch |err| {
-            if (err == error.FileNotFound) {
-                break :blk false;
-            }
-            return err;
-        };
-        break :blk true;
-    };
-
-    if (!cached_file_exists) {
-        // Download the tarball with performance monitoring
-        const start_time = zion_root.milliTimestamp();
-
-        try downloadWithCurlImproved(allocator, version_info.url, cache_path);
-
-        const end_time = zion_root.milliTimestamp();
-        const download_time = end_time - start_time;
-
-        // Get file size for speed calculation
-        const file = try cwd.openFile(io, cache_path, .{});
-        defer file.close(io);
-        const file_size = try file.length(io);
-
-        if (download_time > 0) {
-            const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
-            std.debug.print("📊 Download speed: {d:.1} MB/s\n", .{speed_mbps});
-        }
-    } else {
-        std.debug.print("💾 Using cached package: {s}\n", .{cache_path});
-    }
-
-    // Calculate SHA256 hash of the downloaded file
-    const hash = try calculateFileHash(allocator, cache_path);
-    errdefer allocator.free(hash);
-
-    const url_copy = try allocator.dupe(u8, version_info.url);
-    errdefer allocator.free(url_copy);
-
-    return DownloadResult{
-        .url = url_copy,
-        .hash = hash,
-        .cache_path = cache_path,
-    };
+    return downloadFromUrl(allocator, version_info.url, package_ref);
 }
 
 /// Downloads a package tarball from a URL, saves it to cache, and calculates its SHA256 hash
 /// Includes performance monitoring and smart caching - uses latest version from GitHub API
 pub fn downloadAndHashPackage(allocator: Allocator, package_ref: []const u8) !DownloadResult {
-    // Create cache directory if it doesn't exist
-    try ensureCacheDir(allocator);
-
     // Resolve GitHub URL using API
     const url = try resolveGitHubUrl(allocator, package_ref);
-    errdefer allocator.free(url);
+    defer allocator.free(url);
 
-    // Generate a unique cache path for this package
-    const sanitized_ref = try sanitizePackageRef(allocator, package_ref);
-    defer allocator.free(sanitized_ref);
-    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{sanitized_ref});
-    errdefer allocator.free(cache_path);
-
-    // Check if we already have this cached
-    const io = try zion_root.getIo();
-    const cwd = Dir.cwd();
-    const cached_file_exists = blk: {
-        cwd.access(io, cache_path, .{}) catch |err| {
-            if (err == error.FileNotFound) {
-                break :blk false;
-            }
-            return err;
-        };
-        break :blk true;
-    };
-
-    if (!cached_file_exists) {
-        // Download the tarball with performance monitoring
-        const start_time = zion_root.milliTimestamp();
-
-        try downloadWithCurlImproved(allocator, url, cache_path);
-
-        const end_time = zion_root.milliTimestamp();
-        const download_time = end_time - start_time;
-
-        // Get file size for speed calculation
-        const file = try cwd.openFile(io, cache_path, .{});
-        defer file.close(io);
-        const file_size = try file.length(io);
-
-        if (download_time > 0) {
-            const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
-            std.debug.print("📊 Download speed: {d:.1} MB/s\n", .{speed_mbps});
-        }
-    } else {
-        std.debug.print("💾 Using cached package: {s}\n", .{cache_path});
-    }
-
-    // Calculate SHA256 hash of the downloaded file
-    const hash = try calculateFileHash(allocator, cache_path);
-    errdefer allocator.free(hash);
-
-    return DownloadResult{
-        .url = url,
-        .hash = hash,
-        .cache_path = cache_path,
-    };
+    return downloadFromUrl(allocator, url, package_ref);
 }
 
 /// Ensures the .zion/cache directory exists
@@ -447,4 +351,76 @@ pub fn downloadSmart(allocator: Allocator, url: []const u8, output_path: []const
             return err;
         };
     };
+}
+
+/// Downloads a package from a provided URL (does NOT re-resolve via GitHub)
+/// Use this when you already have a resolved URL from registry lookup
+pub fn downloadFromUrl(allocator: Allocator, url: []const u8, package_name: []const u8) !DownloadResult {
+    // Create cache directory if it doesn't exist
+    try ensureCacheDir(allocator);
+
+    const cache_path = try cachePathForUrl(allocator, package_name, url);
+    errdefer allocator.free(cache_path);
+
+    // Check if we already have this cached
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    const cached_file_exists = blk: {
+        cwd.access(io, cache_path, .{}) catch |err| {
+            if (err == error.FileNotFound) {
+                break :blk false;
+            }
+            return err;
+        };
+        break :blk true;
+    };
+
+    if (!cached_file_exists) {
+        // Download the tarball with performance monitoring
+        const start_time = zion_root.milliTimestamp();
+
+        try downloadWithCurlImproved(allocator, url, cache_path);
+
+        const end_time = zion_root.milliTimestamp();
+        const download_time = end_time - start_time;
+
+        // Get file size for speed calculation
+        const file = try cwd.openFile(io, cache_path, .{});
+        defer file.close(io);
+        const file_size = try file.length(io);
+
+        if (download_time > 0) {
+            const speed_mbps = (@as(f64, @floatFromInt(file_size)) / 1024.0 / 1024.0) / (@as(f64, @floatFromInt(download_time)) / 1000.0);
+            std.debug.print("📊 Download speed: {d:.1} MB/s\n", .{speed_mbps});
+        }
+    } else {
+        std.debug.print("💾 Using cached package: {s}\n", .{cache_path});
+    }
+
+    // Calculate SHA256 hash of the downloaded file
+    const hash = try calculateFileHash(allocator, cache_path);
+    errdefer allocator.free(hash);
+
+    const url_copy = try allocator.dupe(u8, url);
+    errdefer allocator.free(url_copy);
+
+    return DownloadResult{
+        .url = url_copy,
+        .hash = hash,
+        .cache_path = cache_path,
+    };
+}
+
+test "cache path identity uses resolved url" {
+    const allocator = std.testing.allocator;
+
+    const a = try cachePathForUrl(allocator, "libxev", "https://github.com/mitchellh/libxev/archive/refs/tags/v0.1.0.tar.gz");
+    defer allocator.free(a);
+    const b = try cachePathForUrl(allocator, "libxev", "https://github.com/mitchellh/libxev/archive/refs/tags/v0.2.0.tar.gz");
+    defer allocator.free(b);
+    const c = try cachePathForUrl(allocator, "libxev", "https://github.com/mitchellh/libxev/archive/refs/tags/v0.1.0.tar.gz");
+    defer allocator.free(c);
+
+    try std.testing.expect(!std.mem.eql(u8, a, b));
+    try std.testing.expect(std.mem.eql(u8, a, c));
 }

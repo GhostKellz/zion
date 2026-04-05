@@ -5,6 +5,47 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-04 - "Zion-Native Core"
+
+### Added
+- **`zion why` Command** - Explain why a package is in your dependency tree with full chain tracing
+- **Policy Engine** - `zion policy init/audit/show` for package trust management
+  - allow/deny patterns with wildcard support
+  - `require_hash` enforcement option
+  - JSON output for CI/CD: `zion policy audit --json`
+- **Target Management** - `zion target add/remove/list` for cross-compilation
+  - common targets for Linux, macOS, Windows, and WebAssembly
+  - stored in `.zion/targets.json`
+- **Zion-Native Test Workflow** - `zion test` now owns the higher-level testing workflow surface
+  - scaffolded suite at `tests/zion_test_suite.zig`
+  - workflow artifacts under `.zion/test/`
+  - structured JSON reports and failed-test persistence
+
+### Security
+- **Tarball Extraction Hardening** - package extraction now validates archive entries before unpacking
+  - blocks path traversal patterns
+  - rejects unsafe entry types such as links and device files
+- **Registry And Signature Tightening** - insecure remote registry URLs are rejected and signature trust handling is stricter
+- **Download Integrity Verification** - artifact downloads now align more cleanly with expected hash and resolved source metadata
+
+### Changed
+- **Correctness First** - fixed artifact identity, cache identity, manifest serialization, and download flow consistency
+- **Registry Security** - remote insecure HTTP registries are rejected and token handling is safer
+- **Runtime Simplification** - removed `zsync` from the shipped runtime path and collapsed to a sync-first Zion-owned runtime boundary
+- **Dependency Ownership** - removed shipped dependency usage of `zdoc`, `zontom`, `phantom`, `zsync`, and `ghostspec`
+- **Testing Surface Migration** - retired the public GhostSpec-era testing surface in favor of Zion-native `zion test`
+- **Documentation Reorganization** - moved maintained docs into grouped sections under `docs/` and retired stale generated API docs
+- **Command Surface Honesty** - help/docs/aliases updated to better match shipped behavior in v1.1.0
+
+### Fixed
+- cache collisions across add/fetch/update flows
+- unsafe `build.zig.zon` serialization and quoted dependency key handling
+- registry URL validation and local insecure handling
+- command wiring mismatches for interactive/testing-related surfaces
+- legacy runtime split behavior that depended on removed async infrastructure
+
+---
+
 ## [1.0.8] - 2026-03-30 - "Cycle Detection & Branch Tracking"
 
 ### Added

@@ -4,6 +4,24 @@ const registry_manager = @import("../registry_manager.zig");
 const package_registry = @import("../package_registry.zig");
 const zion_root = @import("../root.zig");
 
+/// Redact a token for safe display (shows first 4 and last 4 characters)
+/// Returns a static buffer, not allocated - use immediately
+fn redactToken(token: []const u8) []const u8 {
+    if (token.len <= 8) {
+        return "****";
+    }
+    // Use static buffer for simplicity - this is just for display
+    const Static = struct {
+        var buffer: [64]u8 = undefined;
+    };
+    const display_len = @min(token.len, 20); // Cap for sanity
+    const prefix = token[0..4];
+    const suffix = token[token.len - 4 ..];
+    const result = std.fmt.bufPrint(&Static.buffer, "{s}****{s}", .{ prefix, suffix }) catch "****";
+    _ = display_len;
+    return result;
+}
+
 /// Enhanced registry command with comprehensive registry management
 pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
@@ -17,11 +35,20 @@ pub fn registryCommand(allocator: std.mem.Allocator, args: []const [:0]const u8)
         try listRegistries(allocator);
     } else if (std.mem.eql(u8, subcommand, "add")) {
         if (args.len < 4) {
-            std.debug.print("❌ Usage: zion registry add <url> [name]\n", .{});
+            std.debug.print("❌ Usage: zion registry add <url> [name] [--allow-insecure]\n", .{});
             return;
         }
-        const name = if (args.len >= 5) args[4] else null;
-        try addRegistry(allocator, args[3], name);
+        // Check for --allow-insecure flag
+        var allow_insecure = false;
+        var name: ?[:0]const u8 = null;
+        for (args[4..]) |arg| {
+            if (std.mem.eql(u8, arg, "--allow-insecure")) {
+                allow_insecure = true;
+            } else if (name == null) {
+                name = arg;
+            }
+        }
+        try addRegistry(allocator, args[3], name, allow_insecure);
     } else if (std.mem.eql(u8, subcommand, "remove")) {
         if (args.len < 4) {
             std.debug.print("❌ Usage: zion registry remove <name|url>\n", .{});
@@ -79,7 +106,7 @@ fn showRegistryHelp() !void {
         \\  mirror <subcommand>            Registry mirroring commands
         \\
         \\AUTH COMMANDS:
-        \\  auth set <registry> <token>    Set authentication token
+        \\  auth set <registry> [--stdin]  Set authentication token from env or stdin
         \\  auth remove <registry>         Remove authentication
         \\  auth test <registry>           Test authentication
         \\  auth list                      List configured auth
@@ -100,7 +127,8 @@ fn showRegistryHelp() !void {
         \\EXAMPLES:
         \\  zion registry list
         \\  zion registry add https://packages.company.com corporate
-        \\  zion registry auth set corporate ghp_abc123...
+        \\  export ZION_REGISTRY_AUTH_TOKEN="ghp_abc123..."
+        \\  zion registry auth set corporate
         \\  zion registry test corporate
         \\  zion registry priority corporate 0
         \\
@@ -172,12 +200,28 @@ fn listRegistries(allocator: std.mem.Allocator) !void {
 }
 
 /// Add a new registry
-fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[]const u8) !void {
+fn addRegistry(allocator: std.mem.Allocator, url: []const u8, name: ?[:0]const u8, allow_insecure: bool) !void {
     std.debug.print("➕ Adding registry: {s}\n", .{url});
 
-    // Validate URL format
-    if (!std.mem.startsWith(u8, url, "http://") and !std.mem.startsWith(u8, url, "https://")) {
-        std.debug.print("❌ Invalid URL format. Must start with http:// or https://\n", .{});
+    enhanced_config.validateRegistryUrl(url) catch |err| switch (err) {
+        error.InsecureRegistryUrl => {
+            std.debug.print("❌ Remote HTTP registries are not allowed. Use HTTPS instead.\n", .{});
+            return;
+        },
+        error.InvalidRegistryUrl => {
+            std.debug.print("❌ Invalid URL format. Must start with https:// or local http://localhost\n", .{});
+            return;
+        },
+    };
+
+    if (std.mem.startsWith(u8, url, "http://") and enhanced_config.isLocalRegistryUrl(url)) {
+        if (!allow_insecure) {
+            std.debug.print("❌ Local HTTP registries require --allow-insecure for explicit opt-in.\n", .{});
+            std.debug.print("   zion registry add {s} --allow-insecure\n", .{url});
+            return;
+        }
+        std.debug.print("⚠️  Allowing local HTTP registry for development use only.\n\n", .{});
+    } else if (!std.mem.startsWith(u8, url, "https://")) {
         return;
     }
 
@@ -429,11 +473,19 @@ fn handleAuthCommand(allocator: std.mem.Allocator, args: []const []const u8) !vo
     if (std.mem.eql(u8, auth_cmd, "list")) {
         try listAuthTokens(allocator);
     } else if (std.mem.eql(u8, auth_cmd, "set")) {
-        if (args.len < 3) {
-            std.debug.print("❌ Usage: zion registry auth set <registry> <token>\n", .{});
+        if (args.len < 2) {
+            std.debug.print("❌ Usage: zion registry auth set <registry> [--stdin]\n", .{});
             return;
         }
-        try setAuthToken(allocator, args[1], args[2]);
+        if (args.len >= 3 and !std.mem.eql(u8, args[2], "--stdin")) {
+            std.debug.print("⚠️  Passing tokens on the command line is discouraged and may expose secrets in shell history.\n", .{});
+            try setAuthToken(allocator, args[1], args[2]);
+            return;
+        }
+
+        const token = try readAuthToken(allocator, args[1], args.len >= 3 and std.mem.eql(u8, args[2], "--stdin"));
+        defer allocator.free(token);
+        try setAuthToken(allocator, args[1], token);
     } else if (std.mem.eql(u8, auth_cmd, "remove")) {
         if (args.len < 2) {
             std.debug.print("❌ Usage: zion registry auth remove <registry>\n", .{});
@@ -458,17 +510,44 @@ fn showAuthHelp() !void {
         \\
         \\COMMANDS:
         \\  auth list                      List configured authentication
-        \\  auth set <registry> <token>    Set authentication token
+        \\  auth set <registry> [--stdin]  Set token from env or stdin
         \\  auth remove <registry>         Remove authentication
         \\  auth test <registry>           Test authentication
         \\
         \\EXAMPLES:
-        \\  zion registry auth set github ghp_abc123...
-        \\  zion registry auth set corporate pat_xyz789...
+        \\  export ZION_REGISTRY_AUTH_TOKEN="ghp_abc123..."
+        \\  zion registry auth set github
+        \\  printf 'pat_xyz789...' | zion registry auth set corporate --stdin
         \\  zion registry auth test github
         \\  zion registry auth remove corporate
         \\
     , .{});
+}
+
+fn readAuthToken(allocator: std.mem.Allocator, registry_name: []const u8, from_stdin: bool) ![]u8 {
+    if (!from_stdin) {
+        if (zion_root.getEnv("ZION_REGISTRY_AUTH_TOKEN")) |token| {
+            return allocator.dupe(u8, std.mem.trim(u8, token, " \t\r\n"));
+        }
+        if (std.mem.eql(u8, registry_name, "github")) {
+            if (zion_root.getEnv("ZION_GITHUB_TOKEN")) |token| {
+                return allocator.dupe(u8, std.mem.trim(u8, token, " \t\r\n"));
+            }
+            if (zion_root.getEnv("GITHUB_TOKEN")) |token| {
+                return allocator.dupe(u8, std.mem.trim(u8, token, " \t\r\n"));
+            }
+        }
+        std.debug.print("❌ No token supplied. Set ZION_REGISTRY_AUTH_TOKEN or use --stdin.\n", .{});
+        return error.MissingAuthToken;
+    }
+
+    const io = try zion_root.getIo();
+    const stdin_file = std.Io.File.stdin();
+    var buf: [4096]u8 = undefined;
+    const bytes_read = try stdin_file.readStreaming(io, &.{buf[0..]});
+    const trimmed = std.mem.trim(u8, buf[0..bytes_read], " \t\r\n");
+    if (trimmed.len == 0) return error.MissingAuthToken;
+    return allocator.dupe(u8, trimmed);
 }
 
 /// Helper functions (simplified implementations)
@@ -581,7 +660,7 @@ fn listAuthTokens(allocator: std.mem.Allocator) !void {
 
     if (auth_count == 0) {
         std.debug.print("\n💡 To add authentication:\n", .{});
-        std.debug.print("   zion registry auth set <registry> <token>\n", .{});
+        std.debug.print("   export ZION_REGISTRY_AUTH_TOKEN=\"<token>\" && zion registry auth set <registry>\n", .{});
     }
 }
 
@@ -590,18 +669,20 @@ fn setAuthToken(allocator: std.mem.Allocator, registry_name: []const u8, token: 
 
     std.debug.print("🔐 Setting authentication for {s}...\n", .{registry_name});
 
-    // In a real implementation, this would store the token securely
-    std.debug.print("📝 To set this token permanently:\n\n", .{});
+    // Never echo full token to prevent exposure in terminal history/logs
+    const redacted = redactToken(token);
+    std.debug.print("📝 Token received: {s}\n\n", .{redacted});
+    std.debug.print("📝 To set this token permanently, add to your shell profile:\n\n", .{});
 
     if (std.mem.eql(u8, registry_name, "github")) {
-        std.debug.print("   export ZION_GITHUB_TOKEN=\"{s}\"\n", .{token});
+        std.debug.print("   export ZION_GITHUB_TOKEN=\"<your-token>\"\n", .{});
         std.debug.print("   # or\n", .{});
-        std.debug.print("   export GITHUB_TOKEN=\"{s}\"\n", .{token});
+        std.debug.print("   export GITHUB_TOKEN=\"<your-token>\"\n", .{});
     } else {
-        std.debug.print("   export ZION_REGISTRY_TOKEN_{s}=\"{s}\"\n", .{ registry_name, token });
+        std.debug.print("   export ZION_REGISTRY_TOKEN_{s}=\"<your-token>\"\n", .{registry_name});
     }
 
-    std.debug.print("\n   # Add to your shell profile for persistence\n", .{});
+    std.debug.print("\n   # Replace <your-token> with the token you provided\n", .{});
     std.debug.print("✅ Token configuration complete\n", .{});
 }
 

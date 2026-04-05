@@ -1,5 +1,4 @@
 const std = @import("std");
-const zsync = @import("zsync");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
@@ -9,9 +8,8 @@ const Dir = std.Io.Dir;
 const Io = std.Io;
 
 /// Display comprehensive project status
-pub fn status(allocator: Allocator, io: zsync.Io, args: []const [:0]const u8) !void {
+pub fn status(allocator: Allocator, args: []const [:0]const u8) !void {
     _ = args; // Reserved for future options
-    _ = io;
 
     std.debug.print("🚦 **Zion Project Status**\n", .{});
     std.debug.print("=====================================\n\n", .{});
@@ -97,7 +95,7 @@ pub fn statusMinimal(allocator: Allocator) !void {
     };
     defer allocator.free(zon_content);
 
-    var zon_file = ZonFile.parseFromString(allocator, zon_content) catch {
+    var zon_file = ZonFile.parseZonContent(allocator, zon_content) catch {
         std.debug.print("parse_error\n", .{});
         return;
     };

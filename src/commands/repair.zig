@@ -8,6 +8,7 @@ const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const zion_root = @import("../root.zig");
+const tar_extract = @import("../tar_extract.zig");
 
 /// Repair broken hashes and dependency issues in the project
 pub fn repair(allocator: Allocator) !void {
@@ -156,7 +157,7 @@ pub fn repair(allocator: Allocator) !void {
                 defer allocator.free(deps_path);
 
                 std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
-                if (extractTarball(allocator, cache_path, deps_path)) {
+                if (tar_extract.extractPackage(allocator, cache_path, deps_path)) {
                     std.debug.print("  ✅ Extracted successfully\n", .{});
                 } else |err| {
                     std.debug.print("  ⚠️  Extraction warning: {}\n", .{err});

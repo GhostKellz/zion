@@ -34,28 +34,20 @@ pub fn fetch(allocator: mem.Allocator, args: []const [:0]const u8) !void {
 fn fetchSpecificVersion(allocator: mem.Allocator, package_ref: []const u8, version: []const u8) !void {
     std.debug.print("📦 Fetching {s}@{s}...\n", .{ package_ref, version });
 
+    const slash_index = std.mem.lastIndexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
+    const package_name = package_ref[slash_index + 1 ..];
+
     // Find the specific version
     var version_info = try github.findVersion(allocator, package_ref, version);
     defer version_info.deinit(allocator);
 
     std.debug.print("✅ Found version {s}: {s}\n", .{ version_info.version, version_info.url });
 
-    // Extract package name from reference
-    const slash_index = std.mem.lastIndexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
-    const package_name = package_ref[slash_index + 1 ..];
+    const download_result = try downloader.downloadAndHashPackageVersion(allocator, package_ref, version);
+    defer download_result.deinit(allocator);
 
-    // Download and hash
-    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-{s}.tar.gz", .{ package_name, version_info.version });
-    defer allocator.free(cache_path);
-
-    try downloader.ensureCacheDir(allocator);
-    try downloader.downloadWithCurlImproved(allocator, version_info.url, cache_path);
-
-    const hash = try downloader.calculateFileHash(allocator, cache_path);
-    defer allocator.free(hash);
-
-    std.debug.print("🔐 Hash: {s}\n", .{hash[0..16]});
-    std.debug.print("📁 Cached at: {s}\n", .{cache_path});
+    std.debug.print("🔐 Hash: {s}\n", .{download_result.hash[0..16]});
+    std.debug.print("📁 Cached at: {s}\n", .{download_result.cache_path});
 
     std.debug.print("💡 To add to your project:\n", .{});
     std.debug.print("   zion add {s}  # (adds latest)\n", .{package_ref});
@@ -73,22 +65,11 @@ fn fetchLatestVersion(allocator: mem.Allocator, package_ref: []const u8) !void {
     std.debug.print("✅ Latest version: {s}\n", .{latest_version.version});
     std.debug.print("   URL: {s}\n", .{latest_version.url});
 
-    // Extract package name from reference
-    const slash_index = std.mem.lastIndexOf(u8, package_ref, "/") orelse return error.InvalidPackageReference;
-    const package_name = package_ref[slash_index + 1 ..];
+    const download_result = try downloader.downloadAndHashPackage(allocator, package_ref);
+    defer download_result.deinit(allocator);
 
-    // Download and hash
-    const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}-latest.tar.gz", .{package_name});
-    defer allocator.free(cache_path);
-
-    try downloader.ensureCacheDir(allocator);
-    try downloader.downloadWithCurlImproved(allocator, latest_version.url, cache_path);
-
-    const hash = try downloader.calculateFileHash(allocator, cache_path);
-    defer allocator.free(hash);
-
-    std.debug.print("🔐 Hash: {s}\n", .{hash[0..16]});
-    std.debug.print("📁 Cached at: {s}\n", .{cache_path});
+    std.debug.print("🔐 Hash: {s}\n", .{download_result.hash[0..16]});
+    std.debug.print("📁 Cached at: {s}\n", .{download_result.cache_path});
 
     std.debug.print("💡 To add to your project:\n", .{});
     std.debug.print("   zion add {s}  # (adds to dependencies)\n", .{package_ref});
@@ -132,15 +113,12 @@ fn fetchAll(allocator: mem.Allocator) !void {
         const url = entry.value_ptr.url;
         const hash = entry.value_ptr.hash;
 
-        // Check cache path
-        const cache_path = try std.fmt.allocPrint(allocator, ".zion/cache/{s}.tar.gz", .{pkg_name});
+        const cache_path = try downloader.cachePathForUrl(allocator, pkg_name, url);
         defer allocator.free(cache_path);
 
         const cached_file_exists = blk: {
             cwd.access(io, cache_path, .{}) catch |err| {
-                if (err == error.FileNotFound) {
-                    break :blk false;
-                }
+                if (err == error.FileNotFound) break :blk false;
                 return err;
             };
             break :blk true;
@@ -158,7 +136,8 @@ fn fetchAll(allocator: mem.Allocator) !void {
                 } else {
                     // Not cached, need to download
                     std.debug.print("  - {s}: Downloading using locked info\n", .{pkg_name});
-                    try downloadPackage(allocator, pkg.url, cache_path);
+                    const download_result = try downloader.downloadFromUrl(allocator, pkg.url, pkg_name);
+                    defer download_result.deinit(allocator);
                     downloaded_count += 1;
                 }
             } else {
@@ -167,7 +146,8 @@ fn fetchAll(allocator: mem.Allocator) !void {
 
                 if (!cached_file_exists) {
                     // Need to download before verifying
-                    try downloadPackage(allocator, url, cache_path);
+                    const download_result = try downloader.downloadFromUrl(allocator, url, pkg_name);
+                    defer download_result.deinit(allocator);
                     downloaded_count += 1;
                 }
 
@@ -190,7 +170,8 @@ fn fetchAll(allocator: mem.Allocator) !void {
 
             if (!cached_file_exists) {
                 // Download it first
-                try downloadPackage(allocator, url, cache_path);
+                const download_result = try downloader.downloadFromUrl(allocator, url, pkg_name);
+                defer download_result.deinit(allocator);
                 downloaded_count += 1;
             }
 

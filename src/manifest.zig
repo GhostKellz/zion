@@ -5,6 +5,158 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
 
+/// Escapes a string for safe use in ZON string literals
+/// Handles: backslash, double quote, newline, carriage return, tab, and control chars
+fn escapeZonString(allocator: Allocator, input: []const u8) ![]u8 {
+    // Calculate required size
+    var required_size: usize = 0;
+    for (input) |c| {
+        required_size += switch (c) {
+            '\\', '"' => 2,
+            '\n', '\r', '\t' => 2,
+            else => if (c < 0x20) 4 else 1, // \xNN for control chars
+        };
+    }
+
+    // If no escaping needed, just dupe
+    if (required_size == input.len) {
+        return try allocator.dupe(u8, input);
+    }
+
+    var result = try allocator.alloc(u8, required_size);
+    var i: usize = 0;
+    for (input) |c| {
+        switch (c) {
+            '\\' => {
+                result[i] = '\\';
+                result[i + 1] = '\\';
+                i += 2;
+            },
+            '"' => {
+                result[i] = '\\';
+                result[i + 1] = '"';
+                i += 2;
+            },
+            '\n' => {
+                result[i] = '\\';
+                result[i + 1] = 'n';
+                i += 2;
+            },
+            '\r' => {
+                result[i] = '\\';
+                result[i + 1] = 'r';
+                i += 2;
+            },
+            '\t' => {
+                result[i] = '\\';
+                result[i + 1] = 't';
+                i += 2;
+            },
+            else => {
+                if (c < 0x20) {
+                    // Escape control characters as \xNN
+                    const hex = "0123456789abcdef";
+                    result[i] = '\\';
+                    result[i + 1] = 'x';
+                    result[i + 2] = hex[c >> 4];
+                    result[i + 3] = hex[c & 0xf];
+                    i += 4;
+                } else {
+                    result[i] = c;
+                    i += 1;
+                }
+            },
+        }
+    }
+    return result;
+}
+
+fn unescapeZonString(allocator: Allocator, input: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    defer result.deinit(allocator);
+
+    var i: usize = 0;
+    while (i < input.len) : (i += 1) {
+        const c = input[i];
+        if (c != '\\') {
+            try result.append(allocator, c);
+            continue;
+        }
+
+        i += 1;
+        if (i >= input.len) return error.InvalidEscapeSequence;
+
+        switch (input[i]) {
+            '\\' => try result.append(allocator, '\\'),
+            '"' => try result.append(allocator, '"'),
+            'n' => try result.append(allocator, '\n'),
+            'r' => try result.append(allocator, '\r'),
+            't' => try result.append(allocator, '\t'),
+            'x' => {
+                if (i + 2 >= input.len) return error.InvalidEscapeSequence;
+                const hi = std.fmt.charToDigit(input[i + 1], 16) catch return error.InvalidEscapeSequence;
+                const lo = std.fmt.charToDigit(input[i + 2], 16) catch return error.InvalidEscapeSequence;
+                try result.append(allocator, @as(u8, @intCast((hi << 4) | lo)));
+                i += 2;
+            },
+            else => return error.InvalidEscapeSequence,
+        }
+    }
+
+    return result.toOwnedSlice(allocator);
+}
+
+fn isValidBareIdentifier(name: []const u8) bool {
+    if (name.len == 0) return false;
+    const first = name[0];
+    if (!std.ascii.isAlphabetic(first) and first != '_') return false;
+
+    for (name[1..]) |c| {
+        if (!std.ascii.isAlphanumeric(c) and c != '_') return false;
+    }
+
+    return true;
+}
+
+fn formatDependencyKey(allocator: Allocator, name: []const u8) ![]u8 {
+    if (isValidBareIdentifier(name)) {
+        return std.fmt.allocPrint(allocator, ".{s}", .{name});
+    }
+
+    const escaped = try escapeZonString(allocator, name);
+    defer allocator.free(escaped);
+    return std.fmt.allocPrint(allocator, ".@\"{s}\"", .{escaped});
+}
+
+fn formatProjectNameValue(allocator: Allocator, name: []const u8) ![]u8 {
+    if (isValidBareIdentifier(name)) {
+        return std.fmt.allocPrint(allocator, ".{s}", .{name});
+    }
+
+    const escaped = try escapeZonString(allocator, name);
+    defer allocator.free(escaped);
+    return std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped});
+}
+
+fn parseQuotedZonValueRange(content: []const u8, value_start: usize) ?struct { start: usize, end: usize } {
+    var i = value_start;
+    while (i < content.len) : (i += 1) {
+        if (content[i] != '"') continue;
+
+        var backslashes: usize = 0;
+        var j = i;
+        while (j > value_start and content[j - 1] == '\\') : (j -= 1) {
+            backslashes += 1;
+        }
+
+        if (backslashes % 2 == 0) {
+            return .{ .start = value_start, .end = i };
+        }
+    }
+
+    return null;
+}
+
 /// Represents a dependency in the build.zig.zon file
 pub const Dependency = struct {
     url: []const u8,
@@ -138,19 +290,20 @@ pub const ZonFile = struct {
 
         if (findDependenciesBlockRange(content)) |dep_block| {
             const closing_line_start = findLineStart(content, dep_block.body_end);
+            const dependency_suffix_start = if (closing_line_start < dep_block.body_start) dep_block.body_end else closing_line_start;
             zon_file.dependencies_prefix = try allocator.dupe(u8, content[0..dep_block.body_start]);
-            zon_file.dependencies_suffix = try allocator.dupe(u8, content[closing_line_start..]);
+            zon_file.dependencies_suffix = try allocator.dupe(u8, content[dependency_suffix_start..]);
 
-            var parsed_ranges = try parseDependenciesWithRanges(allocator, content, &zon_file, dep_block.body_start, closing_line_start);
+            var parsed_ranges = try parseDependenciesWithRanges(allocator, content, &zon_file, dep_block.body_start, dependency_suffix_start);
             defer parsed_ranges.deinit(allocator);
 
             if (parsed_ranges.items.len > 0) {
                 const first = parsed_ranges.items[0];
                 const last = parsed_ranges.items[parsed_ranges.items.len - 1];
                 zon_file.dependencies_body_leading = try allocator.dupe(u8, content[dep_block.body_start..first.start]);
-                zon_file.dependencies_body_trailing = try allocator.dupe(u8, content[last.end..closing_line_start]);
+                zon_file.dependencies_body_trailing = try allocator.dupe(u8, content[last.end..dependency_suffix_start]);
             } else {
-                zon_file.dependencies_body_leading = try allocator.dupe(u8, content[dep_block.body_start..closing_line_start]);
+                zon_file.dependencies_body_leading = try allocator.dupe(u8, content[dep_block.body_start..dependency_suffix_start]);
                 zon_file.dependencies_body_trailing = try allocator.dupe(u8, "");
             }
         } else {
@@ -202,6 +355,19 @@ pub const ZonFile = struct {
                 return content[value_start..end_pos];
             }
         }
+        return null;
+    }
+
+    fn parseOwnedZonField(allocator: Allocator, content: []const u8, field_name: []const u8) ?[]const u8 {
+        var pattern_buf: [64]u8 = undefined;
+        const search_pattern = std.fmt.bufPrint(&pattern_buf, "{s} = \"", .{field_name}) catch return null;
+
+        if (std.mem.indexOf(u8, content, search_pattern)) |start_pos| {
+            const value_start = start_pos + search_pattern.len;
+            const range = parseQuotedZonValueRange(content, value_start) orelse return null;
+            return unescapeZonString(allocator, content[range.start..range.end]) catch return null;
+        }
+
         return null;
     }
 
@@ -319,16 +485,29 @@ pub const ZonFile = struct {
         // Look for pattern: .name = .{ .url = "...", .hash = "...", }
         if (!std.mem.startsWith(u8, content, ".")) return null;
 
-        // Extract dependency name
-        var name_end: usize = 1;
-        while (name_end < content.len) {
-            const c = content[name_end];
-            if (!std.ascii.isAlphanumeric(c) and c != '_') break;
-            name_end += 1;
-        }
+        var name_end: usize = 0;
+        const dep_name = blk: {
+            if (content.len > 3 and content[1] == '@' and content[2] == '"') {
+                var quoted_end: usize = 3;
+                while (quoted_end < content.len and content[quoted_end] != '"') {
+                    quoted_end += 1;
+                }
+                if (quoted_end >= content.len) return null;
+                name_end = quoted_end + 1;
+                break :blk unescapeZonString(allocator, content[3..quoted_end]) catch return null;
+            }
 
-        if (name_end <= 1) return null;
-        const dep_name = content[1..name_end];
+            var bare_end: usize = 1;
+            while (bare_end < content.len) {
+                const c = content[bare_end];
+                if (!std.ascii.isAlphanumeric(c) and c != '_') break;
+                bare_end += 1;
+            }
+            if (bare_end <= 1) return null;
+            name_end = bare_end;
+            break :blk allocator.dupe(u8, content[1..bare_end]) catch return null;
+        };
+        errdefer allocator.free(dep_name);
 
         // Look for the dependency block
         const block_start = std.mem.indexOf(u8, content[name_end..], ".{") orelse return null;
@@ -348,13 +527,15 @@ pub const ZonFile = struct {
         const block_content = content[block_content_start .. block_end - 1];
 
         // Extract URL and hash
-        const url = parseZonField(block_content, ".url") orelse return null;
-        const hash = parseZonField(block_content, ".hash") orelse return null;
+        const url = parseOwnedZonField(allocator, block_content, ".url") orelse return null;
+        errdefer allocator.free(url);
+        const hash = parseOwnedZonField(allocator, block_content, ".hash") orelse return null;
+        errdefer allocator.free(hash);
 
         return .{
-            .name = allocator.dupe(u8, dep_name) catch return null,
-            .url = allocator.dupe(u8, url) catch return null,
-            .hash = allocator.dupe(u8, hash) catch return null,
+            .name = dep_name,
+            .url = url,
+            .hash = hash,
             .bytes_consumed = block_end,
         };
     }
@@ -392,11 +573,15 @@ pub const ZonFile = struct {
             // Fallback when we do not have source template context.
             try file.writeStreamingAll(io, ".{\n");
 
-            const name_line = try std.fmt.allocPrint(self.allocator, "    .name = .{s},\n", .{self.name});
+            const formatted_name = try formatProjectNameValue(self.allocator, self.name);
+            defer self.allocator.free(formatted_name);
+            const name_line = try std.fmt.allocPrint(self.allocator, "    .name = {s},\n", .{formatted_name});
             defer self.allocator.free(name_line);
             try file.writeStreamingAll(io, name_line);
 
-            const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{self.version});
+            const escaped_version = try escapeZonString(self.allocator, self.version);
+            defer self.allocator.free(escaped_version);
+            const version_line = try std.fmt.allocPrint(self.allocator, "    .version = \"{s}\",\n", .{escaped_version});
             defer self.allocator.free(version_line);
             try file.writeStreamingAll(io, version_line);
 
@@ -407,15 +592,21 @@ pub const ZonFile = struct {
         while (it.next()) |entry| {
             const name = entry.key_ptr.*;
             const dep = entry.value_ptr.*;
-            const dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
+            const formatted_key = try formatDependencyKey(self.allocator, name);
+            defer self.allocator.free(formatted_key);
+            const dep_name_line = try std.fmt.allocPrint(self.allocator, "        {s} = .{{\n", .{formatted_key});
             defer self.allocator.free(dep_name_line);
             try file.writeStreamingAll(io, dep_name_line);
 
-            const dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
+            const escaped_url = try escapeZonString(self.allocator, dep.url);
+            defer self.allocator.free(escaped_url);
+            const dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{escaped_url});
             defer self.allocator.free(dep_url_line);
             try file.writeStreamingAll(io, dep_url_line);
 
-            const dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
+            const escaped_hash = try escapeZonString(self.allocator, dep.hash);
+            defer self.allocator.free(escaped_hash);
+            const dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{escaped_hash});
             defer self.allocator.free(dep_hash_line);
             try file.writeStreamingAll(io, dep_hash_line);
 
@@ -442,15 +633,21 @@ pub const ZonFile = struct {
                 const name = entry.key_ptr.*;
                 const dep = entry.value_ptr.*;
 
-                const dev_dep_name_line = try std.fmt.allocPrint(self.allocator, "        .{s} = .{{\n", .{name});
+                const formatted_key = try formatDependencyKey(self.allocator, name);
+                defer self.allocator.free(formatted_key);
+                const dev_dep_name_line = try std.fmt.allocPrint(self.allocator, "        {s} = .{{\n", .{formatted_key});
                 defer self.allocator.free(dev_dep_name_line);
                 try file.writeStreamingAll(io, dev_dep_name_line);
 
-                const dev_dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{dep.url});
+                const escaped_dev_url = try escapeZonString(self.allocator, dep.url);
+                defer self.allocator.free(escaped_dev_url);
+                const dev_dep_url_line = try std.fmt.allocPrint(self.allocator, "            .url = \"{s}\",\n", .{escaped_dev_url});
                 defer self.allocator.free(dev_dep_url_line);
                 try file.writeStreamingAll(io, dev_dep_url_line);
 
-                const dev_dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{dep.hash});
+                const escaped_dev_hash = try escapeZonString(self.allocator, dep.hash);
+                defer self.allocator.free(escaped_dev_hash);
+                const dev_dep_hash_line = try std.fmt.allocPrint(self.allocator, "            .hash = \"{s}\",\n", .{escaped_dev_hash});
                 defer self.allocator.free(dev_dep_hash_line);
                 try file.writeStreamingAll(io, dev_dep_hash_line);
 
@@ -513,3 +710,15 @@ pub const ZonFile = struct {
         try self.comments.put(name_copy, comment_copy);
     }
 };
+
+test "dependency key rendering supports non-identifiers" {
+    const allocator = std.testing.allocator;
+
+    const bare = try formatDependencyKey(allocator, "libxev");
+    defer allocator.free(bare);
+    try std.testing.expectEqualStrings(".libxev", bare);
+
+    const escaped = try formatDependencyKey(allocator, "zig-clap");
+    defer allocator.free(escaped);
+    try std.testing.expectEqualStrings(".@\"zig-clap\"", escaped);
+}

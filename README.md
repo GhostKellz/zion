@@ -69,15 +69,12 @@ zion zls install                     # Installation guidance
 ```
 
 ### 🎯 Environment Setup
-- **Complete setup** - Full development environment in one command
-- **Modular** - Install only what you need
-- **Interactive wizard** - Guided configuration with smart defaults
-- **Shell integration** - PATH, completions, profiles automatically configured
+- **Lightweight onboarding** - Verify the core tools you need are installed
+- **Follow-up guidance** - Pairs with `zion zig` and `zion zls` flows
 - **Verification** - `zion setup verify` confirms everything works
 
 ```bash
-zion setup all                       # Complete environment
-zion setup zig                       # Just Zig management
+zion setup all                       # Show setup guidance
 zion setup verify                    # Check everything works
 ```
 
@@ -95,27 +92,59 @@ zion workspace build                 # Build all packages
 
 ### 📦 Package Management
 - **Multi-registry support** - GitHub, Zigistry, Zeppelin registries
+- **GitHub shorthand** - `zion add gh/owner/repo@v1.0.0` syntax
 - **Cryptographic security** - Ed25519 package signing and verification
 - **Smart caching** - TTL-based cache for faster repeated fetches
 - **Parallel downloads** - Connection pooling and batch processing
 - **Dependency tree** - Visualize and detect circular dependencies
+- **Dependency analysis** - `zion why <pkg>` explains dependency chains
+- **Provenance tracking** - Full audit trail in lockfile (origin, hash, timestamp)
 
 ### 🏗️ Arch Linux Integration
 - **Arch-aware** - Detects and works with `pacman`-installed Zig/ZLS
 - **System PATH integration** - Honors filesystem hierarchy
 - **AUR-ready** - PKGBUILD included for packaging
 
-### 🛡️ Security
+### 🛡️ Security & Policy
 - **Package signing** - Ed25519 cryptographic signatures
 - **Hash verification** - Integrity checking on all downloads
 - **Trust store** - Manage trusted signers with `zion security trust`
 - **Key generation** - Built-in key pair generation
+- **Policy engine** - Allow/deny lists, hash requirements (`zion policy`)
+- **Audit support** - `zion policy audit --json` for CI/CD integration
+
+### 🎯 Cross-Compilation
+- **Target management** - Configure build targets with `zion target add`
+- **Common targets** - Linux, macOS, Windows, WebAssembly presets
+- **Platform detection** - Automatic architecture and OS detection
+- **Build integration** - `zig build -Dtarget=<triple>`
+
+```bash
+zion target add wasm32-wasi
+zion target add aarch64-linux-gnu
+zion target list
+```
 
 ### 🚀 Developer Experience
 - **Fast** - Optimized for quick command execution
 - **Helpful errors** - "Did you mean?" suggestions with Levenshtein matching
 - **Intelligent defaults** - Minimal configuration required
 - **Diagnostics** - Detailed troubleshooting with `zion debug` and `zion check`
+
+### 🧪 Testing Workflows
+- **Zion-native workflow surface** - `zion test` now handles both direct test execution and higher-level workflow helpers
+- **Starter suite generation** - Create a Zion-native suite under `tests/zion_test_suite.zig`
+- **Reproducible controls** - Seeded runs, configurable case counts, and workflow time budgets
+- **Focused execution** - Include/exclude filters, failed-only reruns, and CI profiles
+- **Report output** - Write structured per-test JSON summaries under `.zion/test/reports/`
+
+```bash
+zion test bootstrap                  # Scaffold compatibility workflow
+zion test run --seed 123 --cases 32 --include property
+zion test bench --cases 50 --time-budget 250
+zion test ci --ci-profile hardened
+zion test report --open --include fuzz
+```
 
 ## Installation
 
@@ -161,7 +190,7 @@ Zion automatically:
 4. Calculates and stores SHA256 hash for integrity
 5. Updates your `build.zig.zon` manifest
 6. Creates/updates the `zion.lock` file
-7. **Automatically modifies `build.zig`** to include the dependency
+7. Prints build integration guidance when automatic wiring is unavailable
 
 After running this command, you can immediately use the library:
 ```zig
@@ -171,17 +200,25 @@ const libxev = @import("libxev");
 ### Advanced features
 
 ```bash
+# GitHub shorthand syntax
+zion add gh/mitchellh/libxev@v0.2.0
+
+# Dependency analysis
+zion why libxev                   # Why is this package in my tree?
+
+# Policy management
+zion policy init                  # Create policy file
+zion policy audit --json          # Check compliance (CI-friendly)
+
+# Cross-compilation targets
+zion target add wasm32-wasi
+zion target add aarch64-linux-gnu
+
 # Security: Generate signing keys
 zion security keygen
 
-# Security: Sign a package
-zion security sign mypackage.tar.gz
-
 # Performance: Monitor cache efficiency
 zion performance status
-
-# Debug: Analyze project health
-zion debug project
 
 # Multiple packages at once
 zion add mitchellh/libxev karlseguin/httpz ziglang/zig-clap
@@ -197,9 +234,17 @@ Your dependencies are now fully integrated and ready to use!
 
 ## Documentation
 
-See the [docs/](docs/) folder for detailed documentation:
-- [Installation Guide](docs/INSTALL.md)
-- [Commands Reference](docs/COMMANDS.md)
+See the documentation index in [docs/README.md](docs/README.md).
+
+Primary guides:
+- [Installation](docs/getting-started/installation.md)
+- [Commands Reference](docs/reference/commands.md)
+- [Configuration Reference](docs/reference/configuration.md)
+- [Registry Reference](docs/reference/registries.md)
+- [Security Reference](docs/reference/security.md)
+- [Zig And ZLS Reference](docs/reference/zig-and-zls.md)
+- [Testing Overview](docs/testing/overview.md)
+- [Documentation Index](docs/README.md)
 
 ## Contributing
 

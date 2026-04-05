@@ -304,3 +304,230 @@ pub fn verifyPackageSignature(allocator: Allocator, package_path: []const u8, pa
         .signer = "verified",
     };
 }
+
+/// Result of trust-aware signature verification
+pub const TrustVerificationResult = struct {
+    valid: bool,
+    trusted: bool,
+    message: []const u8,
+    signer: []const u8,
+    fingerprint: []const u8,
+
+    pub fn deinit(self: @This(), allocator: Allocator) void {
+        if (self.fingerprint.len > 0 and self.fingerprint[0] != 'n') {
+            // Only free if not a static string like "none"
+            allocator.free(self.fingerprint);
+        }
+    }
+};
+
+/// Compute SHA256 fingerprint of a public key
+fn computeKeyFingerprint(allocator: Allocator, public_key_bytes: [32]u8) ![]const u8 {
+    var hasher = crypto.hash.sha2.Sha256.init(.{});
+    hasher.update(&public_key_bytes);
+    var digest: [32]u8 = undefined;
+    hasher.final(&digest);
+
+    return std.fmt.allocPrint(allocator, "{x}", .{digest});
+}
+
+/// Load trusted fingerprints from ~/.zion/trusted_keys.json
+fn loadTrustedFingerprints(allocator: Allocator) !std.StringHashMap(void) {
+    var trusted = std.StringHashMap(void).init(allocator);
+
+    const home_dir = zion_root.getEnv("HOME") orelse return trusted;
+
+    const trusted_keys_file = try std.fmt.allocPrint(allocator, "{s}/.zion/trusted_keys.json", .{home_dir});
+    defer allocator.free(trusted_keys_file);
+
+    const io = zion_root.getIo() catch return trusted;
+    const cwd = std.Io.Dir.cwd();
+
+    const content = cwd.readFileAlloc(io, trusted_keys_file, allocator, std.Io.Limit.limited(1024 * 1024)) catch |err| {
+        if (err == error.FileNotFound) return trusted;
+        return err;
+    };
+    defer allocator.free(content);
+
+    // Parse newline-delimited JSON entries
+    var lines = std.mem.splitScalar(u8, content, '\n');
+    while (lines.next()) |line| {
+        if (line.len == 0) continue;
+
+        // Simple JSON parsing for {"fingerprint": "...", "trusted": true}
+        if (std.mem.indexOf(u8, line, "\"fingerprint\"")) |fp_start| {
+            const after_colon = std.mem.indexOf(u8, line[fp_start..], ":") orelse continue;
+            const quote_start = std.mem.indexOf(u8, line[fp_start + after_colon..], "\"") orelse continue;
+            const start_pos = fp_start + after_colon + quote_start + 1;
+            const rest = line[start_pos..];
+            const end_quote = std.mem.indexOf(u8, rest, "\"") orelse continue;
+            const fingerprint = rest[0..end_quote];
+
+            if (fingerprint.len > 0) {
+                const fp_copy = try allocator.dupe(u8, fingerprint);
+                try trusted.put(fp_copy, {});
+            }
+        }
+    }
+
+    return trusted;
+}
+
+/// Verify package signature with trust store validation
+/// This function checks if the signing key is in the trust store before accepting the signature
+pub fn verifyPackageSignatureWithTrust(allocator: Allocator, package_path: []const u8, package_name: []const u8) !TrustVerificationResult {
+    _ = package_name;
+
+    const io = zion_root.getIo() catch {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Failed to initialize I/O for verification",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+    const cwd = std.Io.Dir.cwd();
+
+    // Look for signature file (.sig extension)
+    var sig_path_buf: [512]u8 = undefined;
+    const sig_path = std.fmt.bufPrint(&sig_path_buf, "{s}.sig", .{package_path}) catch {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Package path too long",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+
+    // Check if signature file exists
+    const sig_file = cwd.openFile(io, sig_path, .{}) catch {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Package is unsigned (no .sig file found)",
+            .signer = "none",
+            .fingerprint = "none",
+        };
+    };
+    defer sig_file.close(io);
+
+    // Read signature data (public_key:32 + signature:64 = 96 bytes minimum)
+    var sig_data: [128]u8 = undefined;
+    const bytes_read = sig_file.readStreaming(io, &.{sig_data[0..]}) catch {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Failed to read signature file",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+
+    if (bytes_read < 96) {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Invalid signature file format",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    }
+
+    // Parse signature components
+    const public_key_bytes: [32]u8 = sig_data[0..32].*;
+    const signature_bytes: [64]u8 = sig_data[32..96].*;
+
+    // Compute fingerprint of the signing key
+    const fingerprint = try computeKeyFingerprint(allocator, public_key_bytes);
+    errdefer allocator.free(fingerprint);
+
+    // Load trusted fingerprints
+    var trusted = try loadTrustedFingerprints(allocator);
+    defer {
+        var it = trusted.keyIterator();
+        while (it.next()) |key| {
+            allocator.free(key.*);
+        }
+        trusted.deinit();
+    }
+
+    // Check if this key is trusted
+    const is_trusted = trusted.contains(fingerprint);
+
+    if (!is_trusted) {
+        return .{
+            .valid = false,
+            .trusted = false,
+            .message = "Signing key not in trust store",
+            .signer = "untrusted",
+            .fingerprint = fingerprint,
+        };
+    }
+
+    // Key is trusted - proceed with cryptographic verification
+    const pkg_file = cwd.openFile(io, package_path, .{}) catch {
+        allocator.free(fingerprint);
+        return .{
+            .valid = false,
+            .trusted = true,
+            .message = "Failed to open package file",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+    defer pkg_file.close(io);
+
+    var content_list: std.ArrayList(u8) = .empty;
+    defer content_list.deinit(allocator);
+
+    var buffer: [8192]u8 = undefined;
+    while (true) {
+        const read_bytes = pkg_file.readStreaming(io, &.{buffer[0..]}) catch break;
+        if (read_bytes == 0) break;
+        content_list.appendSlice(allocator, buffer[0..read_bytes]) catch {
+            allocator.free(fingerprint);
+            return .{
+                .valid = false,
+                .trusted = true,
+                .message = "Memory allocation failed during verification",
+                .signer = "unknown",
+                .fingerprint = "none",
+            };
+        };
+    }
+
+    // Verify the Ed25519 signature
+    const public_key = crypto.sign.Ed25519.PublicKey.fromBytes(public_key_bytes) catch {
+        allocator.free(fingerprint);
+        return .{
+            .valid = false,
+            .trusted = true,
+            .message = "Invalid public key in signature",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+
+    const sig = crypto.sign.Ed25519.Signature.fromBytes(signature_bytes);
+
+    sig.verify(content_list.items, public_key) catch {
+        allocator.free(fingerprint);
+        return .{
+            .valid = false,
+            .trusted = true,
+            .message = "Signature verification failed - content may have been tampered",
+            .signer = "unknown",
+            .fingerprint = "none",
+        };
+    };
+
+    return .{
+        .valid = true,
+        .trusted = true,
+        .message = "Package signature verified with trusted key",
+        .signer = "trusted",
+        .fingerprint = fingerprint,
+    };
+}

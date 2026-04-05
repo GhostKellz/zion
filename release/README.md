@@ -77,7 +77,7 @@ sudo dnf install rpm/packages/zion-*.rpm
 
 ## Requirements
 
-- Zig 0.11.0 or newer
+- Zig 0.16.0-dev or newer
 - curl
 - tar
 - git

@@ -1,12 +1,34 @@
 const std = @import("std");
-const fs = std.fs;
 const Dir = std.Io.Dir;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("../root.zig");
+const workflow = @import("test_workflow.zig");
+
+fn isWorkflowSubcommand(arg: []const u8) bool {
+    return std.mem.eql(u8, arg, "bootstrap") or
+        std.mem.eql(u8, arg, "install") or
+        std.mem.eql(u8, arg, "update") or
+        std.mem.eql(u8, arg, "uninstall") or
+        std.mem.eql(u8, arg, "wire") or
+        std.mem.eql(u8, arg, "scaffold") or
+        std.mem.eql(u8, arg, "run") or
+        std.mem.eql(u8, arg, "fuzz") or
+        std.mem.eql(u8, arg, "bench") or
+        std.mem.eql(u8, arg, "report") or
+        std.mem.eql(u8, arg, "ci") or
+        std.mem.eql(u8, arg, "info") or
+        std.mem.eql(u8, arg, "docs") or
+        std.mem.eql(u8, arg, "help");
+}
 
 /// Run project tests
 pub fn test_command(allocator: Allocator, args: []const [:0]const u8) !void {
+    if (args.len > 2 and isWorkflowSubcommand(args[2])) {
+        try workflow.testingWorkflow(allocator, args);
+        return;
+    }
+
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
 

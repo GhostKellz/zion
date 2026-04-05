@@ -40,42 +40,10 @@ pub fn build(b: *std.Build) void {
         // Later on we'll use this module as the root module of a test executable
         // which requires us to specify a target.
         .target = target,
+        .link_libc = true,
     });
-
-    // Import zsync dependency
-    const zsync_mod = b.lazyDependency("zsync", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    if (zsync_mod) |zsync| {
-        mod.addImport("zsync", zsync.module("zsync"));
-    }
 
     // ghostnet dependency removed - using standard HTTP client
-
-    // Import ghostspec dependency for integration helpers
-    const ghostspec_mod = b.lazyDependency("ghostspec", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    if (ghostspec_mod) |ghostspec| {
-        mod.addImport("ghostspec", ghostspec.module("ghostspec"));
-    }
-
-    // Import phantom dependency for TUI components
-    const phantom_mod = b.lazyDependency("phantom", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    if (phantom_mod) |phantom| {
-        mod.addImport("phantom", phantom.module("phantom"));
-    }
-
-    // Import zdoc dependency for documentation generation
-    const zdoc_dep = b.lazyDependency("zdoc", .{
-        .target = target,
-        .optimize = optimize,
-    });
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -106,6 +74,7 @@ pub fn build(b: *std.Build) void {
             // definition if desireable (e.g. firmware for embedded devices).
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             // List of modules available for import in source files part of the
             // root module.
             .imports = &.{
@@ -119,22 +88,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Add zsync to executable if available
-    if (zsync_mod) |zsync| {
-        exe.root_module.addImport("zsync", zsync.module("zsync"));
-    }
-
-    // Add ghostspec to executable if available
-    if (ghostspec_mod) |ghostspec| {
-        exe.root_module.addImport("ghostspec", ghostspec.module("ghostspec"));
-    }
-
     // ghostnet dependency removed - using standard HTTP client
-
-    // Add phantom to executable if available
-    if (phantom_mod) |phantom| {
-        exe.root_module.addImport("phantom", phantom.module("phantom"));
-    }
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -194,23 +148,6 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
-
-    // Documentation generation step using zdoc
-    if (zdoc_dep) |zdoc| {
-        const zdoc_exe = zdoc.artifact("zdoc");
-
-        // Create docs generation step
-        const docs_step = b.step("docs", "Generate API documentation");
-
-        const run_zdoc = b.addRunArtifact(zdoc_exe);
-        run_zdoc.addArgs(&.{
-            "--format=html",
-            "src/root.zig", // Root module with all imports
-            "docs/",
-        });
-
-        docs_step.dependOn(&run_zdoc.step);
-    }
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

@@ -217,9 +217,23 @@ pub const GPGKeyring = struct {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
 
-        // Write signed data to temporary file
-        const temp_data_path = "/tmp/zion_verify_data";
-        const temp_sig_path = "/tmp/zion_verify_signature";
+        // Generate random temp file names to prevent race conditions and symlink attacks
+        var random_bytes: [8]u8 = undefined;
+        io.random(&random_bytes);
+        const suffix = std.fmt.bytesToHex(random_bytes, .lower);
+        const pid = std.c.getpid();
+
+        const temp_data_path = try std.fmt.allocPrint(self.allocator, "/tmp/zion_verify_data_{d}_{s}", .{ pid, suffix });
+        defer self.allocator.free(temp_data_path);
+
+        const temp_sig_path = try std.fmt.allocPrint(self.allocator, "/tmp/zion_verify_sig_{d}_{s}", .{ pid, suffix });
+        defer self.allocator.free(temp_sig_path);
+
+        // Ensure cleanup on all exit paths
+        errdefer {
+            cwd.deleteFile(io, temp_data_path) catch {};
+            cwd.deleteFile(io, temp_sig_path) catch {};
+        }
 
         // Write data file
         const data_file = try cwd.createFile(io, temp_data_path, .{});

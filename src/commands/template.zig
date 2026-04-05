@@ -1,10 +1,11 @@
 const std = @import("std");
 const fs = std.fs;
+const Dir = std.Io.Dir;
 const Allocator = std.mem.Allocator;
 
 /// Project template functionality
 /// Creates new projects from predefined templates
-pub fn template(allocator: Allocator, args: []const []const u8) !void {
+pub fn template(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         try printTemplateHelp();
         return;
@@ -66,11 +67,11 @@ fn listTemplates() !void {
 
     const templates = getAvailableTemplates();
 
-    for (templates) |template| {
-        std.debug.print("🔧 {s}\n", .{template.name});
-        std.debug.print("   {s}\n", .{template.description});
-        std.debug.print("   Dependencies: {s}\n", .{template.dependencies});
-        std.debug.print("   💾 zion template new {s} <project-name>\n", .{template.name});
+    for (templates) |tmpl| {
+        std.debug.print("🔧 {s}\n", .{tmpl.name});
+        std.debug.print("   {s}\n", .{tmpl.description});
+        std.debug.print("   Dependencies: {s}\n", .{tmpl.dependencies});
+        std.debug.print("   💾 zion template new {s} <project-name>\n", .{tmpl.name});
         std.debug.print("\n", .{});
     }
 
@@ -81,22 +82,22 @@ fn listTemplates() !void {
 fn showTemplateInfo(template_name: []const u8) !void {
     const templates = getAvailableTemplates();
 
-    for (templates) |template| {
-        if (std.mem.eql(u8, template.name, template_name)) {
-            std.debug.print("📖 Template: {s}\n", .{template.name});
+    for (templates) |tmpl| {
+        if (std.mem.eql(u8, tmpl.name, template_name)) {
+            std.debug.print("📖 Template: {s}\n", .{tmpl.name});
             std.debug.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", .{});
-            std.debug.print("📝 Description: {s}\n", .{template.description});
-            std.debug.print("🎯 Use Case: {s}\n", .{template.use_case});
-            std.debug.print("📦 Dependencies: {s}\n", .{template.dependencies});
+            std.debug.print("📝 Description: {s}\n", .{tmpl.description});
+            std.debug.print("🎯 Use Case: {s}\n", .{tmpl.use_case});
+            std.debug.print("📦 Dependencies: {s}\n", .{tmpl.dependencies});
             std.debug.print("🏗️  Structure:\n", .{});
-            for (template.structure) |file| {
+            for (tmpl.structure) |file| {
                 std.debug.print("   {s}\n", .{file});
             }
             std.debug.print("\n📚 Features:\n", .{});
-            for (template.features) |feature| {
+            for (tmpl.features) |feature| {
                 std.debug.print("   • {s}\n", .{feature});
             }
-            std.debug.print("\n💾 Create: zion template new {s} <project-name>\n", .{template.name});
+            std.debug.print("\n💾 Create: zion template new {s} <project-name>\n", .{tmpl.name});
             return;
         }
     }
@@ -110,7 +111,7 @@ fn createFromTemplate(allocator: Allocator, template_name: []const u8, project_n
     const templates = getAvailableTemplates();
 
     // Find template
-    const template = for (templates) |tmpl| {
+    const tmpl_info = for (templates) |tmpl| {
         if (std.mem.eql(u8, tmpl.name, template_name)) {
             break tmpl;
         }
@@ -123,20 +124,20 @@ fn createFromTemplate(allocator: Allocator, template_name: []const u8, project_n
     std.debug.print("🚀 Creating '{s}' project from '{s}' template...\n", .{ project_name, template_name });
 
     // Create project directory
-    const cwd = fs.cwd();
+    const cwd = Dir.cwd();
     try cwd.makeDir(project_name);
 
     std.debug.print("📁 Created directory: {s}/\n", .{project_name});
 
     // Generate files based on template
-    try generateTemplateFiles(allocator, template, project_name);
+    try generateTemplateFiles(allocator, tmpl_info, project_name);
 
     std.debug.print("✅ Project '{s}' created successfully!\n", .{project_name});
     std.debug.print("\n🎯 Next steps:\n", .{});
     std.debug.print("   cd {s}\n", .{project_name});
     std.debug.print("   zig build\n", .{});
 
-    if (template.dependencies.len > 0 and !std.mem.eql(u8, template.dependencies, "None")) {
+    if (tmpl_info.dependencies.len > 0 and !std.mem.eql(u8, tmpl_info.dependencies, "None")) {
         std.debug.print("   # Dependencies will be auto-installed on first build\n", .{});
     }
 
@@ -144,14 +145,14 @@ fn createFromTemplate(allocator: Allocator, template_name: []const u8, project_n
 }
 
 /// Generate template files
-fn generateTemplateFiles(allocator: Allocator, template: TemplateInfo, project_name: []const u8) !void {
-    const cwd = fs.cwd();
+fn generateTemplateFiles(allocator: Allocator, tmpl_info: TemplateInfo, project_name: []const u8) !void {
+    const cwd = Dir.cwd();
 
     // Create subdirectories
     try cwd.makePath(try std.fmt.allocPrint(allocator, "{s}/src", .{project_name}));
 
-    if (std.mem.indexOf(u8, template.name, "web") != null or
-        std.mem.indexOf(u8, template.name, "game") != null)
+    if (std.mem.indexOf(u8, tmpl_info.name, "web") != null or
+        std.mem.indexOf(u8, tmpl_info.name, "game") != null)
     {
         try cwd.makePath(try std.fmt.allocPrint(allocator, "{s}/assets", .{project_name}));
     }
@@ -210,8 +211,8 @@ fn generateTemplateFiles(allocator: Allocator, template: TemplateInfo, project_n
 }
 
 /// Generate main.zig content based on template
-fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
-    if (std.mem.eql(u8, template.name, "cli")) {
+fn generateMainZig(allocator: Allocator, tmpl_info: TemplateInfo) ![]const u8 {
+    if (std.mem.eql(u8, tmpl_info.name, "cli")) {
         return try allocator.dupe(u8,
             \\const std = @import("std");
             \\const clap = @import("clap");
@@ -261,7 +262,7 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\}
             \\
         );
-    } else if (std.mem.eql(u8, template.name, "web-server")) {
+    } else if (std.mem.eql(u8, tmpl_info.name, "web-server")) {
         return try allocator.dupe(u8,
             \\const std = @import("std");
             \\const httpz = @import("httpz");
@@ -308,7 +309,7 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
             \\}
             \\
         );
-    } else if (std.mem.eql(u8, template.name, "game")) {
+    } else if (std.mem.eql(u8, tmpl_info.name, "game")) {
         return try allocator.dupe(u8,
             \\const std = @import("std");
             \\const raylib = @import("raylib");
@@ -376,8 +377,8 @@ fn generateMainZig(allocator: Allocator, template: TemplateInfo) ![]const u8 {
 }
 
 /// Generate build.zig content
-fn generateBuildZig(allocator: Allocator, template: TemplateInfo, project_name: []const u8) ![]const u8 {
-    if (std.mem.eql(u8, template.name, "lib")) {
+fn generateBuildZig(allocator: Allocator, tmpl_info: TemplateInfo, project_name: []const u8) ![]const u8 {
+    if (std.mem.eql(u8, tmpl_info.name, "lib")) {
         return try std.fmt.allocPrint(allocator,
             \\const std = @import("std");
             \\
@@ -453,7 +454,8 @@ fn generateBuildZig(allocator: Allocator, template: TemplateInfo, project_name: 
 }
 
 /// Generate build.zig.zon content
-fn generateZonFile(allocator: Allocator, template: TemplateInfo, project_name: []const u8) ![]const u8 {
+fn generateZonFile(allocator: Allocator, tmpl_info: TemplateInfo, project_name: []const u8) ![]const u8 {
+    _ = tmpl_info; // Template info reserved for future template-specific dependencies
     return try std.fmt.allocPrint(allocator,
         \\.{{
         \\    .name = "{s}",
@@ -466,7 +468,7 @@ fn generateZonFile(allocator: Allocator, template: TemplateInfo, project_name: [
 }
 
 /// Generate README.md content
-fn generateReadme(allocator: Allocator, template: TemplateInfo, project_name: []const u8) ![]const u8 {
+fn generateReadme(allocator: Allocator, tmpl_info: TemplateInfo, project_name: []const u8) ![]const u8 {
     return try std.fmt.allocPrint(allocator,
         \\# {s}
         \\
@@ -515,7 +517,7 @@ fn generateReadme(allocator: Allocator, template: TemplateInfo, project_name: []
         \\
         \\MIT
         \\
-    , .{ project_name, template.description, template.dependencies, try formatFeatures(allocator, template.features) });
+    , .{ project_name, tmpl_info.description, tmpl_info.dependencies, try formatFeatures(allocator, tmpl_info.features) });
 }
 
 /// Format features list for README

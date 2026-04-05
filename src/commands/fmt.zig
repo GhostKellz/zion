@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 
 /// Code formatting functionality using zig fmt
 /// Provides enhanced formatting features and project-wide formatting
-pub fn fmt(allocator: Allocator, args: []const []const u8) !void {
+pub fn fmt(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len >= 3 and std.mem.eql(u8, args[2], "--help")) {
         try printFmtHelp();
         return;
@@ -168,7 +168,7 @@ const ProjectFormatter = struct {
         for (self.files.items) |file| {
             self.allocator.free(file);
         }
-        self.files.deinit(allocator);
+        self.files.deinit(self.allocator);
     }
 
     /// Recursively discover .zig files in a directory
@@ -264,13 +264,13 @@ const ProjectFormatter = struct {
         // Read any error output
         if (child_format.stderr) |stderr_pipe| {
             var output_buf = std.ArrayList(u8).init(self.allocator);
-            defer output_buf.deinit(allocator);
+            defer output_buf.deinit(self.allocator);
 
             var read_buf: [4096]u8 = undefined;
             while (true) {
                 const bytes_read = try stderr_pipe.readAll(read_buf[0..]);
                 if (bytes_read == 0) break;
-                try output_buf.appendSlice(allocator, read_buf[0..bytes_read]);
+                try output_buf.appendSlice(self.allocator, read_buf[0..bytes_read]);
             }
 
             const stderr_data = try self.allocator.dupe(u8, output_buf.items);

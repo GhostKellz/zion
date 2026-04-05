@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const Dir = Io.Dir;
 const zion_root = @import("root.zig");
+const json_escape = @import("json_escape.zig");
 
 /// Helper to get environment variable as a slice (Zig 0.16.0 compatibility)
 /// Accepts string literals which are sentinel-terminated
@@ -21,6 +22,21 @@ fn getEnvVarDynamic(name: []const u8) ?[]const u8 {
     buf[name.len] = 0;
     const ptr = std.c.getenv(@ptrCast(buf[0..name.len :0])) orelse return null;
     return std.mem.sliceTo(ptr, 0);
+}
+
+pub fn isLocalRegistryUrl(url: []const u8) bool {
+    return std.mem.startsWith(u8, url, "http://localhost") or
+        std.mem.startsWith(u8, url, "http://127.0.0.1") or
+        std.mem.startsWith(u8, url, "http://[::1]");
+}
+
+pub fn validateRegistryUrl(url: []const u8) !void {
+    if (std.mem.startsWith(u8, url, "https://")) return;
+    if (std.mem.startsWith(u8, url, "http://")) {
+        if (isLocalRegistryUrl(url)) return;
+        return error.InsecureRegistryUrl;
+    }
+    return error.InvalidRegistryUrl;
 }
 
 /// Registry configuration for multi-registry support
@@ -228,6 +244,8 @@ pub const ZionConfig = struct {
         // Enhanced Registry configuration
         // Primary registry from environment
         if (getEnvVar("ZION_REGISTRY_URL")) |registry_url| {
+            try validateRegistryUrl(registry_url);
+
             self.registry_url = try self.allocator.dupe(u8, registry_url);
             const auth_token = getEnvVar("ZION_REGISTRY_TOKEN");
 
@@ -257,6 +275,8 @@ pub const ZionConfig = struct {
             while (it.next()) |registry_url| {
                 const trimmed = std.mem.trim(u8, registry_url, " ");
                 if (trimmed.len > 0) {
+                    try validateRegistryUrl(trimmed);
+
                     const registry_name = try std.fmt.allocPrint(self.allocator, "registry-{}", .{priority});
 
                     // Check for specific auth token
@@ -377,6 +397,68 @@ pub const ZionConfig = struct {
         }
     }
 
+    /// Save configuration to zion.json file
+    pub fn save(self: *ZionConfig) !void {
+        const io = try zion_root.getIo();
+        const cwd = Dir.cwd();
+        const config_path = "zion.json";
+
+        var file = try cwd.createFile(io, config_path, .{ .truncate = true });
+        defer file.close(io);
+
+        // Write JSON with proper escaping
+        try file.writeStreamingAll(io, "{\n");
+
+        // GitHub section
+        try file.writeStreamingAll(io, "  \"github\": {\n");
+        if (self.github_username) |username| {
+            const escaped = try json_escape.escapeJsonString(self.allocator, username);
+            defer self.allocator.free(escaped);
+            const line = try std.fmt.allocPrint(self.allocator, "    \"username\": \"{s}\"", .{escaped});
+            defer self.allocator.free(line);
+            try file.writeStreamingAll(io, line);
+            if (self.github_orgs.items.len > 0) {
+                try file.writeStreamingAll(io, ",\n");
+            } else {
+                try file.writeStreamingAll(io, "\n");
+            }
+        }
+        if (self.github_orgs.items.len > 0) {
+            try file.writeStreamingAll(io, "    \"organizations\": [");
+            for (self.github_orgs.items, 0..) |org, i| {
+                const escaped = try json_escape.escapeJsonString(self.allocator, org);
+                defer self.allocator.free(escaped);
+                const org_line = try std.fmt.allocPrint(self.allocator, "\"{s}\"", .{escaped});
+                defer self.allocator.free(org_line);
+                try file.writeStreamingAll(io, org_line);
+                if (i < self.github_orgs.items.len - 1) {
+                    try file.writeStreamingAll(io, ", ");
+                }
+            }
+            try file.writeStreamingAll(io, "]\n");
+        }
+        try file.writeStreamingAll(io, "  },\n");
+
+        // Settings
+        const auto_add_line = try std.fmt.allocPrint(self.allocator, "  \"auto_add_to_build\": {s},\n", .{if (self.auto_add_to_build) "true" else "false"});
+        defer self.allocator.free(auto_add_line);
+        try file.writeStreamingAll(io, auto_add_line);
+
+        const verify_sig_line = try std.fmt.allocPrint(self.allocator, "  \"verify_signatures\": {s},\n", .{if (self.verify_signatures) "true" else "false"});
+        defer self.allocator.free(verify_sig_line);
+        try file.writeStreamingAll(io, verify_sig_line);
+
+        const cache_ttl_line = try std.fmt.allocPrint(self.allocator, "  \"cache_ttl_hours\": {d},\n", .{self.cache_ttl_hours});
+        defer self.allocator.free(cache_ttl_line);
+        try file.writeStreamingAll(io, cache_ttl_line);
+
+        const timeout_line = try std.fmt.allocPrint(self.allocator, "  \"registry_timeout_sec\": {d}\n", .{self.registry_timeout_sec});
+        defer self.allocator.free(timeout_line);
+        try file.writeStreamingAll(io, timeout_line);
+
+        try file.writeStreamingAll(io, "}\n");
+    }
+
     /// Load configuration from zion.lua file (simple key-value parser)
     fn loadFromLuaFile(self: *ZionConfig) !void {
         const io = try zion_root.getIo();
@@ -399,6 +481,12 @@ pub const ZionConfig = struct {
                 try self.parseLuaConfigLine(trimmed[start..]);
             }
         }
+    }
+
+    test "registry url validation rejects insecure remote urls" {
+        try std.testing.expectError(error.InsecureRegistryUrl, validateRegistryUrl("http://packages.example.com"));
+        try validateRegistryUrl("https://packages.example.com");
+        try validateRegistryUrl("http://localhost:8080");
     }
 
     /// Parse a single Lua configuration line

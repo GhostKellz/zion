@@ -1,0 +1,25 @@
+{
+  "summary": {
+    "mode": "report",
+    "success": true,
+    "exit_code": 0,
+    "duration_ms": 9,
+    "timestamp_ms": 266966466,
+    "suite_path": "tests/zion_test_suite.zig",
+    "suite_filter": "",
+    "ci_profile": "default",
+    "seed": 266966457,
+    "cases": 100,
+    "time_budget_ms": 1000,
+    "report_path": ".zion/test/reports/run.json"
+  },
+  "results": [    {
+      "name": "zion/property: addition is commutative",
+      "kind": "property",
+      "status": "passed",
+      "duration_ms": 6,
+      "seed": 266966457,
+      "artifact_path": ".zion/test/reports/run.json"
+    }
+  ]
+}

@@ -21,7 +21,7 @@ done
 
 # Create package directory structure
 PKG_DIR="packages"
-DEB_DIR="$PKG_DIR/zion_1.0.8_amd64"
+DEB_DIR="$PKG_DIR/zion_1.1.0_amd64"
 
 rm -rf "$PKG_DIR"
 mkdir -p "$DEB_DIR"/{DEBIAN,usr/bin,usr/share/doc/zion,usr/share/man/man1}
@@ -31,7 +31,7 @@ mkdir -p "$DEB_DIR"/usr/share/licenses/zion
 # Create control file
 cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: zion
-Version: 1.0.8
+Version: 1.1.0
 Section: devel
 Priority: optional
 Architecture: amd64
@@ -54,8 +54,9 @@ zig build -Doptimize=ReleaseSafe
 cd release/debian
 cp "../../zig-out/bin/zion" "$DEB_DIR/usr/bin/"
 cp "../../README.md" "$DEB_DIR/usr/share/doc/zion/"
-cp "../../docs/COMMANDS.md" "$DEB_DIR/usr/share/doc/zion/"
-cp "../../docs/INSTALL.md" "$DEB_DIR/usr/share/doc/zion/"
+cp "../../docs/README.md" "$DEB_DIR/usr/share/doc/zion/"
+cp "../../docs/getting-started/installation.md" "$DEB_DIR/usr/share/doc/zion/"
+cp "../../docs/reference/commands.md" "$DEB_DIR/usr/share/doc/zion/"
 cp "../man/zion.1" "$DEB_DIR/usr/share/man/man1/"
 cp "../completions/zion.bash" "$DEB_DIR/usr/share/bash-completion/completions/zion"
 cp "../completions/zion.zsh" "$DEB_DIR/usr/share/zsh/site-functions/_zion"
@@ -71,5 +72,5 @@ chmod 644 "$DEB_DIR/usr/share/man/man1/zion.1"
 echo -e "${BLUE}Creating Debian package...${NC}"
 fakeroot dpkg-deb --build "$DEB_DIR"
 
-echo -e "${GREEN}Debian package created: $PKG_DIR/zion_1.0.8_amd64.deb${NC}"
-echo "Install with: sudo dpkg -i $PKG_DIR/zion_1.0.8_amd64.deb"
+echo -e "${GREEN}Debian package created: $PKG_DIR/zion_1.1.0_amd64.deb${NC}"
+echo "Install with: sudo dpkg -i $PKG_DIR/zion_1.1.0_amd64.deb"

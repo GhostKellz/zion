@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-04-04T00:00:00Z",
+  "notes": [
+    "This file documents the Zion-native test workflow surface.",
+    "Zion test workflows are now fully native to Zion."
+  ],
+  "workflow": {
+    "current": {
+      "version": "1.1.0",
+      "source": "built-in"
+    },
+    "zig": {
+      "minimum": "0.16.0-dev",
+      "tested": ["0.16.0-dev"],
+      "recommended": "0.16.0-dev"
+    },
+    "paths": {
+      "suite": "tests/zion_test_suite.zig",
+      "report": ".zion/test/reports/run.json",
+      "failed": ".zion/test/reports/failed.txt"
+    }
+  },
+  "ci_profiles": {
+    "default": {
+      "time_budget_ms": 1000,
+      "max_cases": 100,
+      "fail_fast": true
+    },
+    "hardened": {
+      "time_budget_ms": 10000,
+      "max_cases": 1000,
+      "fail_fast": false
+    }
+  }
+}

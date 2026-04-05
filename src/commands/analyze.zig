@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 
 /// Dependency and project analysis functionality
 /// Provides insights into project structure, dependencies, and potential issues
-pub fn analyze(allocator: Allocator, args: []const []const u8) !void {
+pub fn analyze(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         try printAnalyzeHelp();
         return;

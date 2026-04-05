@@ -1,80 +1,27 @@
 # Zion Documentation
 
-Documentation for Zion, the Zig package manager.
+## Getting Started
 
-## Quick Start
+- [Installation](getting-started/installation.md)
 
-```bash
-# Install
-curl -sSL https://raw.githubusercontent.com/ghostkellz/zion/main/release/install.sh | bash
+## Reference
 
-# Initialize a project
-zion init myproject
-cd myproject
+- [Commands Reference](reference/commands.md)
+- [Configuration Reference](reference/configuration.md)
+- [Registry Reference](reference/registries.md)
+- [Security Reference](reference/security.md)
+- [Zig And ZLS Reference](reference/zig-and-zls.md)
 
-# Add dependencies
-zion add mitchellh/libxev
+## Testing
 
-# Build
-zion build
-```
+- [Testing Overview](testing/overview.md)
 
-## Documentation
+## Archive
 
-| Document | Description |
-|----------|-------------|
-| [Installation](INSTALL.md) | Installation guide for all platforms |
-| [Commands](COMMANDS.md) | Complete command reference |
-| [API Reference](api-reference/index.html) | Source code documentation |
+- [Archived Generated API Docs](archive/zdoc-api-reference/index.html)
+- [Archive Notes](archive/README.md)
 
-## Common Tasks
+## Notes
 
-### Add a dependency
-
-```bash
-zion add owner/repo              # Latest from GitHub
-zion add owner/repo@v1.0.0       # Specific version
-```
-
-### Update dependencies
-
-```bash
-zion update                      # Update all
-zion update <package>            # Update specific
-```
-
-### Manage hashes
-
-```bash
-zion hash update --all           # Update all hashes
-zion hash check                  # Verify integrity
-```
-
-### Lock file operations
-
-```bash
-zion lock                        # Generate lock file
-zion lock sync                   # Sync with build.zig.zon
-zion lock verify                 # Verify integrity
-```
-
-### Version pinning
-
-```bash
-zion pin <package>@<version>     # Pin to version
-zion unpin <package>             # Unpin
-zion unpin <package> --to-main   # Track main branch
-```
-
-### Check for cycles
-
-```bash
-zion tree --check-cycles         # Detect circular dependencies
-```
-
-## Help
-
-```bash
-zion help                        # General help
-zion help <command>              # Command-specific help
-```
+- The primary maintained docs are Markdown files under grouped sections.
+- The old generated API docs were archived because they were produced by `zdoc`, which is no longer part of the active build or docs pipeline.

@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}Checking for Zig installation...${NC}"
 if ! command -v zig &> /dev/null; then
   echo -e "${RED}Error: Zig is not installed or not in PATH${NC}"
-  echo -e "Please install Zig from https://ziglang.org/download/"
+  echo -e "Please install Zig 0.16.0-dev or newer from https://ziglang.org/download/"
   exit 1
 fi
 

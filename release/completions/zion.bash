@@ -1,91 +1,63 @@
-# Bash completion for Zion package manager
+# Bash completion for Zion
 
 _zion_completions() {
-    local cur prev opts
+    local cur prev commands
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Main commands
-    local commands="init add remove rm update list ls info fetch build run test clean lock version help tree pin unpin hash sign keyring zig zls search outdated registry publish doc template workspace config cache status repair analyze fmt check"
+    commands="init add remove rm update list ls info fetch pin unpin repair check build clean lock hash run test tree why policy target doc outdated nvim config security performance debug zig search registry template fmt analyze version publish search-interactive interface verify cache tui status setup zls workspace keyring help"
 
     case "${prev}" in
         zion)
             COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
             return 0
             ;;
-        add|remove|rm|info|pin|unpin)
-            # Package name expected
-            return 0
-            ;;
-        list|ls)
-            COMPREPLY=( $(compgen -W "--json" -- ${cur}) )
+        test)
+            COMPREPLY=( $(compgen -W "bootstrap scaffold run bench ci report info docs" -- ${cur}) )
             return 0
             ;;
         clean)
-            COMPREPLY=( $(compgen -W "--all --cache" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "--all" -- ${cur}) )
             return 0
             ;;
         tree)
             COMPREPLY=( $(compgen -W "--check-cycles -c --depth --duplicates --no-versions" -- ${cur}) )
             return 0
             ;;
-        hash)
-            COMPREPLY=( $(compgen -W "update" -- ${cur}) )
-            return 0
-            ;;
-        zig)
-            COMPREPLY=( $(compgen -W "install list use" -- ${cur}) )
-            return 0
-            ;;
-        zls)
-            COMPREPLY=( $(compgen -W "install update" -- ${cur}) )
-            return 0
-            ;;
-        keyring)
-            COMPREPLY=( $(compgen -W "add list remove" -- ${cur}) )
+        unpin)
+            COMPREPLY=( $(compgen -W "--to-main -m" -- ${cur}) )
             return 0
             ;;
         registry)
-            COMPREPLY=( $(compgen -W "list add remove health" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "list add remove test health auth" -- ${cur}) )
             return 0
             ;;
-        template)
-            COMPREPLY=( $(compgen -W "list create apply" -- ${cur}) )
+        zig)
+            COMPREPLY=( $(compgen -W "install list use current" -- ${cur}) )
+            return 0
+            ;;
+        zls)
+            COMPREPLY=( $(compgen -W "install doctor config" -- ${cur}) )
             return 0
             ;;
         workspace)
-            COMPREPLY=( $(compgen -W "init add list" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "init add build" -- ${cur}) )
             return 0
             ;;
-        config)
-            COMPREPLY=( $(compgen -W "get set list" -- ${cur}) )
+        policy)
+            COMPREPLY=( $(compgen -W "init audit show add-allow add-deny" -- ${cur}) )
             return 0
             ;;
-        cache)
-            COMPREPLY=( $(compgen -W "clean info" -- ${cur}) )
+        target)
+            COMPREPLY=( $(compgen -W "list add remove available" -- ${cur}) )
             return 0
             ;;
-        update)
-            # Can optionally specify a package
-            if [[ ${cur} == -* ]]; then
-                COMPREPLY=( $(compgen -W "--branch" -- ${cur}) )
-            fi
+        keyring)
+            COMPREPLY=( $(compgen -W "status list archver trust" -- ${cur}) )
             return 0
-            ;;
-        *)
             ;;
     esac
-
-    # Handle --depth= completion
-    if [[ ${cur} == --depth=* ]]; then
-        return 0
-    fi
-
-    # Handle --branch= completion
-    if [[ ${cur} == --branch=* ]]; then
-        return 0
-    fi
 
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
     return 0

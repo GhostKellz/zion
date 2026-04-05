@@ -151,7 +151,12 @@ fn setConfig(allocator: Allocator, args: []const [:0]const u8) !void {
         return;
     }
 
-    std.debug.print("💾 Configuration updated! (Note: saving not fully implemented yet)\n", .{});
+    // Persist changes to zion.json
+    zion_config.save() catch |err| {
+        std.debug.print("⚠️  Warning: Could not save configuration: {}\n", .{err});
+        return;
+    };
+    std.debug.print("💾 Configuration saved to zion.json\n", .{});
 }
 
 /// Show current configuration

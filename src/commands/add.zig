@@ -14,6 +14,62 @@ const parallel_downloader = @import("../parallel_downloader.zig");
 const security = @import("../security.zig");
 const semver = @import("../semver.zig");
 const version_resolver = @import("../version_resolver.zig");
+const tar_extract = @import("../tar_extract.zig");
+
+/// Result of parsing a GitHub shorthand reference
+pub const GitHubShorthand = struct {
+    owner: []const u8,
+    repo: []const u8,
+    ref: ?[]const u8,
+
+    /// Returns the normalized "owner/repo" format
+    pub fn toPackageRef(self: GitHubShorthand, allocator: Allocator) ![]const u8 {
+        return std.fmt.allocPrint(allocator, "{s}/{s}", .{ self.owner, self.repo });
+    }
+};
+
+/// Parse GitHub shorthand syntax: gh/owner/repo[@ref] or gh:owner/repo[@ref]
+/// Returns null if the input is not a valid shorthand
+pub fn parseGitHubShorthand(package_ref: []const u8) ?GitHubShorthand {
+    // Check for gh/ or gh: prefix
+    const prefix_len: usize = 3;
+    if (package_ref.len < prefix_len) return null;
+
+    const has_slash_prefix = mem.startsWith(u8, package_ref, "gh/");
+    const has_colon_prefix = mem.startsWith(u8, package_ref, "gh:");
+
+    if (!has_slash_prefix and !has_colon_prefix) return null;
+
+    const rest = package_ref[prefix_len..];
+
+    // Split on @ for optional ref
+    var path: []const u8 = undefined;
+    var ref: ?[]const u8 = null;
+
+    if (mem.indexOf(u8, rest, "@")) |at_pos| {
+        path = rest[0..at_pos];
+        ref = rest[at_pos + 1 ..];
+        if (ref.?.len == 0) ref = null;
+    } else {
+        path = rest;
+    }
+
+    // Split path into owner/repo
+    const slash_pos = mem.indexOf(u8, path, "/") orelse return null;
+    if (slash_pos == 0 or slash_pos == path.len - 1) return null;
+
+    const owner = path[0..slash_pos];
+    const repo = path[slash_pos + 1 ..];
+
+    // Validate owner and repo are not empty
+    if (owner.len == 0 or repo.len == 0) return null;
+
+    return GitHubShorthand{
+        .owner = owner,
+        .repo = repo,
+        .ref = ref,
+    };
+}
 
 /// Enhanced add command with multi-registry support
 pub fn add(allocator: Allocator, package_ref: []const u8, options: AddOptions) !void {
@@ -68,7 +124,25 @@ pub const AddOptions = struct {
 
 /// Add a single dependency with enhanced features
 fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *enhanced_config.ZionConfig, options: AddOptions) !void {
-    std.debug.print("🔍 Resolving package: {s}\n", .{package_ref});
+    // Parse GitHub shorthand if present (gh/owner/repo@ref or gh:owner/repo@ref)
+    var normalized_ref: []const u8 = package_ref;
+    var shorthand_ref: ?[]const u8 = null;
+    var owns_normalized_ref = false;
+
+    if (parseGitHubShorthand(package_ref)) |shorthand| {
+        normalized_ref = try shorthand.toPackageRef(allocator);
+        owns_normalized_ref = true;
+        shorthand_ref = shorthand.ref;
+
+        if (shorthand.ref) |ref| {
+            std.debug.print("🔍 Resolving package: {s} (from gh/{s}/{s}@{s})\n", .{ normalized_ref, shorthand.owner, shorthand.repo, ref });
+        } else {
+            std.debug.print("🔍 Resolving package: {s} (from gh/{s}/{s})\n", .{ normalized_ref, shorthand.owner, shorthand.repo });
+        }
+    } else {
+        std.debug.print("🔍 Resolving package: {s}\n", .{normalized_ref});
+    }
+    defer if (owns_normalized_ref) allocator.free(normalized_ref);
 
     // Initialize registry manager
     var manager = registry_manager.RegistryManager.init(allocator, config);
@@ -76,7 +150,8 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     try manager.initClients();
 
     // Determine version constraint to use
-    var effective_version: ?[]const u8 = options.version;
+    // GitHub shorthand ref takes precedence if no explicit version was provided
+    var effective_version: ?[]const u8 = options.version orelse shorthand_ref;
     var version_constraint: ?[]const u8 = null;
     var owns_version_constraint = false;
     var resolved_via_constraint = false;
@@ -95,7 +170,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
 
         // Try to resolve the constraint using version_resolver
         var resolver = version_resolver.VersionResolver.init(allocator);
-        if (resolver.resolve(package_ref, constraint)) |result| {
+        if (resolver.resolve(normalized_ref, constraint)) |result| {
             var res = result;
             defer res.deinit(allocator);
 
@@ -113,12 +188,12 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     defer if (resolved_via_constraint and effective_version != null) allocator.free(effective_version.?);
 
     // Resolve package across registries
-    const package = try manager.resolvePackage(package_ref, effective_version) orelse {
-        std.debug.print("❌ Package not found: {s}\n", .{package_ref});
+    const package = try manager.resolvePackage(normalized_ref, effective_version) orelse {
+        std.debug.print("❌ Package not found: {s}\n", .{normalized_ref});
 
         // Suggest similar packages
         std.debug.print("🔍 Searching for similar packages...\n", .{});
-        const search_results = try manager.searchPackages(package_ref, .{
+        const search_results = try manager.searchPackages(normalized_ref, .{
             .per_page = 5,
         });
         defer {
@@ -232,10 +307,11 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     // Download with parallel downloader for performance
     std.debug.print("\n📥 Downloading from {s}...\n", .{download_info.registry_name});
 
+    // Always use the registry-provided URL instead of re-resolving
     const download_result = if (config.concurrent_downloads > 1)
         try parallel_downloader.downloadSingleWithProgress(allocator, download_info.url, package.full_name)
     else
-        try downloader.downloadAndHashPackage(allocator, package.full_name);
+        try downloader.downloadFromUrl(allocator, download_info.url, package.full_name);
 
     defer {
         allocator.free(download_result.url);
@@ -243,17 +319,38 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         allocator.free(download_result.cache_path);
     }
 
-    // Verify signatures if requested
+    // Verify download integrity against registry-provided hash
+    if (download_info.sha256_hash) |expected_hash| {
+        if (!std.mem.eql(u8, download_result.hash, expected_hash)) {
+            std.debug.print("❌ Integrity check failed!\n", .{});
+            std.debug.print("   Expected: {s}\n", .{expected_hash});
+            std.debug.print("   Got:      {s}\n", .{download_result.hash});
+            std.debug.print("   This may indicate a compromised download or registry mismatch.\n", .{});
+            return error.IntegrityCheckFailed;
+        }
+        std.debug.print("✅ Integrity verified (SHA256 matches registry)\n", .{});
+    }
+
+    // Verify signatures if requested (with trust store validation)
     if (options.verify_signatures) {
         std.debug.print("🔐 Verifying package signatures...\n", .{});
-        const verification_result = try security.verifyPackageSignature(allocator, download_result.cache_path, package.full_name);
-        defer verification_result.deinit();
+        const verification_result = try security.verifyPackageSignatureWithTrust(allocator, download_result.cache_path, package.full_name);
+        defer verification_result.deinit(allocator);
+
+        if (!verification_result.trusted) {
+            std.debug.print("❌ Signing key not trusted: {s}\n", .{verification_result.message});
+            std.debug.print("   Key fingerprint: {s}\n", .{verification_result.fingerprint});
+            std.debug.print("\n💡 To trust this key, run:\n", .{});
+            std.debug.print("   zion keyring trust {s}\n", .{verification_result.fingerprint});
+            std.debug.print("\n⚠️  Only trust keys from known publishers!\n", .{});
+            return error.SignatureKeyNotTrusted;
+        }
 
         if (!verification_result.valid) {
             std.debug.print("❌ Signature verification failed: {s}\n", .{verification_result.message});
             return error.SignatureVerificationFailed;
         }
-        std.debug.print("✅ Signature verified by: {s}\n", .{verification_result.signer});
+        std.debug.print("✅ Signature verified (trusted key: {s}...)\n", .{verification_result.fingerprint[0..16]});
     }
 
     // Extract the package
@@ -267,7 +364,7 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     defer allocator.free(deps_path);
 
     std.debug.print("📦 Extracting package to {s}...\n", .{deps_path});
-    try extractTarball(allocator, download_result.cache_path, deps_path);
+    try tar_extract.extractPackage(allocator, download_result.cache_path, deps_path);
 
     // Update build.zig.zon
     std.debug.print("📝 Updating build.zig.zon...\n", .{});

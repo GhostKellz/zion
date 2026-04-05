@@ -7,8 +7,8 @@ const ZonFile = @import("../manifest.zig").ZonFile;
 const zion_root = @import("../root.zig");
 
 /// Builds the project by invoking the Zig build system
-pub fn build(allocator: mem.Allocator) !void {
-    _ = allocator;
+/// Forwards any additional arguments to zig build (e.g., -Doptimize=ReleaseFast)
+pub fn build(allocator: mem.Allocator, args: []const [:0]const u8) !void {
     const zon_path = "build.zig.zon";
     const build_path = "build.zig";
     const io = try zion_root.getIo();
@@ -33,11 +33,22 @@ pub fn build(allocator: mem.Allocator) !void {
 
     std.debug.print("Building project...\n", .{});
 
-    // Invoke zig build
-    const argv = [_][]const u8{ "zig", "build" };
+    // Build argv with forwarded args
+    var argv_list: std.ArrayListUnmanaged([]const u8) = .empty;
+    defer argv_list.deinit(allocator);
+
+    try argv_list.append(allocator, "zig");
+    try argv_list.append(allocator, "build");
+
+    // Forward remaining args (skip "zion" and "build")
+    if (args.len > 2) {
+        for (args[2..]) |arg| {
+            try argv_list.append(allocator, arg);
+        }
+    }
 
     var child = try std.process.spawn(io, .{
-        .argv = &argv,
+        .argv = argv_list.items,
         .stdin = .inherit,
         .stdout = .inherit,
         .stderr = .inherit,
