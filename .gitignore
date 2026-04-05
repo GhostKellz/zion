@@ -15,4 +15,6 @@ archive/
 .zion/cache/
 .zion/deps/
 .zion/keys/
+.zion/test/
+.zion/ghostspec/
 cktech/
