@@ -1,5 +1,5 @@
 Name:           zion
-Version:        1.1.0
+Version:        1.1.1
 Release:        1%{?dist}
 Summary:        A modern package manager for Zig
 
@@ -7,9 +7,9 @@ License:        MIT
 URL:            https://github.com/ghostkellz/zion
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
-BuildRequires:  zig >= 0.16.0
+BuildRequires:  zig >= 0.17.0
 BuildRequires:  git
-Requires:       zig >= 0.16.0
+Requires:       zig >= 0.17.0
 Requires:       curl
 Requires:       tar
 
@@ -55,5 +55,8 @@ install -Dm644 LICENSE %{buildroot}%{_docdir}/%{name}/LICENSE
 %{_docdir}/%{name}
 
 %changelog
+* Sun Apr 20 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.1.1-1
+- Updated for Zig 0.17.0 compatibility
+
 * Sat Apr 04 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.1.0-1
 - Zion-native runtime, testing, docs, and release surface refresh

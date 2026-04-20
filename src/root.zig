@@ -10,7 +10,7 @@ pub const runtime = @import("runtime.zig");
 pub const testing = @import("testing/mod.zig");
 
 /// Current version of zion
-pub const ZION_VERSION = "1.1.0";
+pub const ZION_VERSION = "1.1.1";
 
 /// Application context passed through from main to commands
 /// Contains std.Io for filesystem and network operations (required by Zig 0.16.0)

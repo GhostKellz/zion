@@ -24,7 +24,7 @@ mkdir -p "$RPMBUILD_DIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 # Create spec file
 cat > "$RPMBUILD_DIR/SPECS/zion.spec" << 'EOF'
 Name: zion
-Version: 1.1.0
+Version: 1.1.1
 Release: dev%{?dist}
 Summary: A modern, cargo-inspired package manager for Zig
 License: MIT
@@ -76,7 +76,7 @@ install -Dm644 release/completions/zion.fish %{buildroot}%{_datadir}/fish/vendor
 %{_datadir}/fish/vendor_completions.d/zion.fish
 
 %changelog
-* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - 1.1.0-1
+* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - 1.1.1-1
 - Zion-native runtime, testing, docs, and packaging refresh
 EOF
 
@@ -84,10 +84,10 @@ EOF
 cd ../..
 PKG_DIR="packages"
 mkdir -p "$PKG_DIR"
-TARBALL="$PKG_DIR/zion-1.1.0.tar.gz"
+TARBALL="$PKG_DIR/zion-1.1.1.tar.gz"
 
 echo -e "${BLUE}Creating source tarball...${NC}"
-git archive --format=tar.gz --prefix=zion-1.1.0/ HEAD > "$TARBALL"
+git archive --format=tar.gz --prefix=zion-1.1.1/ HEAD > "$TARBALL"
 cp "$TARBALL" "$RPMBUILD_DIR/SOURCES/"
 
 # Build RPM

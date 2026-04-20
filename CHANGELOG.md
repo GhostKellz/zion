@@ -5,6 +5,14 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-04-20 - "Zig 0.17.0 Compatibility"
+
+### Changed
+- Updated minimum Zig version to 0.17.0-dev.39+d092c752f
+- Ensured API compatibility with latest Zig development branch
+
+---
+
 ## [1.1.0] - 2026-04-04 - "Zion-Native Core"
 
 ### Added

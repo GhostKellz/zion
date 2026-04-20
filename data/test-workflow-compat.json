@@ -6,13 +6,13 @@
   ],
   "workflow": {
     "current": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "source": "built-in"
     },
     "zig": {
-      "minimum": "0.16.0-dev",
-      "tested": ["0.16.0-dev"],
-      "recommended": "0.16.0-dev"
+      "minimum": "0.17.0-dev",
+      "tested": ["0.17.0-dev.39+d092c752f"],
+      "recommended": "0.17.0-dev"
     },
     "paths": {
       "suite": "tests/zion_test_suite.zig",
