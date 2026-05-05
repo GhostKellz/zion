@@ -228,7 +228,7 @@ fn handleTrust(allocator: Allocator, args: []const [:0]const u8) !void {
 
     // Create a basic signer info (in real implementation, would fetch from registry)
     const signer_info = sec.SignerInfo{
-        .public_key = [_]u8{0} ** sec.PUBLIC_KEY_SIZE,
+        .public_key = @splat(0),
         .signer_id = signer_id,
         .trust_level = .medium,
         .verified_packages = 0,

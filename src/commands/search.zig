@@ -104,7 +104,8 @@ pub fn search(allocator: Allocator, args: []const []const u8) !void {
         if (!std.mem.eql(u8, current_registry, pkg.registry_name)) {
             current_registry = pkg.registry_name;
             std.debug.print("\n🌐 From {s}:\n", .{pkg.registry_name});
-            std.debug.print("{s}\n\n", .{"-" ** 60});
+            const separator: [60]u8 = @splat('-');
+            std.debug.print("{s}\n\n", .{&separator});
         }
 
         // Package header
