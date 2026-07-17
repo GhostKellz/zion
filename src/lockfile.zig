@@ -6,6 +6,7 @@ const Allocator = std.mem.Allocator;
 const json = std.json;
 const zion_root = @import("root.zig");
 const json_escape = @import("json_escape.zig");
+const AtomicFile = @import("atomic_file.zig").AtomicFile;
 
 /// Lock file format version
 pub const LOCK_FILE_VERSION: u32 = 2;
@@ -227,8 +228,8 @@ pub const LockFile = struct {
         // Parse JSON using new API
         const parsed = std.json.parseFromSlice(std.json.Value, allocator, file_content, .{}) catch |err| {
             std.debug.print("Error parsing lock file: {}\n", .{err});
-            std.debug.print("Lock file content might be corrupted. Creating new lock file.\n", .{});
-            return LockFile.init(allocator);
+            std.debug.print("Refusing to overwrite a malformed lock file.\n", .{});
+            return error.InvalidLockFile;
         };
         defer parsed.deinit();
         const root = parsed.value;
@@ -399,11 +400,10 @@ pub const LockFile = struct {
     /// Save lock file to disk
     pub fn saveToFile(self: *const LockFile) !void {
         const io = try zion_root.getIo();
-        const cwd = Dir.cwd();
         const lock_path = "zion.lock";
-
-        var file = try cwd.createFile(io, lock_path, .{ .truncate = true });
-        defer file.close(io);
+        var replacement = try AtomicFile.init(self.allocator, io, lock_path);
+        defer replacement.deinit();
+        const file = replacement.file;
 
         // Create a simple JSON structure manually for better control
         // Write version header for migration support
@@ -566,6 +566,7 @@ pub const LockFile = struct {
         }
 
         try file.writeStreamingAll(io, "  ]\n}\n");
+        try replacement.commit();
     }
 
     /// Get a package by name

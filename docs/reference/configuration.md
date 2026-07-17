@@ -27,3 +27,15 @@ zion config init --lua
 
 - Token values should be passed through environment or stdin-oriented flows where supported.
 - `zion status` and `zion debug` are useful when validating config behavior.
+
+## Storage Paths
+
+- Zig compilation uses Zig's built-in local and global caches.
+- `ZION_CACHE_DIR` overrides Zion's package and registry cache.
+- Without an override, Zion uses `XDG_CACHE_HOME/zion`, the platform user cache,
+  or `$HOME/.cache/zion` in that order.
+- Project-local transient operations use `.zion/staging/` and remove their
+  operation directory when finished.
+- Repository tests and release checks use the ignored `.scratch/` directory and
+  remove the paths they create.
+- Zion does not use the system temporary directory as a fallback.

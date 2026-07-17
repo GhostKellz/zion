@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const perf = @import("../performance.zig");
-const zion_root = @import("../root.zig");
 
 /// Performance management and monitoring command
 pub fn performance(allocator: Allocator, args: []const []const u8) !void {
@@ -37,13 +36,13 @@ fn printPerformanceHelp() !void {
         \\    status       Show performance metrics and cache status
         \\    cleanup      Clean expired cache entries and optimize storage
         \\    config       Show or modify performance configuration
-        \\    benchmark    Run download performance benchmarks
+        \\    benchmark    Reserved; no benchmark implementation is shipped
         \\
         \\EXAMPLES:
         \\    zion performance status        # Show current performance metrics
         \\    zion performance cleanup       # Clean expired cache entries
         \\    zion performance config        # Show current configuration
-        \\    zion performance benchmark     # Run performance tests
+        \\    zion performance benchmark     # Explain current availability
         \\
     ;
     std.debug.print("{s}", .{help_text});
@@ -115,24 +114,7 @@ fn handleConfig(allocator: Allocator, args: []const []const u8) !void {
 }
 
 fn handleBenchmark(allocator: Allocator, args: []const []const u8) !void {
-    _ = args; // TODO: implement benchmarking
+    _ = args;
     _ = allocator;
-
-    std.debug.print("🏁 Performance Benchmark\n", .{});
-    std.debug.print("═══════════════════════\n", .{});
-
-    std.debug.print("Running download performance tests...\n", .{});
-
-    // Simulate benchmark results
-    const start_time = zion_root.milliTimestamp();
-    zion_root.sleep(1000 * std.time.ns_per_ms); // Simulate 1 second of work
-    const end_time = zion_root.milliTimestamp();
-
-    std.debug.print("\n📊 Benchmark Results:\n", .{});
-    std.debug.print("  Test duration: {d}ms\n", .{end_time - start_time});
-    std.debug.print("  Simulated downloads: 5\n", .{});
-    std.debug.print("  Average speed: 2.5 MB/s\n", .{});
-    std.debug.print("  Cache efficiency: 85%\n", .{});
-
-    std.debug.print("\n💡 Note: Full benchmarking implementation coming soon\n", .{});
+    std.debug.print("No Zion download benchmark is implemented; no measurements were run.\n", .{});
 }

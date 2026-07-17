@@ -8,6 +8,51 @@ const enhanced_config = @import("enhanced_config.zig");
 const RegistryConfig = enhanced_config.RegistryConfig;
 const zion_root = @import("root.zig");
 
+const max_response_bytes: usize = 8 * 1024 * 1024;
+
+fn isLoopbackHost(host: []const u8) bool {
+    return std.mem.eql(u8, host, "localhost") or
+        std.mem.eql(u8, host, "127.0.0.1") or
+        std.mem.eql(u8, host, "[::1]");
+}
+
+pub fn validateRegistryUrl(url: []const u8) !void {
+    const uri = std.Uri.parse(url) catch return error.InvalidUrl;
+    if (uri.user != null or uri.password != null) return error.CredentialsInUrl;
+    const scheme = uri.scheme;
+    if (std.mem.eql(u8, scheme, "https")) return;
+    if (!std.mem.eql(u8, scheme, "http")) return error.InsecureRegistryUrl;
+    const host = uri.host orelse return error.InvalidUrl;
+    const host_text = switch (host) {
+        .raw => |value| value,
+        .percent_encoded => |value| if (std.mem.indexOfScalar(u8, value, '%') == null) value else return error.InvalidUrl,
+    };
+    if (!isLoopbackHost(host_text)) return error.InsecureRegistryUrl;
+}
+
+pub fn encodeUrlComponent(allocator: Allocator, value: []const u8) ![]u8 {
+    var encoded: std.ArrayList(u8) = .empty;
+    defer encoded.deinit(allocator);
+    const hex = "0123456789ABCDEF";
+    for (value) |byte| {
+        if (std.ascii.isAlphanumeric(byte) or byte == '-' or byte == '_' or byte == '.' or byte == '~') {
+            try encoded.append(allocator, byte);
+        } else {
+            try encoded.appendSlice(allocator, &.{ '%', hex[byte >> 4], hex[byte & 0xf] });
+        }
+    }
+    return encoded.toOwnedSlice(allocator);
+}
+
+fn validatePackagePart(value: []const u8) !void {
+    if (value.len == 0 or value.len > 100) return error.InvalidPackageReference;
+    for (value) |byte| {
+        if (!std.ascii.isAlphanumeric(byte) and byte != '-' and byte != '_' and byte != '.') {
+            return error.InvalidPackageReference;
+        }
+    }
+}
+
 /// Package structure with enhanced metadata
 pub const Package = struct {
     name: []const u8,
@@ -218,7 +263,10 @@ pub const RegistryClient = struct {
     pub fn checkHealth(self: *RegistryClient) !void {
         const start_time = zion_root.milliTimestamp();
 
-        const health_url = try std.fmt.allocPrint(self.allocator, "{s}/health", .{self.config.base_url});
+        const health_url = if (std.mem.eql(u8, self.config.name, "github"))
+            try std.fmt.allocPrint(self.allocator, "{s}/rate_limit", .{self.config.base_url})
+        else
+            try std.fmt.allocPrint(self.allocator, "{s}/health", .{self.config.base_url});
         defer self.allocator.free(health_url);
 
         const response = self.makeRequest("GET", health_url, null) catch |err| {
@@ -281,15 +329,22 @@ pub const RegistryClient = struct {
 
     /// Fetch package metadata with enhanced information
     pub fn fetchPackageMetadata(self: *RegistryClient, owner: []const u8, repo: []const u8) !Package {
+        try validatePackagePart(owner);
+        try validatePackagePart(repo);
         const api_url = try self.config.getApiUrl(self.allocator);
         defer self.allocator.free(api_url);
 
+        const encoded_owner = try encodeUrlComponent(self.allocator, owner);
+        defer self.allocator.free(encoded_owner);
+        const encoded_repo = try encodeUrlComponent(self.allocator, repo);
+        defer self.allocator.free(encoded_repo);
+
         const package_url = if (std.mem.eql(u8, self.config.name, "github"))
-            try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}", .{ api_url, owner, repo })
+            try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}", .{ api_url, encoded_owner, encoded_repo })
         else if (std.mem.eql(u8, self.config.name, "zigistry"))
-            try std.fmt.allocPrint(self.allocator, "{s}/api/packages/github/{s}/{s}", .{ api_url, owner, repo })
+            try std.fmt.allocPrint(self.allocator, "{s}/api/packages/github/{s}/{s}", .{ api_url, encoded_owner, encoded_repo })
         else
-            try std.fmt.allocPrint(self.allocator, "{s}/packages/{s}/{s}", .{ api_url, owner, repo });
+            try std.fmt.allocPrint(self.allocator, "{s}/packages/{s}/{s}", .{ api_url, encoded_owner, encoded_repo });
         defer self.allocator.free(package_url);
 
         const response = try self.makeRequest("GET", package_url, null);
@@ -326,30 +381,22 @@ pub const RegistryClient = struct {
 
     /// Fetch releases for a package
     pub fn fetchReleases(self: *RegistryClient, owner: []const u8, repo: []const u8) ![]Release {
+        try validatePackagePart(owner);
+        try validatePackagePart(repo);
         const api_url = try self.config.getApiUrl(self.allocator);
         defer self.allocator.free(api_url);
 
-        const releases_url = try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}/releases", .{ api_url, owner, repo });
+        const encoded_owner = try encodeUrlComponent(self.allocator, owner);
+        defer self.allocator.free(encoded_owner);
+        const encoded_repo = try encodeUrlComponent(self.allocator, repo);
+        defer self.allocator.free(encoded_repo);
+        const releases_url = try std.fmt.allocPrint(self.allocator, "{s}/repos/{s}/{s}/releases", .{ api_url, encoded_owner, encoded_repo });
         defer self.allocator.free(releases_url);
 
-        const response = self.makeRequest("GET", releases_url, null) catch {
-            return &[_]Release{}; // Empty releases
-        };
+        const response = try self.makeRequest("GET", releases_url, null);
         defer self.allocator.free(response);
 
-        // For mock, return a release pointing to main branch (always exists)
-        // Real HTTP implementation should fetch actual releases from GitHub API
-        var releases = try self.allocator.alloc(Release, 1);
-        const tarball_url = try std.fmt.allocPrint(self.allocator, "https://github.com/{s}/{s}/archive/refs/heads/main.tar.gz", .{ owner, repo });
-        releases[0] = Release{
-            .tag_name = try self.allocator.dupe(u8, "main"),
-            .name = try self.allocator.dupe(u8, "Main Branch"),
-            .published_at = try self.allocator.dupe(u8, "2024-01-01"),
-            .prerelease = false,
-            .tarball_url = tarball_url,
-            .zipball_url = null,
-        };
-        return releases;
+        return self.parseReleases(response);
     }
 
     /// Fetch dependency graph for a package
@@ -370,36 +417,121 @@ pub const RegistryClient = struct {
 
     /// Make HTTP request with authentication and retry logic
     pub fn makeRequest(self: *RegistryClient, method: []const u8, url: []const u8, body: ?[]const u8) ![]const u8 {
-        var retry_count: u32 = 0;
-        const max_retries = 3;
-
-        while (retry_count < max_retries) : (retry_count += 1) {
-            const result = try self.makeRequestInternal(method, url, body);
-            if (result.success) {
-                return result.data;
-            }
-
-            // Exponential backoff
-            const backoff_ms = std.math.pow(u32, 2, retry_count) * 1000;
-            zion_root.sleep(backoff_ms * std.time.ns_per_ms);
+        var attempt: u32 = 0;
+        const attempts = @max(@as(u32, self.config.retry_attempts), 1);
+        while (attempt < attempts) : (attempt += 1) {
+            return self.makeRequestInternal(method, url, body) catch |err| {
+                const retryable = switch (err) {
+                    error.RateLimited, error.RegistryServerError, error.ConnectionFailed => true,
+                    else => false,
+                };
+                if (!retryable or attempt + 1 == attempts) return err;
+                const delay_ms = @as(u64, self.config.retry_delay_ms) * (@as(u64, 1) << @intCast(attempt));
+                zion_root.sleep(delay_ms * std.time.ns_per_ms);
+                continue;
+            };
         }
-
         return error.MaxRetriesExceeded;
     }
 
-    fn makeRequestInternal(self: *RegistryClient, method: []const u8, url: []const u8, body: ?[]const u8) !struct { success: bool, data: []const u8 } {
-        // Simplified HTTP approach
-        // In a real implementation, you would use proper HTTP client with headers
-        _ = method;
-        _ = body;
+    fn makeRequestInternal(self: *RegistryClient, method_text: []const u8, url: []const u8, body: ?[]const u8) ![]const u8 {
+        const Outcome = union(enum) {
+            response: anyerror![]const u8,
+            timeout: void,
+        };
+        var outcomes: [2]Outcome = undefined;
+        var select = std.Io.Select(Outcome).init(self.io, &outcomes);
+        select.async(.response, performRequest, .{ self, method_text, url, body });
+        select.async(.timeout, waitForTimeout, .{ self.io, self.config.timeout_ms });
+        const first = try select.await();
+        switch (first) {
+            .response => |result| {
+                select.cancelDiscard();
+                return result;
+            },
+            .timeout => {
+                while (select.cancel()) |pending| switch (pending) {
+                    .response => |result| if (result) |data| self.allocator.free(data) else |_| {},
+                    .timeout => {},
+                };
+                return error.RegistryTimeout;
+            },
+        }
+    }
 
-        // Simulate HTTP request - in production, use actual HTTP client
-        const logger = @import("logger.zig");
-        logger.debug("Making request to: {s}", .{url});
+    fn waitForTimeout(io: std.Io, timeout_ms: u32) void {
+        std.Io.Timeout.sleep(.{ .duration = .{
+            .raw = .fromMilliseconds(timeout_ms),
+            .clock = .real,
+        } }, io) catch {};
+    }
 
-        // Return mock data for now
-        const mock_response = try self.allocator.dupe(u8, "{}");
-        return .{ .success = true, .data = mock_response };
+    fn performRequest(self: *RegistryClient, method_text: []const u8, url: []const u8, body: ?[]const u8) ![]const u8 {
+        try validateRegistryUrl(url);
+        const method: http.Method = if (std.mem.eql(u8, method_text, "GET"))
+            .GET
+        else if (std.mem.eql(u8, method_text, "POST"))
+            .POST
+        else
+            return error.UnsupportedHttpMethod;
+
+        const response_buffer = try self.allocator.alloc(u8, max_response_bytes + 1);
+        defer self.allocator.free(response_buffer);
+        var response_writer = std.Io.Writer.fixed(response_buffer);
+
+        var auth_value: ?[]u8 = null;
+        defer if (auth_value) |value| self.allocator.free(value);
+        var extra_headers: [2]http.Header = undefined;
+        extra_headers[0] = .{ .name = "accept", .value = "application/json" };
+        var extra_header_count: usize = 1;
+        if (self.config.auth_token) |token| {
+            if (std.mem.indexOfAny(u8, token, "\r\n") != null) return error.InvalidAuthToken;
+            auth_value = try std.fmt.allocPrint(self.allocator, "Bearer {s}", .{token});
+            extra_headers[1] = .{ .name = "authorization", .value = auth_value.? };
+            extra_header_count = 2;
+        }
+
+        const uri = std.Uri.parse(url) catch return error.InvalidUrl;
+        var request = self.http_client.request(method, uri, .{
+            // The current std HTTP client does not emit its privileged-header
+            // collection. Authenticated redirects therefore fail closed so an
+            // Authorization header can never be forwarded to another origin.
+            .redirect_behavior = if (self.config.auth_token == null) @enumFromInt(3) else .unhandled,
+            .headers = .{ .accept_encoding = .omit, .user_agent = .{ .override = "zion" } },
+            .extra_headers = extra_headers[0..extra_header_count],
+        }) catch return error.ConnectionFailed;
+        defer request.deinit();
+
+        if (body) |payload| {
+            request.sendBodyComplete(@constCast(payload)) catch return error.ConnectionFailed;
+        } else {
+            request.sendBodiless() catch return error.ConnectionFailed;
+        }
+        var redirect_buffer: [8192]u8 = undefined;
+        var response = request.receiveHead(&redirect_buffer) catch return error.ConnectionFailed;
+
+        const status = @intFromEnum(response.head.status);
+        if (status == 429) return error.RateLimited;
+        if (status >= 500) return error.RegistryServerError;
+        if (status < 200 or status >= 300) return error.RegistryRequestRejected;
+
+        const content_type = response.head.content_type orelse return error.UnexpectedContentType;
+        const media_type = std.mem.trim(u8, std.mem.sliceTo(content_type, ';'), " \t");
+        if (!std.ascii.eqlIgnoreCase(media_type, "application/json") and !std.mem.endsWith(u8, media_type, "+json")) {
+            return error.UnexpectedContentType;
+        }
+
+        const response_reader = response.reader(&.{});
+        _ = response_reader.streamRemaining(&response_writer) catch |err| switch (err) {
+            error.WriteFailed => return error.ResponseTooLarge,
+            else => return error.ConnectionFailed,
+        };
+        const received = response_writer.buffered();
+        const trimmed = std.mem.trimStart(u8, received, " \t\r\n");
+        if (trimmed.len == 0 or (trimmed[0] != '{' and trimmed[0] != '[')) {
+            return error.UnexpectedContentType;
+        }
+        return self.allocator.dupe(u8, received);
     }
 
     // URL builders for different registry types
@@ -409,16 +541,22 @@ pub const RegistryClient = struct {
 
         try url_buffer.appendSlice(self.allocator, api_url);
         try url_buffer.appendSlice(self.allocator, "/search/repositories?q=");
-        try url_buffer.appendSlice(self.allocator, query);
+        const encoded_query = try encodeUrlComponent(self.allocator, query);
+        defer self.allocator.free(encoded_query);
+        try url_buffer.appendSlice(self.allocator, encoded_query);
 
         if (filters.language) |lang| {
             try url_buffer.appendSlice(self.allocator, "+language:");
-            try url_buffer.appendSlice(self.allocator, lang);
+            const encoded = try encodeUrlComponent(self.allocator, lang);
+            defer self.allocator.free(encoded);
+            try url_buffer.appendSlice(self.allocator, encoded);
         }
 
         if (filters.license) |license| {
             try url_buffer.appendSlice(self.allocator, "+license:");
-            try url_buffer.appendSlice(self.allocator, license);
+            const encoded = try encodeUrlComponent(self.allocator, license);
+            defer self.allocator.free(encoded);
+            try url_buffer.appendSlice(self.allocator, encoded);
         }
 
         if (filters.min_stars) |min_stars| {
@@ -458,20 +596,26 @@ pub const RegistryClient = struct {
 
         try url_buffer.appendSlice(self.allocator, api_url);
         try url_buffer.appendSlice(self.allocator, "/api/searchPackages?q=");
-        try url_buffer.appendSlice(self.allocator, query);
+        const encoded_query = try encodeUrlComponent(self.allocator, query);
+        defer self.allocator.free(encoded_query);
+        try url_buffer.appendSlice(self.allocator, encoded_query);
 
         // Add Zigistry-specific filters
         if (filters.categories.len > 0) {
             try url_buffer.appendSlice(self.allocator, "&filter=");
             for (filters.categories, 0..) |category, i| {
                 if (i > 0) try url_buffer.append(self.allocator, ',');
-                try url_buffer.appendSlice(self.allocator, category);
+                const encoded = try encodeUrlComponent(self.allocator, category);
+                defer self.allocator.free(encoded);
+                try url_buffer.appendSlice(self.allocator, encoded);
             }
         }
 
         if (filters.zig_version) |version| {
             try url_buffer.appendSlice(self.allocator, "&zigVersion=");
-            try url_buffer.appendSlice(self.allocator, version);
+            const encoded = try encodeUrlComponent(self.allocator, version);
+            defer self.allocator.free(encoded);
+            try url_buffer.appendSlice(self.allocator, encoded);
         }
 
         const limit_str = try std.fmt.allocPrint(self.allocator, "&limit={d}&offset={d}", .{
@@ -485,27 +629,109 @@ pub const RegistryClient = struct {
     }
 
     fn buildGenericSearchUrl(self: *RegistryClient, api_url: []const u8, query: []const u8, filters: SearchFilters) ![]const u8 {
-        return try std.fmt.allocPrint(self.allocator, "{s}/search?q={s}&language={s}&sort={s}&order={s}&per_page={d}&page={d}", .{ api_url, query, filters.language orelse "zig", @tagName(filters.sort_by), @tagName(filters.order), filters.per_page, filters.page });
+        const encoded_query = try encodeUrlComponent(self.allocator, query);
+        defer self.allocator.free(encoded_query);
+        const encoded_language = try encodeUrlComponent(self.allocator, filters.language orelse "zig");
+        defer self.allocator.free(encoded_language);
+        return try std.fmt.allocPrint(self.allocator, "{s}/search?q={s}&language={s}&sort={s}&order={s}&per_page={d}&page={d}", .{ api_url, encoded_query, encoded_language, @tagName(filters.sort_by), @tagName(filters.order), filters.per_page, filters.page });
     }
 
     // Parsers for different response formats
     fn parsePackageMetadata(self: *RegistryClient, response: []const u8, owner: []const u8, repo: []const u8) !Package {
-        _ = response;
-        // This is a simplified parser - in reality, you'd need proper JSON parsing
-        // based on the registry type
-        const full_name = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ owner, repo });
-
-        return Package{
-            .name = try self.allocator.dupe(u8, repo),
-            .full_name = full_name,
-            .description = null,
-            .version = try self.allocator.dupe(u8, "latest"),
-            .tarball_url = try self.allocator.dupe(u8, ""),
+        if (!std.mem.eql(u8, self.config.name, "github")) return self.parseGenericPackageMetadata(response);
+        const parsed = try json.parseFromSlice(struct {
+            name: []const u8,
+            full_name: []const u8,
+            description: ?[]const u8 = null,
+            updated_at: []const u8,
+            html_url: []const u8,
+            default_branch: []const u8,
+            stargazers_count: u64 = 0,
+            license: ?struct { spdx_id: ?[]const u8 = null } = null,
+            homepage: ?[]const u8 = null,
+            topics: []const []const u8 = &.{},
+        }, self.allocator, response, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        _ = owner;
+        _ = repo;
+        var categories: std.ArrayList([]const u8) = .empty;
+        errdefer {
+            for (categories.items) |item| self.allocator.free(item);
+            categories.deinit(self.allocator);
+        }
+        for (parsed.value.topics) |topic| try categories.append(self.allocator, try self.allocator.dupe(u8, topic));
+        const archive_url = try std.fmt.allocPrint(self.allocator, "https://github.com/{s}/archive/refs/heads/{s}.tar.gz", .{ parsed.value.full_name, parsed.value.default_branch });
+        return .{
+            .name = try self.allocator.dupe(u8, parsed.value.name),
+            .full_name = try self.allocator.dupe(u8, parsed.value.full_name),
+            .description = if (parsed.value.description) |value| try self.allocator.dupe(u8, value) else null,
+            .version = try self.allocator.dupe(u8, parsed.value.default_branch),
+            .tarball_url = archive_url,
             .sha256_hash = null,
-            .published_at = try self.allocator.dupe(u8, ""),
+            .published_at = try self.allocator.dupe(u8, parsed.value.updated_at),
             .registry_name = try self.allocator.dupe(u8, self.config.name),
-            .last_updated = try self.allocator.dupe(u8, ""),
+            .license = if (parsed.value.license) |license| if (license.spdx_id) |value| try self.allocator.dupe(u8, value) else null else null,
+            .homepage = if (parsed.value.homepage) |value| try self.allocator.dupe(u8, value) else null,
+            .repository_url = try self.allocator.dupe(u8, parsed.value.html_url),
+            .stars = parsed.value.stargazers_count,
+            .last_updated = try self.allocator.dupe(u8, parsed.value.updated_at),
+            .categories = try categories.toOwnedSlice(self.allocator),
         };
+    }
+
+    fn parseGenericPackageMetadata(self: *RegistryClient, response: []const u8) !Package {
+        const parsed = try json.parseFromSlice(struct {
+            name: []const u8,
+            full_name: []const u8,
+            description: ?[]const u8 = null,
+            version: []const u8,
+            tarball_url: []const u8,
+            sha256_hash: ?[]const u8 = null,
+            published_at: []const u8 = "",
+            last_updated: []const u8 = "",
+        }, self.allocator, response, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        return .{
+            .name = try self.allocator.dupe(u8, parsed.value.name),
+            .full_name = try self.allocator.dupe(u8, parsed.value.full_name),
+            .description = if (parsed.value.description) |value| try self.allocator.dupe(u8, value) else null,
+            .version = try self.allocator.dupe(u8, parsed.value.version),
+            .tarball_url = try self.allocator.dupe(u8, parsed.value.tarball_url),
+            .sha256_hash = if (parsed.value.sha256_hash) |value| try self.allocator.dupe(u8, value) else null,
+            .published_at = try self.allocator.dupe(u8, parsed.value.published_at),
+            .registry_name = try self.allocator.dupe(u8, self.config.name),
+            .last_updated = try self.allocator.dupe(u8, parsed.value.last_updated),
+        };
+    }
+
+    fn parseReleases(self: *RegistryClient, response: []const u8) ![]Release {
+        const parsed = try json.parseFromSlice([]struct {
+            tag_name: []const u8,
+            name: ?[]const u8 = null,
+            published_at: ?[]const u8 = null,
+            prerelease: bool = false,
+            tarball_url: []const u8,
+            zipball_url: ?[]const u8 = null,
+            body: ?[]const u8 = null,
+        }, self.allocator, response, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        var releases: std.ArrayList(Release) = .empty;
+        errdefer {
+            for (releases.items) |release| release.deinit(self.allocator);
+            releases.deinit(self.allocator);
+        }
+        for (parsed.value) |release| {
+            try releases.append(self.allocator, .{
+                .tag_name = try self.allocator.dupe(u8, release.tag_name),
+                .name = try self.allocator.dupe(u8, release.name orelse release.tag_name),
+                .published_at = try self.allocator.dupe(u8, release.published_at orelse ""),
+                .prerelease = release.prerelease,
+                .tarball_url = try self.allocator.dupe(u8, release.tarball_url),
+                .zipball_url = if (release.zipball_url) |value| try self.allocator.dupe(u8, value) else null,
+                .release_notes = if (release.body) |value| try self.allocator.dupe(u8, value) else null,
+            });
+        }
+        return releases.toOwnedSlice(self.allocator);
     }
 
     fn parseGitHubSearchResults(self: *RegistryClient, response: []const u8) ![]Package {
@@ -708,6 +934,44 @@ pub const RegistryClient = struct {
         return deps.toOwnedSlice(self.allocator);
     }
 };
+
+test "registry URL policy permits HTTPS and loopback fixtures only" {
+    try validateRegistryUrl("https://registry.example.test/api");
+    try validateRegistryUrl("http://127.0.0.1:8080/api");
+    try std.testing.expectError(error.InsecureRegistryUrl, validateRegistryUrl("http://registry.example.test/api"));
+    try std.testing.expectError(error.InsecureRegistryUrl, validateRegistryUrl("file:///etc/passwd"));
+    try std.testing.expectError(error.CredentialsInUrl, validateRegistryUrl("https://user:secret@registry.example.test/api"));
+}
+
+test "registry URL components are percent encoded" {
+    const encoded = try encodeUrlComponent(std.testing.allocator, "owner/name?token=secret value");
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("owner%2Fname%3Ftoken%3Dsecret%20value", encoded);
+}
+
+test "malformed package path parts are rejected before network access" {
+    try validatePackagePart("owner-name");
+    try std.testing.expectError(error.InvalidPackageReference, validatePackagePart("../owner"));
+    try std.testing.expectError(error.InvalidPackageReference, validatePackagePart("repo?token=value"));
+}
+
+test "release parsing returns owned API metadata without fabricated branches" {
+    const config = RegistryConfig{
+        .name = "github",
+        .base_url = "https://api.github.com",
+    };
+    var client = RegistryClient.init(std.testing.allocator, config, std.testing.io);
+    defer client.deinit();
+    const releases = try client.parseReleases(
+        \\[{"tag_name":"v2.0.0","name":"two","published_at":"now","prerelease":false,"tarball_url":"https://example.test/v2.tar.gz","zipball_url":null}]
+    );
+    defer {
+        for (releases) |release| release.deinit(std.testing.allocator);
+        std.testing.allocator.free(releases);
+    }
+    try std.testing.expectEqual(@as(usize, 1), releases.len);
+    try std.testing.expectEqualStrings("v2.0.0", releases[0].tag_name);
+}
 
 /// Package cache for offline support and performance
 pub const PackageCache = struct {

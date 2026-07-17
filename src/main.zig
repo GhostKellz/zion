@@ -1,6 +1,8 @@
 const std = @import("std");
 const zion = @import("zion");
+const version = @import("build_options").version;
 const commands = zion.commands;
+const command_metadata = zion.command_metadata;
 const qol = zion.qol_enhancements;
 const Runtime = zion.runtime.Runtime;
 
@@ -9,44 +11,10 @@ const AppContext = zion.AppContext;
 
 /// Resolve command aliases to full command names
 fn resolveCommandAlias(command: []const u8) []const u8 {
-    // Common aliases
-    if (std.mem.eql(u8, command, "s")) return "search";
-    if (std.mem.eql(u8, command, "i")) return "info";
-    if (std.mem.eql(u8, command, "a")) return "add";
-    if (std.mem.eql(u8, command, "r")) return "remove";
-    if (std.mem.eql(u8, command, "u")) return "update";
-    if (std.mem.eql(u8, command, "l")) return "list";
-    if (std.mem.eql(u8, command, "c")) return "check";
-    if (std.mem.eql(u8, command, "b")) return "build";
-    if (std.mem.eql(u8, command, "t")) return "test";
-    if (std.mem.eql(u8, command, "h")) return "help";
-    if (std.mem.eql(u8, command, "v")) return "version";
-    if (std.mem.eql(u8, command, "f")) return "fetch";
-    if (std.mem.eql(u8, command, "si")) return "search-interactive";
-    if (std.mem.eql(u8, command, "reg")) return "registry";
-    if (std.mem.eql(u8, command, "cfg")) return "config";
-    if (std.mem.eql(u8, command, "sec")) return "security";
-    if (std.mem.eql(u8, command, "perf")) return "performance";
-    if (std.mem.eql(u8, command, "dbg")) return "debug";
-    if (std.mem.eql(u8, command, "tui")) return "tui";
-    if (std.mem.eql(u8, command, "ui")) return "interface";
-    if (std.mem.eql(u8, command, "kr")) return "keyring";
-    if (std.mem.eql(u8, command, "key")) return "keyring";
-    if (std.mem.eql(u8, command, "archver")) return "archver";
-
-    // New command aliases (v1.1.0)
-    if (std.mem.eql(u8, command, "w")) return "why";
-    if (std.mem.eql(u8, command, "pol")) return "policy";
-    if (std.mem.eql(u8, command, "tgt")) return "target";
-
-    // Compatibility aliases for placeholder commands
-    if (std.mem.eql(u8, command, "hc")) return "health";
-    if (std.mem.eql(u8, command, "bench")) return "benchmark";
-
-    return command;
+    return command_metadata.resolve(command);
 }
 
-/// Main entry point - accepts std.process.Init for Zig 0.16.0 compatibility
+/// Main entry point using the process initialization context provided by Zig.
 pub fn main(init: std.process.Init) !void {
     const args = init.minimal.args.toSlice(init.arena.allocator()) catch |err| {
         std.debug.print("Failed to get command line arguments: {}\n", .{err});
@@ -201,7 +169,7 @@ fn zionMain(ctx: *const AppContext) !void {
     } else if (std.mem.eql(u8, command, "analyze")) {
         try commands.analyze(allocator, args);
     } else if (std.mem.eql(u8, command, "health") or std.mem.eql(u8, command, "benchmark")) {
-        std.debug.print("⚠️  '{s}' is not part of the shipped v1.1.0 runtime surface.\n", .{command});
+        std.debug.print("⚠️  '{s}' is not part of the shipped v{s} runtime surface.\n", .{ command, version });
         std.debug.print("   Phase 3 removed the old zsync-backed runtime path; no Zion-specific std-based implementation exists yet.\n", .{});
     } else if (std.mem.eql(u8, command, "publish")) {
         try commands.publish(allocator, args);
@@ -230,7 +198,7 @@ fn zionMain(ctx: *const AppContext) !void {
     } else if (std.mem.eql(u8, command, "keyring")) {
         try commands.keyring(allocator, args);
     } else if (std.mem.eql(u8, command, "archver")) {
-        const archver_str = try allocator.dupeZ(u8, "archver");
+        const archver_str = try allocator.dupeSentinel(u8, "archver", 0);
         defer allocator.free(archver_str);
         var archver_args = [_][:0]const u8{ args[0], args[1], archver_str };
         try commands.keyring(allocator, &archver_args);

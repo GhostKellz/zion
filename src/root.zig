@@ -8,12 +8,16 @@ pub const semver = @import("semver.zig");
 pub const version_resolver = @import("version_resolver.zig");
 pub const runtime = @import("runtime.zig");
 pub const testing = @import("testing/mod.zig");
+pub const paths = @import("paths.zig");
+pub const command_metadata = @import("command_metadata.zig");
+pub const atomic_file = @import("atomic_file.zig");
+pub const dependency_transaction = @import("dependency_transaction.zig");
 
-/// Current version of zion
-pub const ZION_VERSION = "1.1.1";
+/// Current version of zion, sourced from build.zig.zon via build options.
+pub const ZION_VERSION = @import("build_options").version;
 
 /// Application context passed through from main to commands
-/// Contains std.Io for filesystem and network operations (required by Zig 0.16.0)
+/// Contains the shared filesystem and network I/O context.
 pub const AppContext = struct {
     allocator: std.mem.Allocator,
     std_io: std.Io,
@@ -39,8 +43,7 @@ pub fn getEnv(key: []const u8) ?[]const u8 {
     return ctx.environ.get(key);
 }
 
-/// Helper to sleep for a given number of nanoseconds (Zig 0.16.0 compatibility)
-/// Replaces std.Thread.sleep() which was removed
+/// Sleep for a given number of nanoseconds through libc.
 pub fn sleep(nanoseconds: u64) void {
     _ = std.c.nanosleep(&.{
         .sec = @intCast(@divTrunc(nanoseconds, std.time.ns_per_s)),
@@ -48,17 +51,14 @@ pub fn sleep(nanoseconds: u64) void {
     }, null);
 }
 
-/// Helper to get current Unix timestamp in seconds (Zig 0.16.0 compatibility)
-/// Replaces std.time.timestamp() which was removed
+/// Get the current Unix timestamp in seconds.
 pub fn timestamp() i64 {
     var ts: std.c.timespec = undefined;
     if (std.c.clock_gettime(std.posix.CLOCK.REALTIME, &ts) != 0) return 0;
     return ts.sec;
 }
 
-/// Helper to get current timestamp in milliseconds (Zig 0.16.0 compatibility)
-/// Replaces std.time.milliTimestamp() which was removed
-/// Uses monotonic clock for elapsed time measurements
+/// Get a monotonic timestamp in milliseconds for elapsed-time measurements.
 pub fn milliTimestamp() i64 {
     var ts: std.c.timespec = undefined;
     if (std.c.clock_gettime(std.posix.CLOCK.MONOTONIC, &ts) != 0) {
@@ -82,8 +82,7 @@ pub fn shouldDisableColors() bool {
     // Also check ZION_NO_COLOR for zion-specific override
     if (getEnv("ZION_NO_COLOR")) |_| return true;
     // Check if output is not a TTY (for piping)
-    // Note: In Zig 0.16.0, we'd check std.io.getStdOut().isTty() but
-    // for simplicity we'll rely on environment variables
+    // Terminal capability is inferred from the environment for now.
     if (getEnv("TERM")) |term| {
         if (std.mem.eql(u8, term, "dumb")) return true;
     }
@@ -168,6 +167,7 @@ pub const config = @import("config.zig");
 pub const registry = @import("registry.zig");
 pub const downloader = @import("downloader.zig");
 pub const hash_conversion = @import("hash_conversion.zig");
+pub const tar_extract = @import("tar_extract.zig");
 
 // Advanced print function used in the main.zig example
 pub fn advancedPrint() !void {

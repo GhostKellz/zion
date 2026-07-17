@@ -1,7 +1,7 @@
-.TH ZION 1 "April 2026" "Zion 1.1.1" "User Commands"
+.TH ZION 1 "June 2026" "Zion @VERSION@" "User Commands"
 
 .SH NAME
-zion \- Zig package manager, toolchain manager, and testing workflow tool
+zion \- Zig project, toolchain, dependency metadata, and testing utility
 
 .SH SYNOPSIS
 .B zion
@@ -10,8 +10,9 @@ zion \- Zig package manager, toolchain manager, and testing workflow tool
 
 .SH DESCRIPTION
 .B Zion
-is a Zig development tool that combines package management, Zig/ZLS environment management,
-security workflows, and a Zion-native testing surface.
+is a Zig development tool for project scaffolding, dependency metadata, Zig/ZLS
+environment management, security helpers, and a Zion-native testing surface.
+Registry-backed package operations are experimental.
 
 .SH CORE COMMANDS
 .TP
@@ -20,7 +21,7 @@ Initialize a new Zig project.
 
 .TP
 .B add
-Add a dependency to the current project.
+Experimentally resolve and add a dependency to the current project.
 
 .TP
 .B remove , rm
@@ -28,11 +29,11 @@ Remove a dependency from the current project.
 
 .TP
 .B update
-Update dependencies.
+Experimentally resolve dependency updates.
 
 .TP
 .B fetch
-Fetch dependencies and cache them locally.
+Experimentally fetch dependencies and cache them locally.
 
 .TP
 .B build
@@ -120,7 +121,7 @@ Neovim integration helpers.
 .SH REGISTRIES, SECURITY, AND POLICY
 .TP
 .B registry
-Manage configured registries and connectivity.
+Inspect and configure experimental registry integrations.
 
 .TP
 .B security
@@ -140,7 +141,7 @@ Package trust policy management.
 
 .TP
 .B publish
-Publish a package.
+Experimentally publish a package.
 
 .SH TEST WORKFLOW
 .TP
@@ -166,7 +167,7 @@ Run benchmark-focused workflow cases.
 
 .TP
 .B zion test ci
-Run CI profile workflow cases.
+Run automation-profile workflow cases.
 
 .TP
 .B zion test report
@@ -228,13 +229,25 @@ Zion-native test workflow artifacts.
 
 .SH REQUIREMENTS
 .TP
-Zig 0.16.0-dev or newer
+Zig toolchain satisfying .minimum_zig_version in build.zig.zon
 .TP
 curl
+
 .TP
 tar
 .TP
 git
+
+.SH COMMAND MATURITY INDEX
+Stable local commands: init, remove, list, info, check, build, clean, lock,
+hash, run, test, tree, why, policy, target, doc, config, cache, status, setup,
+version, and help.
+
+Experimental commands: add, update, fetch, pin, unpin, repair, outdated, nvim,
+security, performance, debug, zig, search, registry, publish,
+search-interactive, verify, tui, zls, workspace, and keyring.
+
+Reserved or compatibility surfaces: template, fmt, analyze, and interface.
 
 .SH SEE ALSO
 .BR zig (1)

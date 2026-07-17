@@ -1,6 +1,6 @@
 # Installation
 
-Install Zion on a current Zig 0.16.0-dev workflow.
+Zion tracks its minimum supported Zig toolchain in the repository manifest.
 
 ## Quick Install
 
@@ -18,7 +18,7 @@ curl -fsSL https://zion.cktech.sh | bash
 
 ## Requirements
 
-- Zig 0.16.0-dev
+- A Zig toolchain satisfying `.minimum_zig_version` in `build.zig.zon`
 - curl
 - tar
 - git
@@ -30,6 +30,13 @@ git clone https://github.com/ghostkellz/zion.git
 cd zion
 zig build -Doptimize=ReleaseSafe
 zig build install
+```
+
+Check the installed toolchain and the manifest requirement before building:
+
+```bash
+zig version
+sed -n 's/.*\.minimum_zig_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' build.zig.zon
 ```
 
 ## Verification

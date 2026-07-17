@@ -29,7 +29,7 @@ chmod +x build.sh
 
 ## Requirements
 
-- Zig 0.16.0-dev or newer
+- A Zig toolchain satisfying `.minimum_zig_version` in `build.zig.zon`
 - pacman
 - makepkg
 - git

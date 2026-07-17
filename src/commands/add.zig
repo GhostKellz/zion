@@ -15,6 +15,7 @@ const security = @import("../security.zig");
 const semver = @import("../semver.zig");
 const version_resolver = @import("../version_resolver.zig");
 const tar_extract = @import("../tar_extract.zig");
+const DependencyTransaction = @import("../dependency_transaction.zig").DependencyTransaction;
 
 /// Result of parsing a GitHub shorthand reference
 pub const GitHubShorthand = struct {
@@ -278,6 +279,15 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         }
     }
 
+    validateDependencySupport(package.dependencies) catch |err| {
+        if (err == error.OptionalDependenciesUnsupported) {
+            std.debug.print("❌ Optional dependencies require explicit selection, which is not supported yet.\n", .{});
+        } else {
+            std.debug.print("❌ Transitive dependency installation is not supported yet; add required dependencies explicitly.\n", .{});
+        }
+        return err;
+    };
+
     if (options.dry_run) {
         std.debug.print("\n🔍 Dry run complete. No changes made.\n", .{});
         return;
@@ -363,8 +373,11 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
         try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
     defer allocator.free(deps_path);
 
-    std.debug.print("📦 Extracting package to {s}...\n", .{deps_path});
-    try tar_extract.extractPackage(allocator, download_result.cache_path, deps_path);
+    var transaction = try DependencyTransaction.init(allocator, io, package_name, options.dev_only);
+    defer transaction.deinit();
+
+    std.debug.print("📦 Staging verified package for {s}...\n", .{deps_path});
+    try tar_extract.extractPackage(allocator, download_result.cache_path, transaction.staged_path);
 
     // Update build.zig.zon
     std.debug.print("📝 Updating build.zig.zon...\n", .{});
@@ -425,6 +438,9 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
     );
     try lock_file.saveToFile();
 
+    try transaction.installStaged();
+    try transaction.commit();
+
     // Auto-integrate into build.zig if requested
     if (options.auto_integrate) {
         std.debug.print("🔧 Updating build.zig...\n", .{});
@@ -453,6 +469,26 @@ fn addSingleDependency(allocator: Allocator, package_ref: []const u8, config: *e
 
     // Show update notification if package has newer version
     // This would check against the registry in a real implementation
+}
+
+fn validateDependencySupport(dependencies: []const package_registry.Dependency) !void {
+    for (dependencies) |dependency| {
+        if (dependency.optional) return error.OptionalDependenciesUnsupported;
+    }
+    if (dependencies.len > 0) return error.TransitiveDependenciesUnsupported;
+}
+
+test "unsupported dependency kinds fail explicitly" {
+    try validateDependencySupport(&.{});
+    try std.testing.expectError(error.TransitiveDependenciesUnsupported, validateDependencySupport(&.{.{
+        .name = "required",
+        .version_requirement = "*",
+    }}));
+    try std.testing.expectError(error.OptionalDependenciesUnsupported, validateDependencySupport(&.{.{
+        .name = "optional",
+        .version_requirement = "*",
+        .optional = true,
+    }}));
 }
 
 /// Add multiple packages with parallel processing

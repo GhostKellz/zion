@@ -10,6 +10,8 @@ const Dependency = package_registry.Dependency;
 const SearchFilters = package_registry.SearchFilters;
 const RegistryHealth = package_registry.RegistryHealth;
 const zion_root = @import("root.zig");
+const paths = @import("paths.zig");
+const semver = @import("semver.zig");
 
 /// Registry Manager - coordinates multiple registries
 pub const RegistryManager = struct {
@@ -39,9 +41,12 @@ pub const RegistryManager = struct {
 
                 // Enable caching if configured
                 if (self.config.max_cache_size_mb > 0) {
-                    const cache_dir = try std.fmt.allocPrint(self.allocator, "{s}/registry_{s}", .{ "/tmp/zion-cache", reg_config.name });
+                    const base_cache_dir = try paths.cacheDir(self.allocator);
+                    defer self.allocator.free(base_cache_dir);
+                    const cache_dir = try std.fs.path.join(self.allocator, &.{ base_cache_dir, "registries", reg_config.name });
                     defer self.allocator.free(cache_dir);
 
+                    try paths.ensurePrivateDir(io, cache_dir);
                     try client.enableCache(cache_dir, self.config.cache_ttl_hours);
                 }
 
@@ -100,10 +105,12 @@ pub const RegistryManager = struct {
             const repo = parts.next() orelse continue;
 
             // Try to fetch package metadata
-            const package = client.fetchPackageMetadata(owner, repo) catch |err| {
+            var package = client.fetchPackageMetadata(owner, repo) catch |err| {
                 std.log.debug("Failed to fetch package from {s}: {any}", .{ client.config.name, err });
                 continue;
             };
+            self.allocator.free(package.version);
+            package.version = try self.allocator.dupe(u8, version orelse "latest");
 
             try resolved_packages.append(self.allocator, package);
 
@@ -211,9 +218,9 @@ pub const RegistryManager = struct {
             // Find matching version
             // Handle "latest" specially - return the first (most recent) release
             if (std.mem.eql(u8, version, "latest")) {
-                if (releases.len > 0) {
+                if (selectLatestStableRelease(releases)) |release| {
                     return DownloadInfo{
-                        .url = try self.allocator.dupe(u8, releases[0].tarball_url),
+                        .url = try self.allocator.dupe(u8, release.tarball_url),
                         .sha256_hash = null,
                         .registry_name = try self.allocator.dupe(u8, client.config.name),
                         .size = 0,
@@ -335,6 +342,33 @@ pub const RegistryManager = struct {
         };
     }
 };
+
+fn selectLatestStableRelease(releases: []const Release) ?Release {
+    var fallback: ?Release = null;
+    var best: ?Release = null;
+    var best_version: ?semver.Version = null;
+    for (releases) |release| {
+        if (release.prerelease) continue;
+        if (fallback == null) fallback = release;
+        const version_text = if (std.mem.startsWith(u8, release.tag_name, "v")) release.tag_name[1..] else release.tag_name;
+        const parsed = semver.Version.parse(version_text) catch continue;
+        if (parsed.isPrerelease()) continue;
+        if (best_version == null or parsed.compare(best_version.?) == .gt) {
+            best = release;
+            best_version = parsed;
+        }
+    }
+    return best orelse fallback;
+}
+
+test "latest release selection prefers highest stable semantic version" {
+    const releases = [_]Release{
+        .{ .tag_name = "v1.9.0", .name = "", .published_at = "", .prerelease = false, .tarball_url = "one", .zipball_url = null },
+        .{ .tag_name = "v2.0.0-beta.1", .name = "", .published_at = "", .prerelease = true, .tarball_url = "beta", .zipball_url = null },
+        .{ .tag_name = "v1.10.0", .name = "", .published_at = "", .prerelease = false, .tarball_url = "two", .zipball_url = null },
+    };
+    try std.testing.expectEqualStrings("v1.10.0", selectLatestStableRelease(&releases).?.tag_name);
+}
 
 pub const DownloadInfo = struct {
     url: []const u8,

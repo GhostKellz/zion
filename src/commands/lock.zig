@@ -97,6 +97,7 @@ fn lockDefault(allocator: Allocator) !void {
     }
 
     if (count == 0) {
+        try lock_file.saveToFile();
         std.debug.print("No dependencies found to lock.\n", .{});
     } else if (updated_lock) {
         // Save the updated lock file

@@ -1,8 +1,8 @@
 # Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
 pkgname=zion
-pkgver=1.1.1
+pkgver=1.1.3
 pkgrel=1
-pkgdesc="A modern, cargo-inspired package manager for the Zig programming language"
+pkgdesc="A Zig project, toolchain, and dependency metadata utility"
 arch=('x86_64' 'aarch64')
 url="https://github.com/ghostkellz/zion"
 license=('MIT')
@@ -28,8 +28,9 @@ package() {
     install -Dm644 "docs/getting-started/installation.md" "$pkgdir/usr/share/doc/zion/installation.md"
     install -Dm644 "docs/reference/commands.md" "$pkgdir/usr/share/doc/zion/commands.md"
 
-    # Install man page
-    install -Dm644 "release/man/zion.1" "$pkgdir/usr/share/man/man1/zion.1"
+    # Install man page (stamp version from build.zig.zon)
+    sed "s/@VERSION@/$pkgver/g" "release/man/zion.1" > "$pkgdir/usr/share/man/man1/zion.1"
+    chmod 644 "$pkgdir/usr/share/man/man1/zion.1"
 
     # Install shell completions
     install -Dm644 "release/completions/zion.bash" "$pkgdir/usr/share/bash-completion/completions/zion"

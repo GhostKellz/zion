@@ -5,6 +5,36 @@ All notable changes to Zion will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-07-16 - "Release Baseline Cleanup"
+
+### Changed
+- The runtime, installers, packaging helpers, and release checks now keep
+  project-created staging and scratch data inside project or platform-owned
+  directories instead of the system temporary directory.
+- `build.zig.zon` is the source of truth for the Zion release and minimum Zig
+  versions used by the binary and package builders.
+- Maintained documentation and package descriptions now distinguish stable
+  local project utilities from experimental registry-backed operations.
+- Packaging (Debian, RPM, Arch, man page) now derives its version from
+  `build.zig.zon` at build time instead of hardcoded strings.
+
+### Fixed
+- Updated the codebase for the Zig toolchain declared in `build.zig.zon`.
+- Removed stale toolchain-version prose and corrected release verification paths.
+- Applied private permissions and cleanup behavior to Zion staging and cache
+  directories.
+- **`b.args` removal** - Replaced the old run-args pattern in `build.zig` with the
+  new `run_cmd.addPassthruArgs()` idiom.
+- **`Allocator.dupeZ` removal** - Migrated all 10 call sites to
+  `dupeSentinel(u8, x, 0)` across `tui.zig`, `main.zig`, `mod.zig`, `setup.zig`,
+  and `setup_command_test.zig`.
+- **Version drift** - The binary reported a stale version because `src/root.zig`
+  hardcoded `ZION_VERSION`. The version is now sourced from `build.zig.zon` via
+  build options (`@import("build_options").version`), making `build.zig.zon` the
+  single source of truth.
+
+---
+
 ## [1.1.1] - 2026-04-20 - "Zig 0.17.0 Compatibility"
 
 ### Changed

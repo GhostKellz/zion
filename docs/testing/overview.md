@@ -34,12 +34,6 @@ Run benchmark-focused workflow:
 zion test bench --cases 50 --time-budget 250
 ```
 
-Run hardened CI profile:
-
-```bash
-zion test ci --ci-profile hardened
-```
-
 Generate a structured report:
 
 ```bash
@@ -57,3 +51,17 @@ zion test report --open --include fuzz
 
 - corpus/crash replay is not fully implemented yet
 - the in-tree property and benchmark helper modules are not yet the sole execution backbone of the generated suite
+
+## Repository Gate Inventory
+
+`zig build test` is the authoritative repository test step. It executes tests
+reachable from `src/root.zig` and `src/main.zig`, the maintained command alias
+suite in `src/tests/active_test_runner.zig`, the loopback registry fixture, and
+the isolated dependency-transaction fixture. The fixture server covers success,
+authentication, redirects, timeouts, malformed JSON, response limits, rate
+limits, and retry recovery without internet access. Transaction fixtures cover
+rollback and interrupted-write recovery under `.scratch/`.
+
+The old `src/tests/*` zsync suites are retained only as historical migration
+input and are not test authority. `test_build.zig` no longer references removed
+zsync or phantom packages.

@@ -28,7 +28,10 @@ echo -e "${GREEN}Found Zig: ${ZIG_VERSION}${NC}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
-# Build Zion with the dev version of Zig
+# Single source of truth: pull version from build.zig.zon
+VERSION="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_ROOT/build.zig.zon" | head -1)"
+
+# Build Zion with the installed Zig toolchain.
 echo -e "${BLUE}Building Zion using Zig ${ZIG_VERSION}...${NC}"
 cd "$REPO_ROOT"
 zig build -Doptimize=ReleaseSafe
@@ -134,15 +137,23 @@ case $INSTALL_CHOICE in
         # Install man page
         MAN_DIR="/usr/local/share/man/man1"
         echo -e "${BLUE}Installing man page...${NC}"
+        # Stamp version from build.zig.zon into the man page template.
+        mkdir -p "$REPO_ROOT/.scratch"
+        RENDERED_MAN="$REPO_ROOT/.scratch/zion-man-$$.1"
+        trap 'rm -f "$RENDERED_MAN"' EXIT INT TERM
+        sed "s/@VERSION@/$VERSION/g" "$REPO_ROOT/release/man/zion.1" > "$RENDERED_MAN"
         if command -v sudo &> /dev/null; then
             sudo mkdir -p "$MAN_DIR"
-            sudo cp "$REPO_ROOT/release/man/zion.1" "$MAN_DIR/zion.1"
+            sudo cp "$RENDERED_MAN" "$MAN_DIR/zion.1"
             sudo mandb &>/dev/null
             echo -e "${GREEN}Man page installed to $MAN_DIR/zion.1${NC}"
         else
-            su -c "mkdir -p '$MAN_DIR' && cp '$REPO_ROOT/release/man/zion.1' '$MAN_DIR/zion.1' && mandb &>/dev/null"
+            su -c "mkdir -p '$MAN_DIR' && cp '$RENDERED_MAN' '$MAN_DIR/zion.1' && mandb &>/dev/null"
             echo -e "${GREEN}Man page installed to $MAN_DIR/zion.1${NC}"
         fi
+        rm -f "$RENDERED_MAN"
+        rmdir "$REPO_ROOT/.scratch" 2>/dev/null || true
+        trap - EXIT INT TERM
         ;;
     3)
         echo -e "${GREEN}Build completed. Binary is at:${NC}"

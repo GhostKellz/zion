@@ -90,7 +90,7 @@ fn executeIntegrationWorkflow(ctx: CommandContext, mode: integration.RunMode) !v
     const extras = ctx.extraArgs(3);
     integration.executeWorkflow(ctx.allocator, mode, extras) catch |err| switch (err) {
         error.SpawnFailed => {
-            std.debug.print("❌ Unable to spawn 'zig'. Ensure Zig 0.16+ is installed and on PATH.\n", .{});
+            std.debug.print("❌ Unable to spawn 'zig'. Ensure the required Zig toolchain is installed and on PATH.\n", .{});
             return err;
         },
         else => return err,
@@ -290,6 +290,10 @@ fn handleInfo(ctx: CommandContext) !void {
 
     if (workflow_obj.get("zig")) |zig_val| switch (zig_val) {
         .object => |zig_obj| {
+            if (zig_obj.get("compatibility_source")) |source_val| switch (source_val) {
+                .string => |source| std.debug.print("\nZig compatibility: {s}\n", .{source}),
+                else => {},
+            };
             if (zig_obj.get("minimum")) |min_val| switch (min_val) {
                 .string => |min| std.debug.print("\nZig minimum: {s}\n", .{min}),
                 else => {},

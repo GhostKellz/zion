@@ -46,8 +46,9 @@ fn makeSingleRequest(allocator: std.mem.Allocator, url: []const u8, timeout_sec:
     // Set connection timeout
     const timeout_ns = @as(u64, timeout_sec) * std.time.ns_per_s;
 
+    var server_header_buffer: [16384]u8 = @splat(0);
     var req = client.open(.GET, try std.Uri.parse(url), .{
-        .server_header_buffer = &[_]u8{0} ** 16384,
+        .server_header_buffer = &server_header_buffer,
         .connection = .{ .timeout_ms = @intCast(timeout_sec * 1000) },
     }) catch return HttpError.NetworkError;
     defer req.deinit(allocator);

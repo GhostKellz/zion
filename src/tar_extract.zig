@@ -95,6 +95,18 @@ fn parseEntryType(line: []const u8) u8 {
     };
 }
 
+test "unsafe archive paths and entry types are rejected" {
+    try std.testing.expect(validateEntryPath("package/src/main.zig", .{}) == null);
+    try std.testing.expect(validateEntryPath("../escape", .{}) != null);
+    try std.testing.expect(validateEntryPath("package/../../escape", .{}) != null);
+    try std.testing.expect(validateEntryPath("/absolute", .{}) != null);
+    try std.testing.expect(validateEntryPath("package\\..\\escape", .{}) != null);
+    try std.testing.expectEqual(@as(u8, 'l'), parseEntryType("lrwxrwxrwx owner/group 0 date time link"));
+    try std.testing.expectEqual(@as(u8, 'h'), parseEntryType("hrw-r--r-- owner/group 0 date time hardlink"));
+    try std.testing.expectEqual(@as(u8, 'D'), parseEntryType("crw------- owner/group 0 date time device"));
+    try std.testing.expectEqual(@as(u8, '?'), parseEntryType("prw------- owner/group 0 date time fifo"));
+}
+
 /// List and validate tarball contents before extraction
 pub fn validateTarball(allocator: Allocator, tarball_path: []const u8, options: ExtractOptions) !ValidationResult {
     const io = try zion_root.getIo();
@@ -173,6 +185,15 @@ pub fn validateTarball(allocator: Allocator, tarball_path: []const u8, options: 
 
         // Parse entry type from tar -tv output
         const entry_type = parseEntryType(line);
+
+        if (entry_type == '?') {
+            result.valid = false;
+            try result.rejected_entries.append(allocator, try allocator.dupe(u8, line));
+            if (result.error_message == null) {
+                result.error_message = try allocator.dupe(u8, "unsupported archive entry type");
+            }
+            continue;
+        }
 
         // Check for device files
         if (entry_type == 'D') {

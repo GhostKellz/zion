@@ -119,15 +119,15 @@ fn setupZig(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("  📦 Installing Zig {s}...\n", .{version});
 
         // Use the existing zig_manager to install
-        const version_z = try allocator.dupeZ(u8, version);
+        const version_z = try allocator.dupeSentinel(u8, version, 0);
         defer allocator.free(version_z);
         const handler = zig_manager_override orelse zig_manager.zig_manager;
 
         var install_args = try std.ArrayList([:0]u8).initCapacity(allocator, 4);
         defer install_args.deinit(allocator);
-        try install_args.append(allocator, try allocator.dupeZ(u8, "zion"));
-        try install_args.append(allocator, try allocator.dupeZ(u8, "zig"));
-        try install_args.append(allocator, try allocator.dupeZ(u8, "install"));
+        try install_args.append(allocator, try allocator.dupeSentinel(u8, "zion", 0));
+        try install_args.append(allocator, try allocator.dupeSentinel(u8, "zig", 0));
+        try install_args.append(allocator, try allocator.dupeSentinel(u8, "install", 0));
         try install_args.append(allocator, version_z);
 
         try handler(allocator, install_args.items);
@@ -135,9 +135,9 @@ fn setupZig(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("  🔗 Setting as active version...\n", .{});
         var use_args = try std.ArrayList([:0]u8).initCapacity(allocator, 4);
         defer use_args.deinit(allocator);
-        try use_args.append(allocator, try allocator.dupeZ(u8, "zion"));
-        try use_args.append(allocator, try allocator.dupeZ(u8, "zig"));
-        try use_args.append(allocator, try allocator.dupeZ(u8, "use"));
+        try use_args.append(allocator, try allocator.dupeSentinel(u8, "zion", 0));
+        try use_args.append(allocator, try allocator.dupeSentinel(u8, "zig", 0));
+        try use_args.append(allocator, try allocator.dupeSentinel(u8, "use", 0));
         try use_args.append(allocator, version_z);
 
         try handler(allocator, use_args.items);

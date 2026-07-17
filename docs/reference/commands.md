@@ -16,6 +16,9 @@
 
 ## Package Management
 
+These commands are experimental while real registry response handling and
+transactional manifest updates are being completed.
+
 ```bash
 zion add <package>
 zion add <package>@<version>

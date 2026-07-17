@@ -2,7 +2,7 @@
 
 complete -c zion -f
 
-for cmd in init add remove rm update list ls info fetch pin unpin repair check build clean lock hash run test tree why policy target doc outdated nvim config security performance debug zig search registry template fmt analyze version publish search-interactive verify cache tui status setup zls workspace keyring help
+for cmd in init add remove rm update list ls info fetch pin unpin repair check build clean lock hash run test tree why policy target doc outdated nvim config security performance debug zig search registry template fmt analyze version publish search-interactive interface verify cache tui status setup zls workspace keyring help
     complete -c zion -n '__fish_use_subcommand' -a "$cmd"
 end
 

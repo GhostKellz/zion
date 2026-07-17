@@ -5,6 +5,15 @@
 
 set -e
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEST_WORKSPACE="$REPO_ROOT/.scratch/v1.0.7-workspace"
+
+cleanup() {
+    rm -rf "$TEST_WORKSPACE"
+    rmdir "$REPO_ROOT/.scratch" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
 echo "🧪 Zion v1.0.7 Comprehensive Test Suite"
 echo "======================================"
 
@@ -159,26 +168,26 @@ echo -e "\n📦 Package Management Tests"
 echo "==========================="
 
 # Create test workspace
-mkdir -p /tmp/zion-test-workspace
-cd /tmp/zion-test-workspace
+mkdir -p "$TEST_WORKSPACE"
+cd "$TEST_WORKSPACE"
 
 # Initialize test project
-run_test "Initialize test project" "../../../data/projects/zion/zig-out/bin/zion init"
+run_test "Initialize test project" "\"$REPO_ROOT/zig-out/bin/zion\" init"
 
 # Test adding packages (should be faster with vectorized downloads)
-benchmark_test "Add package speed" "../../../data/projects/zion/zig-out/bin/zion add ziglang/zig-clap 2>/dev/null || true" "10"
+benchmark_test "Add package speed" "\"$REPO_ROOT/zig-out/bin/zion\" add ziglang/zig-clap 2>/dev/null || true" "10"
 
 # Test batch operations (should be 5-10x faster)  
-benchmark_test "Batch add speed" "../../../data/projects/zion/zig-out/bin/zion add ziglang/zig-clap Hejsil/zig-clap 2>/dev/null || true" "15"
+benchmark_test "Batch add speed" "\"$REPO_ROOT/zig-out/bin/zion\" add ziglang/zig-clap Hejsil/zig-clap 2>/dev/null || true" "15"
 
 echo -e "\n🛡️ Error Handling Tests"
 echo "======================"
 
 # Test error handling improvements
-run_test "Graceful failure - invalid package" "../../../data/projects/zion/zig-out/bin/zion add nonexistent/invalid-package-12345 2>/dev/null" "1"
+run_test "Graceful failure - invalid package" "\"$REPO_ROOT/zig-out/bin/zion\" add nonexistent/invalid-package-12345 2>/dev/null" "1"
 
 # Test timeout handling
-run_test "Timeout handling" "timeout 5s ../../../data/projects/zion/zig-out/bin/zion search test 2>/dev/null || true"
+run_test "Timeout handling" "timeout 5s \"$REPO_ROOT/zig-out/bin/zion\" search test 2>/dev/null || true"
 
 echo -e "\n🧠 Memory Tests"
 echo "==============="
@@ -186,8 +195,8 @@ echo "==============="
 # Test memory efficiency (should use 15% less memory)
 run_test "Memory leak check - multiple operations" "
     for i in {1..5}; do 
-        ../../../data/projects/zion/zig-out/bin/zion health >/dev/null 2>&1 || true
-        ../../../data/projects/zion/zig-out/bin/zion benchmark >/dev/null 2>&1 || true
+        "$REPO_ROOT/zig-out/bin/zion" health >/dev/null 2>&1 || true
+        "$REPO_ROOT/zig-out/bin/zion" benchmark >/dev/null 2>&1 || true
     done
 "
 
@@ -195,27 +204,27 @@ echo -e "\n🔄 Backward Compatibility Tests"
 echo "==============================="
 
 # Test that all old commands still work
-run_test "Old init command" "../../../data/projects/zion/zig-out/bin/zion init 2>/dev/null || true"
-run_test "Old list command" "../../../data/projects/zion/zig-out/bin/zion list 2>/dev/null || true"
-run_test "Old remove command" "../../../data/projects/zion/zig-out/bin/zion remove zig-clap 2>/dev/null || true"
+run_test "Old init command" "\"$REPO_ROOT/zig-out/bin/zion\" init 2>/dev/null || true"
+run_test "Old list command" "\"$REPO_ROOT/zig-out/bin/zion\" list 2>/dev/null || true"
+run_test "Old remove command" "\"$REPO_ROOT/zig-out/bin/zion\" remove zig-clap 2>/dev/null || true"
 
 echo -e "\n🎯 Alias Tests"
 echo "============="
 
 # Test all new aliases
-run_test_with_output "Search alias (s)" "../../../data/projects/zion/zig-out/bin/zion s test 2>/dev/null || true" ""
-run_test_with_output "Add alias (a)" "../../../data/projects/zion/zig-out/bin/zion a --help 2>/dev/null || true" ""
-run_test_with_output "Help alias (h)" "../../../data/projects/zion/zig-out/bin/zion h 2>/dev/null || true" ""
+run_test_with_output "Search alias (s)" "\"$REPO_ROOT/zig-out/bin/zion\" s test 2>/dev/null || true" ""
+run_test_with_output "Add alias (a)" "\"$REPO_ROOT/zig-out/bin/zion\" a --help 2>/dev/null || true" ""
+run_test_with_output "Help alias (h)" "\"$REPO_ROOT/zig-out/bin/zion\" h 2>/dev/null || true" ""
 
 echo -e "\n🚀 Async Feature Tests"
 echo "====================="
 
 # Test that async features are available
-run_test_with_output "Async runtime initialization" "../../../data/projects/zion/zig-out/bin/zion benchmark 2>&1" "zsync"
+run_test_with_output "Async runtime initialization" "\"$REPO_ROOT/zig-out/bin/zion\" benchmark 2>&1" "zsync"
 
 # Test graceful fallback when async fails
 export ZION_FORCE_SYNC=1
-run_test "Sync fallback mode" "../../../data/projects/zion/zig-out/bin/zion version"
+run_test "Sync fallback mode" "\"$REPO_ROOT/zig-out/bin/zion\" version"
 unset ZION_FORCE_SYNC
 
 echo -e "\n🔧 Configuration Tests"  
@@ -228,7 +237,7 @@ fi
 
 # Cleanup
 cd - >/dev/null
-rm -rf /tmp/zion-test-workspace
+cleanup
 
 echo -e "\n📊 Test Results Summary"
 echo "======================="

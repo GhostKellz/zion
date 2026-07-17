@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
+const paths = @import("paths.zig");
 
 /// Quality of Life Enhancements for Zion
 /// Focuses on CLI improvements, smart suggestions, and user experience
@@ -108,7 +109,7 @@ pub const CommandSuggester = struct {
                 matrix[i][j] = @min(matrix[i - 1][j] + 1, // deletion
                     @min(matrix[i][j - 1] + 1, // insertion
                         matrix[i - 1][j - 1] + cost // substitution
-                        ));
+                    ));
             }
         }
 
@@ -256,8 +257,7 @@ pub const PerformanceHints = struct {
         std.debug.print("  🖥️  CPU Cores: {} (recommending {} parallel downloads)\n", .{ cpu_count, available_parallelism });
 
         // Check cache directory
-        const home_dir = std.posix.getenv("HOME") orelse "/tmp";
-        const cache_dir = try std.fmt.allocPrint(allocator, "{s}/.cache/zion", .{home_dir});
+        const cache_dir = try paths.cacheDir(allocator);
         defer allocator.free(cache_dir);
 
         var cache_size: u64 = 0;
@@ -332,8 +332,11 @@ pub const CommandHistory = struct {
     history_file: []const u8,
 
     pub fn init(allocator: Allocator) !CommandHistory {
-        const home_dir = std.posix.getenv("HOME") orelse "/tmp";
-        const history_file = try std.fmt.allocPrint(allocator, "{s}/.zion_history", .{home_dir});
+        const state_dir = try paths.stateDir(allocator);
+        defer allocator.free(state_dir);
+        const io = try zion_root.getIo();
+        try paths.ensurePrivateDir(io, state_dir);
+        const history_file = try std.fs.path.join(allocator, &.{ state_dir, "history" });
 
         return CommandHistory{
             .allocator = allocator,

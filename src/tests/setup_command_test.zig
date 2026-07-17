@@ -56,10 +56,10 @@ test "setup zig installs and activates specified version" {
     setup.zig_manager_override = SetupHarness.handler;
 
     var args = [_][:0]u8{
-        try allocator.dupeZ(u8, "zion"),
-        try allocator.dupeZ(u8, "setup"),
-        try allocator.dupeZ(u8, "zig"),
-        try allocator.dupeZ(u8, "--version=0.14.1"),
+        try allocator.dupeSentinel(u8, "zion", 0),
+        try allocator.dupeSentinel(u8, "setup", 0),
+        try allocator.dupeSentinel(u8, "zig", 0),
+        try allocator.dupeSentinel(u8, "--version=0.14.1", 0),
     };
     defer {
         for (args) |arg| allocator.free(arg);
@@ -89,10 +89,10 @@ test "setup zig respects skip install flag" {
     setup.zig_manager_override = SetupHarness.handler;
 
     var args = [_][:0]u8{
-        try allocator.dupeZ(u8, "zion"),
-        try allocator.dupeZ(u8, "setup"),
-        try allocator.dupeZ(u8, "zig"),
-        try allocator.dupeZ(u8, "--skip-install"),
+        try allocator.dupeSentinel(u8, "zion", 0),
+        try allocator.dupeSentinel(u8, "setup", 0),
+        try allocator.dupeSentinel(u8, "zig", 0),
+        try allocator.dupeSentinel(u8, "--skip-install", 0),
     };
     defer {
         for (args) |arg| allocator.free(arg);

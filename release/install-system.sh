@@ -4,6 +4,17 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRATCH_ROOT="$REPO_ROOT/.scratch"
+BUILD_DIR="$SCRATCH_ROOT/install-system-$$"
+
+cleanup() {
+  rm -rf "$BUILD_DIR"
+  rmdir "$SCRATCH_ROOT" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
 # Colors for terminal output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,7 +33,7 @@ fi
 echo -e "${BLUE}Checking for Zig installation...${NC}"
 if ! command -v zig &> /dev/null; then
   echo -e "${RED}Error: Zig is not installed or not in PATH${NC}"
-  echo -e "Please install Zig 0.16.0-dev or newer from https://ziglang.org/download/"
+  echo -e "Please install the Zig version declared by build.zig.zon."
   exit 1
 fi
 
@@ -40,9 +51,9 @@ for cmd in curl tar git; do
 done
 echo -e "${GREEN}All dependencies found${NC}"
 
-# Temporary build directory
-BUILD_DIR=$(mktemp -d)
-echo -e "${BLUE}Using temporary build directory: $BUILD_DIR${NC}"
+# Repository-scoped build directory
+mkdir -p "$SCRATCH_ROOT"
+echo -e "${BLUE}Using isolated build directory: $BUILD_DIR${NC}"
 
 # Clone repository
 echo -e "${BLUE}Cloning repository...${NC}"
@@ -65,8 +76,11 @@ install -Dm644 "docs/README.md" "/usr/local/share/doc/zion/docs-index.md"
 install -Dm644 "docs/getting-started/installation.md" "/usr/local/share/doc/zion/installation.md"
 install -Dm644 "docs/reference/commands.md" "/usr/local/share/doc/zion/commands.md"
 
-# Install man page
-install -Dm644 "release/man/zion.1" "/usr/local/share/man/man1/zion.1"
+# Install man page (stamp version from build.zig.zon)
+VERSION="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' build.zig.zon | head -1)"
+install -d "/usr/local/share/man/man1"
+sed "s/@VERSION@/$VERSION/g" "release/man/zion.1" > "/usr/local/share/man/man1/zion.1"
+chmod 644 "/usr/local/share/man/man1/zion.1"
 
 # Install shell completions
 install -Dm644 "release/completions/zion.bash" "/usr/local/share/bash-completion/completions/zion"
@@ -80,7 +94,7 @@ fi
 
 # Clean up
 echo -e "${BLUE}Cleaning up...${NC}"
-rm -rf "$BUILD_DIR"
+cleanup
 
 echo -e "${GREEN}Zion has been installed system-wide successfully!${NC}"
 echo -e "Run 'zion --version' to verify the installation"

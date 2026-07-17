@@ -1,0 +1,17 @@
+pkgbase = zion
+	pkgdesc = A Zig project, toolchain, and dependency metadata utility
+	pkgver = 1.1.3
+	pkgrel = 1
+	url = https://github.com/ghostkellz/zion
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = git
+	depends = zig
+	depends = curl
+	depends = tar
+	depends = git
+	source = git+https://github.com/ghostkellz/zion.git#tag=v1.1.3
+	sha256sums = SKIP
+
+pkgname = zion

@@ -23,9 +23,6 @@
     // on the following line intact, so that it shows up in code reviews that
     // modify the field.
     .fingerprint = 0x8090a350bccc7360, // Changing this has security and trust implications.
-    // Tracks the earliest Zig version that the package considers to be a
-    // supported use case.
-    .minimum_zig_version = "0.15.0-dev.822+dd75e7bcb",
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.

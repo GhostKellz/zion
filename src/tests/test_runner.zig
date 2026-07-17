@@ -171,7 +171,7 @@ test "Concurrency: race condition detection" {
 // Test runner entry point
 pub fn main() !void {
     std.debug.print("\n🧪 Running Zion Comprehensive Test Suite\n", .{});
-    std.debug.print("=" ** 50 ++ "\n\n", .{});
+    std.debug.print("==================================================\n\n", .{});
 
     // Run all tests
     const test_start = std.time.milliTimestamp();
@@ -181,7 +181,7 @@ pub fn main() !void {
     const test_end = std.time.milliTimestamp();
     const test_duration = test_end - test_start;
 
-    std.debug.print("\n" ++ "=" ** 50 ++ "\n", .{});
+    std.debug.print("\n==================================================\n", .{});
     std.debug.print("✅ All tests completed in {}ms\n", .{test_duration});
     std.debug.print("\n📊 Test Summary:\n", .{});
     std.debug.print("  • Unit Tests: PASSED\n", .{});

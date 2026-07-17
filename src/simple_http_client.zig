@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-/// Simplified HTTP client for Zig 0.16 compatibility
+/// Simplified HTTP client for the current Zion I/O boundary.
 pub const SimpleHttpClient = struct {
     allocator: Allocator,
 

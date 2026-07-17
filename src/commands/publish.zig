@@ -9,6 +9,7 @@ const enhanced_config = @import("../enhanced_config.zig");
 const registry_manager = @import("../registry_manager.zig");
 const package_registry = @import("../package_registry.zig");
 const security = @import("../security.zig");
+const paths = @import("../paths.zig");
 const ZonFile = @import("../manifest.zig").ZonFile;
 
 /// Enhanced publish command with multi-registry support
@@ -91,6 +92,12 @@ pub fn publish(allocator: Allocator, args: []const []const u8) !void {
     std.debug.print("🔨 Building package...\n", .{});
     const package_path = try buildPackageForPublish(allocator, metadata, options);
     defer allocator.free(package_path);
+    const io = try zion_root.getIo();
+    const cwd = Dir.cwd();
+    defer if (fs.path.dirname(package_path)) |staging_dir| {
+        cwd.deleteTree(io, staging_dir) catch {};
+        cwd.deleteDir(io, paths.project_staging_dir) catch {};
+    };
 
     // Verify package integrity
     std.debug.print("🔐 Verifying package integrity...\n", .{});
@@ -440,9 +447,11 @@ fn buildPackageForPublish(allocator: Allocator, metadata: PackageMetadata, optio
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
 
-    // Create temporary build directory
-    const temp_dir = try std.fmt.allocPrint(allocator, "/tmp/zion-publish-{d}", .{zion_root.timestamp()});
-    try cwd.createDirPath(io, temp_dir);
+    try paths.ensurePrivateDir(io, paths.project_staging_dir);
+    const temp_dir = try paths.uniqueProjectStagingPath(allocator, io, "publish");
+    defer allocator.free(temp_dir);
+    try paths.ensurePrivateDir(io, temp_dir);
+    errdefer cwd.deleteTree(io, temp_dir) catch {};
 
     // Run build to ensure everything compiles
     std.debug.print("   Running: zig build\n", .{});
@@ -564,7 +573,7 @@ fn verifyPackageIntegrity(allocator: Allocator, package_path: []const u8, metada
 
 /// Sign package with security module
 fn signPackage(allocator: Allocator, package_path: []const u8, metadata: PackageMetadata) !security.PackageSignature {
-    var security_manager = security.SecurityManager.init(allocator, "/tmp/zion-keys");
+    var security_manager = security.SecurityManager.init(allocator, ".zion/keys");
     defer security_manager.deinit();
 
     // Generate or load signing key

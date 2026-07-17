@@ -16,9 +16,17 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Build the image
-docker build -t ghostkellz/zion:latest .
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+VERSION="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_ROOT/build.zig.zon" | head -1)"
+
+cd "$REPO_ROOT"
+zig build -Doptimize=ReleaseSafe
+mkdir -p .scratch
+sed "s/@VERSION@/$VERSION/g" release/man/zion.1 > .scratch/zion.1
+trap 'rm -f "$REPO_ROOT/.scratch/zion.1"; rmdir "$REPO_ROOT/.scratch" 2>/dev/null || true' EXIT INT TERM
+
+docker build --network none -f release/docker/Dockerfile -t "zion:$VERSION" .
 
 echo -e "${GREEN}Docker image built successfully!${NC}"
-echo -e "You can now run: docker run --rm ghostkellz/zion:latest"
-echo -e "Or for interactive use: docker run -it --rm -v \$(pwd):/workspace ghostkellz/zion:latest bash"
+docker run --rm --network none "zion:$VERSION" version

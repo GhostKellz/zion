@@ -1,182 +1,90 @@
 #!/usr/bin/env bash
-# Zion Build and Release Verification Script
+set -euo pipefail
 
-set -e
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+scratch_root="$repo_root/.scratch"
+run_root="$scratch_root/release-verify-$$"
+cache_root="$repo_root/.zig-cache/release-verify-$$"
+image_tag=""
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+cleanup() {
+    if [[ -n "$image_tag" ]]; then docker image rm "$image_tag" >/dev/null 2>&1 || true; fi
+    rm -rf "$run_root" "$cache_root"
+    rmdir "$scratch_root" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
-echo -e "${BLUE}🚀 Zion Release Verification${NC}"
-echo -e "═══════════════════════════════════════"
+mkdir -p "$run_root" "$cache_root/global" "$cache_root/local"
+cd "$repo_root"
+export ZIG_GLOBAL_CACHE_DIR="$cache_root/global"
+export ZIG_LOCAL_CACHE_DIR="$cache_root/local"
 
-# Check Zig version
-echo -e "\n${BLUE}📋 Checking Zig installation...${NC}"
-if ! command -v zig &> /dev/null; then
-    echo -e "${RED}❌ Zig is not installed${NC}"
-    exit 1
-fi
-
-ZIG_VERSION=$(zig version)
-echo -e "${GREEN}✅ Zig version: ${ZIG_VERSION}${NC}"
-
-# Check dependencies
-echo -e "\n${BLUE}📋 Checking dependencies...${NC}"
-for cmd in curl tar git; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "${RED}❌ Missing dependency: $cmd${NC}"
-        exit 1
-    else
-        echo -e "${GREEN}✅ Found: $cmd${NC}"
-    fi
+for command in zig git tar curl python3 docker; do
+    command -v "$command" >/dev/null || { echo "missing release dependency: $command" >&2; exit 1; }
 done
 
-# Clean previous builds
-echo -e "\n${BLUE}🧹 Cleaning previous builds...${NC}"
-rm -rf zig-out/ .zig-cache/
+echo "[1/8] formatting and repository policies"
+zig fmt --check build.zig test_build.zig src tests/*.zig
+bash scripts/check-project-policy.sh
+bash scripts/check-command-parity.sh
+python3 scripts/check-doc-links.py
+for script in scripts/*.sh release/**/*.sh; do bash -n "$script"; done
 
-# Build Debug version
-echo -e "\n${BLUE}🔨 Building debug version...${NC}"
-if zig build; then
-    echo -e "${GREEN}✅ Debug build successful${NC}"
-else
-    echo -e "${RED}❌ Debug build failed${NC}"
-    exit 1
-fi
+echo "[2/8] clean-cache debug build and representative tests"
+zig build
+zig build test
 
-# Build Release version
-echo -e "\n${BLUE}🔨 Building release version...${NC}"
-if zig build -Doptimize=ReleaseSafe; then
-    echo -e "${GREEN}✅ Release build successful${NC}"
-else
-    echo -e "${RED}❌ Release build failed${NC}"
-    exit 1
-fi
+echo "[3/8] clean-cache ReleaseSafe build"
+zig build -Doptimize=ReleaseSafe
 
-# Test basic functionality
-echo -e "\n${BLUE}🧪 Testing basic functionality...${NC}"
+echo "[4/8] binary and project-flow smoke checks"
+version="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' build.zig.zon | head -1)"
+[[ "$(zig-out/bin/zion version 2>&1)" == "zion $version" ]]
+zig-out/bin/zion help >/dev/null
+zig-out/bin/zion status >/dev/null
+mkdir -p "$run_root/project"
+(cd "$run_root/project" && "$repo_root/zig-out/bin/zion" init >/dev/null)
+(cd "$run_root/project" && "$repo_root/zig-out/bin/zion" lock >/dev/null)
+(cd "$run_root/project" && "$repo_root/zig-out/bin/zion" lock verify >/dev/null)
+(cd "$run_root/project" && "$repo_root/zig-out/bin/zion" check >/dev/null)
+(cd "$run_root/project" && "$repo_root/zig-out/bin/zion" remove absent-package >/dev/null)
+mkdir -p "$run_root/security"
+printf 'signed fixture\n' > "$run_root/security/package.tar.gz"
+(cd "$run_root/security" && "$repo_root/zig-out/bin/zion" security keygen >/dev/null)
+(cd "$run_root/security" && "$repo_root/zig-out/bin/zion" security sign package.tar.gz >/dev/null)
+(cd "$run_root/security" && "$repo_root/zig-out/bin/zion" security verify package.tar.gz >/dev/null)
+[[ "$(stat -c '%a' "$run_root/security/.zion/keys/private.key")" == "600" ]]
 
-# Test version command
-echo -e "\n${BLUE}🧪 Testing basic functionality...${NC}"
-VERSION_OUTPUT=$(./zig-out/bin/zion version 2>&1)
-echo "Version output: '$VERSION_OUTPUT'"
-if echo "$VERSION_OUTPUT" | grep -E "(zion [0-9]+\.[0-9]+\.[0-9]+|[0-9]+\.[0-9]+\.[0-9]+)" > /dev/null; then
-    echo -e "${GREEN}✅ Version command works - got: '$VERSION_OUTPUT'${NC}"
-else
-    echo -e "${RED}❌ Version command failed - unexpected output: '$VERSION_OUTPUT'${NC}"
-    # Don't exit on version check failure - continue with other tests
-fi
+echo "[5/8] release metadata consistency"
+bash scripts/check-release-consistency.sh
+git diff --check
+namcap release/arch/PKGBUILD
 
-# Test help command
-if ./zig-out/bin/zion help > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Help command works${NC}"
-else
-    echo -e "${RED}❌ Help command failed${NC}"
-    # Don't exit - continue with other tests
-fi
+echo "[6/8] install layout, upgrade, and uninstall simulation"
+mkdir -p "$run_root/install-root"
+bash scripts/stage-release-layout.sh "$run_root/install-root"
+test -x "$run_root/install-root/usr/bin/zion"
+test -f "$run_root/install-root/usr/share/doc/zion/README.md"
+test -f "$run_root/install-root/usr/share/man/man1/zion.1"
+test -f "$run_root/install-root/usr/share/bash-completion/completions/zion"
+test -f "$run_root/install-root/usr/share/zsh/site-functions/_zion"
+test -f "$run_root/install-root/usr/share/fish/vendor_completions.d/zion.fish"
+test -f "$run_root/install-root/usr/share/licenses/zion/LICENSE"
+bash scripts/stage-release-layout.sh "$run_root/install-root"
+rm -rf "$run_root/install-root"
+test ! -e "$run_root/install-root"
 
-# Create temporary test directory
-TEST_DIR=$(mktemp -d)
-cd "$TEST_DIR"
+echo "[7/8] package artifacts and checksums"
+bash scripts/build-release-artifacts.sh "$run_root/artifacts"
+(cd "$run_root/artifacts" && sha256sum -c SHA256SUMS)
 
-# Test init command
-echo -e "\n${BLUE}🧪 Testing project initialization...${NC}"
-if "$OLDPWD/zig-out/bin/zion" init > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Init command works${NC}"
-    
-    # Check created files
-    if [[ -f "build.zig" && -f "build.zig.zon" && -f "src/main.zig" ]]; then
-        echo -e "${GREEN}✅ All project files created${NC}"
-    else
-        echo -e "${RED}❌ Missing project files${NC}"
-        exit 1
-    fi
-else
-    echo -e "${RED}❌ Init command failed${NC}"
-    exit 1
-fi
+echo "[8/8] non-root, network-disabled container artifact"
+mkdir -p .scratch
+sed "s/@VERSION@/$version/g" release/man/zion.1 > .scratch/zion.1
+image_tag="zion-release-verify:$version-$$"
+docker build --network none -f release/docker/Dockerfile -t "$image_tag" .
+rm -f .scratch/zion.1
+container_version="$(docker run --rm --network none "$image_tag" version 2>&1)"
+[[ "$container_version" == "zion $version" ]]
 
-# Cleanup test directory
-cd "$OLDPWD"
-rm -rf "$TEST_DIR"
-
-# Check file sizes and structure
-echo -e "\n${BLUE}📊 Build artifacts analysis...${NC}"
-BINARY_SIZE=$(du -h zig-out/bin/zion | cut -f1)
-echo -e "${GREEN}📦 Binary size: ${BINARY_SIZE}${NC}"
-
-# Verify all required commands are present
-echo -e "\n${BLUE}🔍 Verifying command completeness...${NC}"
-COMMANDS=(
-    "init" "add" "remove" "update" "list" "info" "fetch" "build" 
-    "clean" "lock" "version" "help" "security" "performance" "debug"
-)
-
-# Get help output once
-HELP_OUTPUT=$(./zig-out/bin/zion help 2>/dev/null)
-
-for cmd in "${COMMANDS[@]}"; do
-    if echo "$HELP_OUTPUT" | grep -q "^\s*$cmd"; then
-        echo -e "${GREEN}✅ Command available: $cmd${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Command not found in help: $cmd${NC}"
-    fi
-done
-
-# Documentation check
-echo -e "\n${BLUE}📚 Documentation check...${NC}"
-if [[ -f "README.md" && -f "COMMANDS.md" && -f "DOCS.md" ]]; then
-    echo -e "${GREEN}✅ All documentation files present${NC}"
-else
-    echo -e "${RED}❌ Missing documentation files${NC}"
-    exit 1
-fi
-
-# Installation scripts check
-echo -e "\n${BLUE}📦 Installation scripts check...${NC}"
-if [[ -f "release/install.sh" && -f "release/install-system.sh" ]]; then
-    echo -e "${GREEN}✅ Installation scripts present${NC}"
-else
-    echo -e "${YELLOW}⚠️  Some installation scripts missing${NC}"
-fi
-
-# Package files check
-echo -e "\n${BLUE}📋 Package files check...${NC}"
-PACKAGE_FILES=(
-    "release/arch/PKGBUILD"
-    "release/debian/build-deb.sh"
-    "release/rpm/build-rpm.sh"
-    "release/docker/Dockerfile"
-    "release/man/zion.1"
-)
-
-for file in "${PACKAGE_FILES[@]}"; do
-    if [[ -f "$file" ]]; then
-        echo -e "${GREEN}✅ Found: $file${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Missing: $file${NC}"
-    fi
-done
-
-# Final summary
-echo -e "\n${GREEN}🎉 Zion Release Verification Complete!${NC}"
-echo -e "═══════════════════════════════════════════════════"
-echo -e "${GREEN}✅ Build: Success${NC}"
-echo -e "${GREEN}✅ Core functionality: Working${NC}"
-echo -e "${GREEN}✅ Documentation: Complete${NC}"
-echo -e "${GREEN}✅ Installation scripts: Ready${NC}"
-echo -e "${GREEN}✅ Package files: Available${NC}"
-
-echo -e "\n${BLUE}📋 Release Checklist:${NC}"
-echo -e "✅ Version: $VERSION_OUTPUT"
-echo -e "✅ All commands implemented"
-echo -e "✅ Documentation complete"
-echo -e "✅ Installation methods ready"
-echo -e "✅ Build system working"
-echo -e "✅ Security features implemented"
-echo -e "✅ Performance optimizations included"
-
-echo -e "\n${GREEN}🚀 Ready for release!${NC}"
+echo "Local release gate passed for Zion $version"

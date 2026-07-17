@@ -297,11 +297,11 @@ fn isValidTarget(target_triple: []const u8) bool {
 
     const arch = target_triple[0..first_dash];
     const valid_archs = [_][]const u8{
-        "x86_64",    "aarch64",     "arm",      "armeb", "riscv64",
-        "riscv32",   "wasm32",      "wasm64",   "i386",  "powerpc64",
-        "powerpc",   "mips",        "mips64",   "sparc", "sparc64",
-        "thumb",     "thumbeb",     "hexagon",  "s390x", "m68k",
-        "native",    "x86",         "loongarch64",
+        "x86_64",  "aarch64", "arm",         "armeb", "riscv64",
+        "riscv32", "wasm32",  "wasm64",      "i386",  "powerpc64",
+        "powerpc", "mips",    "mips64",      "sparc", "sparc64",
+        "thumb",   "thumbeb", "hexagon",     "s390x", "m68k",
+        "native",  "x86",     "loongarch64",
     };
 
     var arch_valid = false;

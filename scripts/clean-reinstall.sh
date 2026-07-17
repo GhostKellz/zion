@@ -59,8 +59,8 @@ else
     print_warning "No existing configuration found"
 fi
 
-# Step 2: Complete uninstall of v0.6
-print_step "Uninstalling Zion v0.6..."
+# Step 2: Remove an existing installation.
+print_step "Uninstalling existing Zion installation..."
 
 # Remove binary
 if [ -f "$INSTALL_DIR/zion" ]; then
@@ -101,7 +101,7 @@ print_step "Checking prerequisites..."
 
 # Check for Zig
 if ! command_exists zig; then
-    print_error "Zig is not installed. Please install Zig 0.11.0+ first."
+    print_error "Zig is not installed. Install the toolchain declared by build.zig.zon first."
     exit 1
 fi
 
@@ -118,8 +118,8 @@ done
 
 print_success "All prerequisites satisfied"
 
-# Step 4: Build and install v0.7.0
-print_step "Building Zion v0.7.0..."
+# Step 4: Build the current checkout.
+print_step "Building Zion..."
 
 # Ensure we're in the right directory
 if [ ! -f "build.zig" ]; then
@@ -139,10 +139,10 @@ if [ ! -f "zig-out/bin/zion" ]; then
     exit 1
 fi
 
-print_success "Zion v0.7.0 built successfully"
+print_success "Zion built successfully"
 
 # Step 5: Install binary
-print_step "Installing Zion v0.7.0..."
+print_step "Installing Zion..."
 
 # Ensure install directory exists
 mkdir -p "$INSTALL_DIR"
@@ -151,7 +151,7 @@ mkdir -p "$INSTALL_DIR"
 cp zig-out/bin/zion "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/zion"
 
-print_success "Zion v0.7.0 installed to $INSTALL_DIR/zion"
+print_success "Zion installed to $INSTALL_DIR/zion"
 
 # Step 6: Install shell completions
 print_step "Installing shell completions..."
@@ -213,43 +213,34 @@ fi
 # Test basic functionality
 if command_exists zion; then
     ZION_VERSION=$(zion version 2>/dev/null || echo "unknown")
-    print_success "Zion v0.7.0 is working: $ZION_VERSION"
+    print_success "Installed Zion reports: $ZION_VERSION"
 else
     print_error "Installation verification failed"
     exit 1
 fi
 
-# Step 8: Initialize v0.7.0 configuration
-print_step "Initializing v0.7.0 configuration..."
+# Step 8: Initialize configuration.
+print_step "Initializing configuration..."
 
 # Let zion create its config directory
 zion help > /dev/null 2>&1 || true
 
-print_success "v0.7.0 configuration initialized"
+print_success "Configuration initialized"
 
 # Step 9: Migration guidance
 echo ""
-echo -e "${MAGENTA}🎉 Zion v0.7.0 Installation Complete!${NC}"
+echo -e "${MAGENTA}🎉 Zion Installation Complete!${NC}"
 echo -e "${MAGENTA}======================================${NC}"
 echo ""
 echo -e "${GREEN}✅ What's installed:${NC}"
-echo "   • Zion v0.7.0 binary: $INSTALL_DIR/zion"
+echo "   • Zion binary: $INSTALL_DIR/zion"
 echo "   • Shell completions for your shell"
 echo "   • PATH updated in your shell config"
-echo ""
-echo -e "${BLUE}🚀 New in v0.7.0:${NC}"
-echo "   • Multi-registry support (GitHub, Zigistry, Zepplin)"
-echo "   • Enhanced package search and filtering"
-echo "   • Package signing and security verification"
-echo "   • Development dependencies support"
-echo "   • Parallel downloading for better performance"
-echo "   • Enhanced configuration with environment variables"
 echo ""
 echo -e "${CYAN}📋 Next steps:${NC}"
 echo "   1. Restart your shell or run: source ~/.zshrc"
 echo "   2. Test with: zion version"
-echo "   3. Try the new interactive search: zion search-interactive"
-echo "   4. For existing projects, run: zion init (to upgrade them)"
+echo "   3. Review available commands: zion help"
 echo ""
 echo -e "${YELLOW}💾 Backup location:${NC}"
 echo "   Your old configuration is backed up at: $BACKUP_DIR"

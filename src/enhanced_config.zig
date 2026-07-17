@@ -6,7 +6,7 @@ const Dir = Io.Dir;
 const zion_root = @import("root.zig");
 const json_escape = @import("json_escape.zig");
 
-/// Helper to get environment variable as a slice (Zig 0.16.0 compatibility)
+/// Read an environment variable as a borrowed slice.
 /// Accepts string literals which are sentinel-terminated
 fn getEnvVar(name: [*:0]const u8) ?[]const u8 {
     const ptr = std.c.getenv(name) orelse return null;
@@ -48,6 +48,8 @@ pub const RegistryConfig = struct {
     priority: u32 = 0, // Lower = higher priority
     enabled: bool = true,
     timeout_ms: u32 = 30000,
+    retry_attempts: u8 = 3,
+    retry_delay_ms: u32 = 1000,
 
     pub fn getApiUrl(self: RegistryConfig, allocator: std.mem.Allocator) ![]const u8 {
         // Handle GitHub's special case (no /api/v1 prefix)
@@ -257,7 +259,7 @@ pub const ZionConfig = struct {
                 else
                     null,
                 .priority = 0, // Highest priority
-                .api_version = try self.allocator.dupe(u8, "v1"),
+                .api_version = "v1",
             });
 
             if (auth_token) |token| {
@@ -292,7 +294,7 @@ pub const ZionConfig = struct {
                             try self.allocator.dupe(u8, token)
                         else
                             null,
-                        .api_version = try self.allocator.dupe(u8, "v1"),
+                        .api_version = "v1",
                     });
 
                     if (auth_token) |token| {
@@ -304,21 +306,22 @@ pub const ZionConfig = struct {
             }
         }
 
-        // Always add GitHub as fallback (lowest priority)
-        const github_token = getEnvVar("ZION_GITHUB_TOKEN") orelse getEnvVar("GITHUB_TOKEN");
-        try self.registries.append(self.allocator, RegistryConfig{
-            .name = try self.allocator.dupe(u8, "github"),
-            .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
-            .api_version = try self.allocator.dupe(u8, ""), // GitHub doesn't use /api/v1 prefix
-            .priority = 999, // Lowest priority
-            .auth_token = if (github_token) |token|
-                try self.allocator.dupe(u8, token)
-            else
-                null,
-        });
-
-        if (github_token) |token| {
-            try self.registry_auth_tokens.put(try self.allocator.dupe(u8, "github"), try self.allocator.dupe(u8, token));
+        const disable_github = if (getEnvVar("ZION_DISABLE_GITHUB_FALLBACK")) |value|
+            std.mem.eql(u8, value, "1") or std.ascii.eqlIgnoreCase(value, "true")
+        else
+            false;
+        if (!disable_github) {
+            const github_token = getEnvVar("ZION_GITHUB_TOKEN") orelse getEnvVar("GITHUB_TOKEN");
+            try self.registries.append(self.allocator, RegistryConfig{
+                .name = try self.allocator.dupe(u8, "github"),
+                .base_url = try self.allocator.dupe(u8, "https://api.github.com"),
+                .api_version = try self.allocator.dupe(u8, ""),
+                .priority = 999,
+                .auth_token = if (github_token) |token| try self.allocator.dupe(u8, token) else null,
+            });
+            if (github_token) |token| {
+                try self.registry_auth_tokens.put(try self.allocator.dupe(u8, "github"), try self.allocator.dupe(u8, token));
+            }
         }
 
         // Sort registries by priority

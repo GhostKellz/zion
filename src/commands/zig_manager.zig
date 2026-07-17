@@ -67,7 +67,7 @@ fn installVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         std.debug.print("❌ Usage: zion zig install <version>\n", .{});
         std.debug.print("Examples:\n", .{});
         std.debug.print("  zion zig install 0.11.0\n", .{});
-        std.debug.print("  zion zig install 0.12.0-dev.3180+83e578a18\n", .{});
+        std.debug.print("  zion zig install <development-version>\n", .{});
         std.debug.print("  zion zig install master\n", .{});
         return;
     }
@@ -110,7 +110,7 @@ fn useVersion(allocator: Allocator, args: []const [:0]const u8) !void {
         // Clear the active managed version to fall back to system
         try clearActiveVersion(allocator);
 
-        const sys_version = getZigVersionFromPath(allocator, io, system_zig) catch "unknown";
+        const sys_version = getZigVersionFromPath(allocator, io, system_zig) catch try allocator.dupe(u8, "unknown");
         defer allocator.free(sys_version);
 
         std.debug.print("✅ Now using system Zig ({s})\n", .{sys_version});
@@ -156,7 +156,7 @@ fn showCurrent(allocator: Allocator) !void {
         defer allocator.free(sys_path);
         std.debug.print("🖥️  System Zig: {s}\n", .{sys_path});
 
-        const sys_version = getZigVersionFromPath(allocator, io, sys_path) catch "unknown";
+        const sys_version = getZigVersionFromPath(allocator, io, sys_path) catch try allocator.dupe(u8, "unknown");
         defer allocator.free(sys_version);
         std.debug.print("    Version: {s}\n", .{sys_version});
     } else {
@@ -379,7 +379,7 @@ fn listInstalledVersions(allocator: Allocator) !void {
     const system_zig = detectSystemZig(allocator, io) catch null;
     if (system_zig) |sys_path| {
         defer allocator.free(sys_path);
-        const sys_version = getZigVersionFromPath(allocator, io, sys_path) catch "unknown";
+        const sys_version = getZigVersionFromPath(allocator, io, sys_path) catch try allocator.dupe(u8, "unknown");
         defer allocator.free(sys_version);
         std.debug.print("  🖥️  system ({s}) - {s}\n", .{ sys_version, sys_path });
     }
@@ -422,36 +422,9 @@ fn listInstalledVersions(allocator: Allocator) !void {
 
 fn listRemoteVersions(allocator: Allocator, show_prerelease: bool) !void {
     _ = allocator;
-
-    std.debug.print("  📡 Available Zig versions for x86_64-linux:\n", .{});
-
-    // Stable releases
-    const stable_versions = [_][]const u8{
-        "0.14.1",
-        "0.13.0",
-        "0.12.1",
-        "0.11.0",
-    };
-
-    std.debug.print("\n  🟢 Stable Releases:\n", .{});
-    for (stable_versions) |version| {
-        std.debug.print("    {s}\n", .{version});
-    }
-
-    if (show_prerelease) {
-        const dev_versions = [_][]const u8{
-            "0.15.0-dev.936+fc2c1883b",
-            "0.15.0-dev.1000+abc123def", // Example
-            "master", // Latest development
-        };
-
-        std.debug.print("\n  🟡 Development Releases:\n", .{});
-        for (dev_versions) |version| {
-            std.debug.print("    {s}\n", .{version});
-        }
-    } else {
-        std.debug.print("\n💡 Use --prerelease to see development versions\n", .{});
-    }
+    _ = show_prerelease;
+    std.debug.print("  Remote Zig discovery is not implemented; no static version list is shown.\n", .{});
+    std.debug.print("  Consult ziglang.org/download/ and install an exact version.\n", .{});
 }
 
 fn downloadAndInstallZig(allocator: Allocator, version: []const u8) !void {
@@ -681,8 +654,8 @@ fn getZigVersionFromPath(allocator: Allocator, io: Io, zig_path: []const u8) ![]
 
 fn getZigDownloadUrl(allocator: Allocator, version: []const u8) ![]const u8 {
     // Map versions to their download URLs for x86_64-linux
-    if (std.mem.eql(u8, version, "0.15.0-dev.936+fc2c1883b")) {
-        return try allocator.dupe(u8, "https://ziglang.org/builds/zig-x86_64-linux-0.15.0-dev.936+fc2c1883b.tar.xz");
+    if (std.mem.indexOf(u8, version, "-dev.") != null) {
+        return std.fmt.allocPrint(allocator, "https://ziglang.org/builds/zig-x86_64-linux-{s}.tar.xz", .{version});
     } else if (std.mem.eql(u8, version, "0.14.1")) {
         return try allocator.dupe(u8, "https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz");
     } else if (std.mem.eql(u8, version, "0.13.0")) {
@@ -692,8 +665,7 @@ fn getZigDownloadUrl(allocator: Allocator, version: []const u8) ![]const u8 {
     } else if (std.mem.eql(u8, version, "0.11.0")) {
         return try allocator.dupe(u8, "https://ziglang.org/download/0.11.0/zig-x86_64-linux-0.11.0.tar.xz");
     } else if (std.mem.eql(u8, version, "master")) {
-        // For master, use the latest dev build (this would need to be dynamic in practice)
-        return try allocator.dupe(u8, "https://ziglang.org/builds/zig-x86_64-linux-0.15.0-dev.936+fc2c1883b.tar.xz");
+        return error.UnsupportedVersion;
     } else {
         return error.UnsupportedVersion;
     }
@@ -758,7 +730,7 @@ fn printZigHelp() void {
     std.debug.print("EXAMPLES:\n", .{});
     std.debug.print("    zion zig list --remote          # Show available versions\n", .{});
     std.debug.print("    zion zig install 0.14.1         # Install Zig 0.14.1\n", .{});
-    std.debug.print("    zion zig install 0.15.0-dev.936+fc2c1883b  # Install dev version\n", .{});
+    std.debug.print("    zion zig install <development-version>  # Install exact dev version\n", .{});
     std.debug.print("    zion zig use 0.14.1             # Switch to Zig 0.14.1\n", .{});
     std.debug.print("    zion zig current                # Show current version\n", .{});
     std.debug.print("    zion zig default 0.14.1         # Set as default\n", .{});

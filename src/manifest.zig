@@ -4,6 +4,7 @@ const Dir = std.Io.Dir;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
+const AtomicFile = @import("atomic_file.zig").AtomicFile;
 
 /// Escapes a string for safe use in ZON string literals
 /// Handles: backslash, double quote, newline, carriage return, tab, and control chars
@@ -267,6 +268,20 @@ pub const ZonFile = struct {
 
         const name_copy = try self.allocator.dupe(u8, name);
         try self.dependencies.put(name_copy, dep);
+    }
+
+    pub fn removeDependency(self: *ZonFile, name: []const u8, dev_only: bool) bool {
+        var dependencies = if (dev_only) &self.dev_dependencies else &self.dependencies;
+        var iterator = dependencies.iterator();
+        while (iterator.next()) |entry| {
+            if (!std.mem.eql(u8, entry.key_ptr.*, name)) continue;
+            const owned_name = entry.key_ptr.*;
+            entry.value_ptr.deinit(self.allocator);
+            _ = dependencies.remove(name);
+            self.allocator.free(owned_name);
+            return true;
+        }
+        return false;
     }
 
     /// Load ZON file from disk
@@ -560,9 +575,9 @@ pub const ZonFile = struct {
     /// Save ZON file to disk with proper Zig identifier format
     pub fn saveToFile(self: *const ZonFile, file_path: []const u8) !void {
         const io = try zion_root.getIo();
-        const cwd = Dir.cwd();
-        const file = try cwd.createFile(io, file_path, .{ .truncate = true });
-        defer file.close(io);
+        var replacement = try AtomicFile.init(self.allocator, io, file_path);
+        defer replacement.deinit();
+        const file = replacement.file;
 
         if (self.dependencies_prefix) |prefix| {
             try file.writeStreamingAll(io, prefix);
@@ -619,6 +634,7 @@ pub const ZonFile = struct {
 
         if (self.dependencies_suffix) |suffix| {
             try file.writeStreamingAll(io, suffix);
+            try replacement.commit();
             return;
         }
 
@@ -658,6 +674,7 @@ pub const ZonFile = struct {
         }
 
         try file.writeStreamingAll(io, "}\n");
+        try replacement.commit();
     }
 
     /// Add a development dependency
@@ -721,4 +738,12 @@ test "dependency key rendering supports non-identifiers" {
     const escaped = try formatDependencyKey(allocator, "zig-clap");
     defer allocator.free(escaped);
     try std.testing.expectEqualStrings(".@\"zig-clap\"", escaped);
+}
+
+test "development dependency removal is idempotent" {
+    var zon = try ZonFile.init(std.testing.allocator, "fixture", "1.0.0");
+    defer zon.deinit();
+    try zon.addDevDependency("tool", "https://example.test/tool.tar.gz", "hash");
+    try std.testing.expect(zon.removeDependency("tool", true));
+    try std.testing.expect(!zon.removeDependency("tool", true));
 }

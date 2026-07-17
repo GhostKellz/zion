@@ -1,6 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
-const commands = @import("../commands/mod.zig");
+const commands = @import("zion").commands;
 
 const Harness = struct {
     pub var expected: []const []const u8 = &[_][]const u8{};

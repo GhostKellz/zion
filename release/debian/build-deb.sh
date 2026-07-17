@@ -10,6 +10,14 @@ NC='\033[0m'
 
 echo -e "${BLUE}Building Debian package for Zion...${NC}"
 
+# Single source of truth: pull version from build.zig.zon
+VERSION="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' ../../build.zig.zon | head -1)"
+MIN_ZIG_VERSION="$(sed -n 's/.*\.minimum_zig_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' ../../build.zig.zon | head -1)"
+if [ -z "$VERSION" ] || [ -z "$MIN_ZIG_VERSION" ]; then
+    echo -e "${RED}Error: could not read project metadata from build.zig.zon${NC}"
+    exit 1
+fi
+
 # Check dependencies
 for cmd in dpkg-deb fakeroot; do
     if ! command -v $cmd &> /dev/null; then
@@ -21,7 +29,7 @@ done
 
 # Create package directory structure
 PKG_DIR="packages"
-DEB_DIR="$PKG_DIR/zion_1.1.1_amd64"
+DEB_DIR="$PKG_DIR/zion_${VERSION}_amd64"
 
 rm -rf "$PKG_DIR"
 mkdir -p "$DEB_DIR"/{DEBIAN,usr/bin,usr/share/doc/zion,usr/share/man/man1}
@@ -31,17 +39,15 @@ mkdir -p "$DEB_DIR"/usr/share/licenses/zion
 # Create control file
 cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: zion
-Version: 1.1.1
+Version: ${VERSION}
 Section: devel
 Priority: optional
 Architecture: amd64
-Depends: zig (>= 0.17.0), curl, tar, git
+Depends: zig (>= ${MIN_ZIG_VERSION}), curl, tar, git
 Maintainer: Christopher Kelley <ckelley@ghostkellz.sh>
-Description: A modern, cargo-inspired package manager for Zig
- Zion is a modern package manager for the Zig programming language that
- provides seamless dependency management with automatic build integration.
- It supports GitHub repositories and provides reproducible builds through
- lock files.
+Description: A development tool for Zig projects
+ Zion provides project scaffolding, dependency metadata, toolchain helpers,
+ and a built-in test workflow for Zig projects.
 Homepage: https://github.com/ghostkellz/zion
 EOF
 
@@ -57,7 +63,7 @@ cp "../../README.md" "$DEB_DIR/usr/share/doc/zion/"
 cp "../../docs/README.md" "$DEB_DIR/usr/share/doc/zion/"
 cp "../../docs/getting-started/installation.md" "$DEB_DIR/usr/share/doc/zion/"
 cp "../../docs/reference/commands.md" "$DEB_DIR/usr/share/doc/zion/"
-cp "../man/zion.1" "$DEB_DIR/usr/share/man/man1/"
+sed "s/@VERSION@/$VERSION/g" "../man/zion.1" > "$DEB_DIR/usr/share/man/man1/zion.1"
 cp "../completions/zion.bash" "$DEB_DIR/usr/share/bash-completion/completions/zion"
 cp "../completions/zion.zsh" "$DEB_DIR/usr/share/zsh/site-functions/_zion"
 cp "../completions/zion.fish" "$DEB_DIR/usr/share/fish/vendor_completions.d/zion.fish"
@@ -72,5 +78,5 @@ chmod 644 "$DEB_DIR/usr/share/man/man1/zion.1"
 echo -e "${BLUE}Creating Debian package...${NC}"
 fakeroot dpkg-deb --build "$DEB_DIR"
 
-echo -e "${GREEN}Debian package created: $PKG_DIR/zion_1.1.1_amd64.deb${NC}"
-echo "Install with: sudo dpkg -i $PKG_DIR/zion_1.1.1_amd64.deb"
+echo -e "${GREEN}Debian package created: $PKG_DIR/zion_${VERSION}_amd64.deb${NC}"
+echo "Install with: sudo dpkg -i $PKG_DIR/zion_${VERSION}_amd64.deb"

@@ -42,6 +42,7 @@ _zion() {
         'version:Show version information'
         'publish:Publish packages'
         'search-interactive:Interactive package search'
+        'interface:Compatibility interface'
         'verify:Signature verification helpers'
         'cache:Cache helpers'
         'tui:Terminal UI'

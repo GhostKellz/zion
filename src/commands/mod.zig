@@ -1,4 +1,5 @@
 const std = @import("std");
+const zion_version = @import("build_options").version;
 
 // Import individual command modules
 pub const init_mod = @import("init.zig");
@@ -40,9 +41,9 @@ pub const doc = @import("doc.zig").doc;
 pub const outdated = @import("outdated.zig").outdated;
 pub const zig_manager = @import("zig_manager.zig").zig_manager;
 
-pub var zig_command_override: ?fn (std.mem.Allocator, [][:0]u8) anyerror!void = null;
+pub var zig_command_override: ?*const fn (std.mem.Allocator, [][:0]u8) anyerror!void = null;
 
-pub fn setZigCommandHandler(handler: ?fn (std.mem.Allocator, [][:0]u8) anyerror!void) void {
+pub fn setZigCommandHandler(handler: ?*const fn (std.mem.Allocator, [][:0]u8) anyerror!void) void {
     zig_command_override = handler;
 }
 
@@ -91,11 +92,11 @@ pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
         zig_args.deinit(allocator);
     }
 
-    try zig_args.append(allocator, try allocator.dupeZ(u8, "zion"));
-    try zig_args.append(allocator, try allocator.dupeZ(u8, "zig"));
+    try zig_args.append(allocator, try allocator.dupeSentinel(u8, "zion", 0));
+    try zig_args.append(allocator, try allocator.dupeSentinel(u8, "zig", 0));
 
     for (args) |arg| {
-        try zig_args.append(allocator, try allocator.dupeZ(u8, arg));
+        try zig_args.append(allocator, try allocator.dupeSentinel(u8, arg, 0));
     }
 
     const handler = zig_command_override orelse zig_manager;
@@ -107,8 +108,8 @@ pub fn zig(allocator: std.mem.Allocator, args: []const []const u8) !void {
 pub fn template(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     _ = allocator;
     _ = args;
-    std.debug.print("📋 'zion template' is not part of the shipped v1.1.0 surface yet.\n", .{});
-    std.debug.print("   The implementation needs Zig 0.16 compatibility work before it is safe to expose.\n", .{});
+    std.debug.print("📋 'zion template' is not part of the shipped v{s} surface yet.\n", .{zion_version});
+    std.debug.print("   The implementation needs compiler-API work before it is safe to expose.\n", .{});
 }
 
 pub fn fmt(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
@@ -121,6 +122,6 @@ pub fn fmt(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
 pub fn analyze(allocator: std.mem.Allocator, args: []const [:0]const u8) !void {
     _ = allocator;
     _ = args;
-    std.debug.print("📊 'zion analyze' is not shipped as a stable v1.1.0 command yet.\n", .{});
+    std.debug.print("📊 'zion analyze' is not shipped as a stable v{s} command yet.\n", .{zion_version});
     std.debug.print("   Use 'zion tree', 'zion why', and 'zion check' for current project insight.\n", .{});
 }

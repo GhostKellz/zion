@@ -9,6 +9,21 @@ const github = @import("github.zig");
 /// Maximum size of downloaded content (100MB)
 const MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024;
 
+pub fn validateDownloadUrl(url: []const u8) !void {
+    const uri = std.Uri.parse(url) catch return error.InvalidDownloadUrl;
+    if (uri.user != null or uri.password != null) return error.CredentialsInUrl;
+    const host_component = uri.host orelse return error.InvalidDownloadUrl;
+    const host = switch (host_component) {
+        .raw => |value| value,
+        .percent_encoded => |value| if (std.mem.indexOfScalar(u8, value, '%') == null) value else return error.InvalidDownloadUrl,
+    };
+    if (std.mem.eql(u8, uri.scheme, "https")) return;
+    if (!std.mem.eql(u8, uri.scheme, "http")) return error.InsecureDownloadUrl;
+    if (!std.mem.eql(u8, host, "localhost") and !std.mem.eql(u8, host, "127.0.0.1") and !std.mem.eql(u8, host, "[::1]")) {
+        return error.InsecureDownloadUrl;
+    }
+}
+
 /// Result of a package download operation
 pub const DownloadResult = struct {
     url: []const u8,
@@ -159,7 +174,10 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
     var buffer: [65536]u8 = undefined; // Increased from 8KB to 64KB
 
     while (true) {
-        const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch break;
+        const bytes_read = file.readStreaming(io, &.{buffer[0..]}) catch |err| switch (err) {
+            error.EndOfStream => break,
+            else => return err,
+        };
         if (bytes_read == 0) break;
         hash.update(buffer[0..bytes_read]);
     }
@@ -179,11 +197,18 @@ pub fn calculateFileHash(allocator: Allocator, file_path: []const u8) ![]const u
 /// This implementation is a fallback in case std.http has issues
 pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
     const io = try zion_root.getIo();
+    try validateDownloadUrl(url);
     std.debug.print("Downloading with curl: {s}...\n", .{url});
 
     const argv = [_][]const u8{
         "curl",
-        "-L", // Follow redirects
+        "-L",
+        "--proto",
+        "=http,https",
+        "--proto-redir",
+        "=https",
+        "--max-filesize",
+        "104857600",
         "-o",
         output_path,
         url,
@@ -234,6 +259,7 @@ pub fn downloadWithCurl(allocator: Allocator, url: []const u8, output_path: []co
 pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
     const io = try zion_root.getIo();
     const cwd = Dir.cwd();
+    try validateDownloadUrl(url);
     std.debug.print("Downloading {s}...\n", .{url});
 
     // Ensure output directory exists
@@ -241,14 +267,29 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
         try cwd.createDirPath(io, dir);
     }
 
+    var random_bytes: [8]u8 = undefined;
+    io.random(&random_bytes);
+    const suffix = std.fmt.bytesToHex(random_bytes, .lower);
+    const partial_path = try std.fmt.allocPrint(allocator, "{s}.partial-{s}", .{ output_path, suffix });
+    defer allocator.free(partial_path);
+    defer cwd.deleteFile(io, partial_path) catch {};
+
     const argv = [_][]const u8{
         "curl",
-        "-L", // Follow redirects
+        "-L",
         "-f", // Fail on HTTP errors
+        "--proto",
+        "=http,https",
+        "--proto-redir",
+        "=https",
+        "--max-redirs",
+        "3",
+        "--max-filesize",
+        "104857600",
         "--retry", "3", // Retry on failure
         "--retry-delay", "2", // Delay between retries
         "--max-time", "300", // 5 minute timeout
-        "-o",         output_path,
+        "-o",         partial_path,
         url,
     };
 
@@ -281,8 +322,7 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
         .exited => |code| {
             if (code != 0) {
                 std.debug.print("curl failed with exit code {d}: {s}\n", .{ code, stderr_buf.items });
-                // Try wget as fallback
-                return downloadWithWget(allocator, url, output_path);
+                return error.DownloadFailed;
             }
         },
         else => {
@@ -292,17 +332,20 @@ pub fn downloadWithCurlImproved(allocator: Allocator, url: []const u8, output_pa
     }
 
     // Verify the file was actually created and has content
-    const file = cwd.openFile(io, output_path, .{}) catch {
-        std.debug.print("Downloaded file not found: {s}\n", .{output_path});
+    const file = cwd.openFile(io, partial_path, .{}) catch {
+        std.debug.print("Downloaded file was not created\n", .{});
         return error.DownloadFailed;
     };
     defer file.close(io);
 
     const file_size = try file.length(io);
     if (file_size == 0) {
-        std.debug.print("Downloaded file is empty: {s}\n", .{output_path});
+        std.debug.print("Downloaded file is empty\n", .{});
         return error.DownloadFailed;
     }
+    if (file_size > MAX_DOWNLOAD_SIZE) return error.DownloadTooLarge;
+
+    try std.Io.Dir.rename(cwd, partial_path, cwd, output_path, io);
 
     std.debug.print("Successfully downloaded {d} bytes\n", .{file_size});
 }
@@ -345,12 +388,15 @@ pub fn downloadWithWget(_: Allocator, url: []const u8, output_path: []const u8) 
 
 /// Smart downloader that tries curl first, then wget as fallback
 pub fn downloadSmart(allocator: Allocator, url: []const u8, output_path: []const u8) !void {
-    downloadWithCurlImproved(allocator, url, output_path) catch |err| {
-        std.debug.print("curl failed, trying wget...\n", .{});
-        return downloadWithWget(allocator, url, output_path) catch {
-            return err;
-        };
-    };
+    return downloadWithCurlImproved(allocator, url, output_path);
+}
+
+test "download URL policy rejects credentials and insecure remote transport" {
+    try validateDownloadUrl("https://example.test/package.tar.gz");
+    try validateDownloadUrl("http://127.0.0.1:8080/package.tar.gz");
+    try std.testing.expectError(error.InsecureDownloadUrl, validateDownloadUrl("http://example.test/package.tar.gz"));
+    try std.testing.expectError(error.InsecureDownloadUrl, validateDownloadUrl("file:///etc/passwd"));
+    try std.testing.expectError(error.CredentialsInUrl, validateDownloadUrl("https://user:secret@example.test/package.tar.gz"));
 }
 
 /// Downloads a package from a provided URL (does NOT re-resolve via GitHub)

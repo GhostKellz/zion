@@ -1,27 +1,11 @@
-FROM alpine:latest
+FROM debian:trixie-slim
 
-# Install dependencies
-RUN apk add --no-cache \
-    zig \
-    git \
-    curl \
-    tar \
-    bash
+COPY zig-out/bin/zion /usr/local/bin/zion
+COPY README.md /usr/share/doc/zion/README.md
+COPY LICENSE /usr/share/licenses/zion/LICENSE
+COPY .scratch/zion.1 /usr/share/man/man1/zion.1
 
-# Set working directory
-WORKDIR /workspace
-
-# Clone and build Zion
-RUN git clone https://github.com/ghostkellz/zion.git /tmp/zion \
-    && cd /tmp/zion \
-    && zig build -Doptimize=ReleaseSafe \
-    && cp zig-out/bin/zion /usr/local/bin/zion \
-    && rm -rf /tmp/zion
-
-# Create a non-root user
-RUN adduser -D -s /bin/bash zion
-
-# Switch to non-root user
+RUN useradd --create-home --shell /usr/sbin/nologin zion
 USER zion
 
 # Set the entrypoint

@@ -1,5 +1,6 @@
 //! Use `zig init --strip` next time to generate a project without comments.
 const std = @import("std");
+const build_zon = @import("build.zig.zon");
 
 // Although this function looks imperative, it does not perform the build
 // directly and instead it mutates the build graph (`b`) that will be then
@@ -17,6 +18,12 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
+
+    // Expose the version from build.zig.zon as the single source of truth so
+    // runtime code never hardcodes a version string.
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", build_zon.version);
+    const build_options_mod = options.createModule();
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
@@ -41,6 +48,9 @@ pub fn build(b: *std.Build) void {
         // which requires us to specify a target.
         .target = target,
         .link_libc = true,
+        .imports = &.{
+            .{ .name = "build_options", .module = build_options_mod },
+        },
     });
 
     // ghostnet dependency removed - using standard HTTP client
@@ -84,6 +94,7 @@ pub fn build(b: *std.Build) void {
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
                 .{ .name = "zion", .module = mod },
+                .{ .name = "build_options", .module = build_options_mod },
             },
         }),
     });
@@ -118,9 +129,7 @@ pub fn build(b: *std.Build) void {
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     // Creates an executable that will run `test` blocks from the provided module.
     // Here `mod` needs to define a target, which is why earlier we made sure to
@@ -148,6 +157,62 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    const active_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tests/active_test_runner.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "zion", .module = mod },
+                .{ .name = "build_options", .module = build_options_mod },
+            },
+        }),
+    });
+    const run_active_tests = b.addRunArtifact(active_tests);
+    test_step.dependOn(&run_active_tests.step);
+
+    const fixture_test = b.addExecutable(.{
+        .name = "registry-fixture-test",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/registry_fixture_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "zion", .module = mod },
+                .{ .name = "build_options", .module = build_options_mod },
+            },
+        }),
+    });
+    const fixture_cmd = b.addSystemCommand(&.{ "bash", "scripts/run-registry-fixture-tests.sh" });
+    fixture_cmd.addArtifactArg(fixture_test);
+
+    const transaction_test = b.addExecutable(.{
+        .name = "transaction-fixture-test",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/transaction_fixture_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "zion", .module = mod },
+                .{ .name = "build_options", .module = build_options_mod },
+            },
+        }),
+    });
+    fixture_cmd.addArtifactArg(transaction_test);
+    fixture_cmd.addArtifactArg(exe);
+    test_step.dependOn(&fixture_cmd.step);
+
+    const policy_cmd = b.addSystemCommand(&.{ "bash", "scripts/check-project-policy.sh" });
+    const policy_step = b.step("policy-check", "Check local path and version-string policies");
+    policy_step.dependOn(&policy_cmd.step);
+
+    const parity_cmd = b.addSystemCommand(&.{ "bash", "scripts/check-command-parity.sh" });
+    const parity_step = b.step("command-parity", "Check command metadata and user-facing surface parity");
+    parity_step.dependOn(&parity_cmd.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

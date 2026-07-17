@@ -5,6 +5,7 @@ const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const sec = @import("../security.zig");
 const zion_root = @import("../root.zig");
+const paths = @import("../paths.zig");
 
 /// Security management command for package signing, verification, and trust
 pub fn security(allocator: Allocator, args: []const [:0]const u8) !void {
@@ -43,7 +44,7 @@ fn printSecurityHelp() void {
         \\    keygen                  Generate a new signing key pair
         \\    sign <package>          Sign a package with your private key
         \\    verify <package>        Verify a package signature
-        \\    trust <signer_id>       Add a signer to your trust store
+        \\    trust <signer_id>       Reserved until signer keys can be supplied
         \\    status                  Show security status and trust store
         \\
         \\EXAMPLES:
@@ -81,7 +82,7 @@ fn handleKeyGen(allocator: Allocator, args: []const [:0]const u8) !void {
     try pub_key_file.writeStreamingAll(io, &key_pair.public_key);
 
     // Save private key (with warning about security)
-    const priv_key_file = try cwd.createFile(io, ".zion/keys/private.key", .{});
+    const priv_key_file = try cwd.createFile(io, ".zion/keys/private.key", .{ .permissions = paths.privateFilePermissions() });
     defer priv_key_file.close(io);
     try priv_key_file.writeStreamingAll(io, &key_pair.private_key);
 
@@ -148,7 +149,8 @@ fn handleSign(allocator: Allocator, args: []const [:0]const u8) !void {
     const sig_file = try cwd.createFile(io, sig_path, .{});
     defer sig_file.close(io);
 
-    // Write signature metadata in JSON format
+    const signature_hex = std.fmt.bytesToHex(signature.signature, .lower);
+    const public_key_hex = std.fmt.bytesToHex(signature.public_key, .lower);
     const signature_json = try std.fmt.allocPrint(allocator,
         \\{{
         \\  "signature": "{s}",
@@ -159,8 +161,8 @@ fn handleSign(allocator: Allocator, args: []const [:0]const u8) !void {
         \\}}
         \\
     , .{
-        "placeholder_signature",
-        "placeholder_public_key",
+        &signature_hex,
+        &public_key_hex,
         signature.timestamp,
         signature.signer_id,
         signature.algorithm,
@@ -206,41 +208,40 @@ fn handleVerify(allocator: Allocator, args: []const [:0]const u8) !void {
     };
     defer allocator.free(sig_content);
 
-    std.debug.print("🔍 Verifying package: {s}\n", .{package_path});
-    std.debug.print("📋 Signature file found: {s}\n", .{sig_path});
-    std.debug.print("✅ Package verified (simplified verification)\n", .{});
+    const parsed = std.json.parseFromSlice(struct {
+        signature: []const u8,
+        public_key: []const u8,
+        timestamp: i64,
+        signer_id: []const u8,
+        algorithm: []const u8,
+    }, allocator, sig_content, .{ .ignore_unknown_fields = true }) catch return error.InvalidSignatureFile;
+    defer parsed.deinit();
+    if (!std.mem.eql(u8, parsed.value.algorithm, "Ed25519")) return error.UnsupportedSignatureAlgorithm;
+    if (parsed.value.signature.len != sec.SIGNATURE_SIZE * 2 or parsed.value.public_key.len != sec.PUBLIC_KEY_SIZE * 2) {
+        return error.InvalidSignatureFile;
+    }
+    var signature_bytes: [sec.SIGNATURE_SIZE]u8 = undefined;
+    var public_key_bytes: [sec.PUBLIC_KEY_SIZE]u8 = undefined;
+    _ = std.fmt.hexToBytes(&signature_bytes, parsed.value.signature) catch return error.InvalidSignatureFile;
+    _ = std.fmt.hexToBytes(&public_key_bytes, parsed.value.public_key) catch return error.InvalidSignatureFile;
+    var security_manager = sec.SecurityManager.init(allocator, ".zion/keys");
+    defer security_manager.deinit();
+    const valid = try security_manager.verifyPackage(package_path, .{
+        .signature = signature_bytes,
+        .public_key = public_key_bytes,
+        .timestamp = parsed.value.timestamp,
+        .signer_id = parsed.value.signer_id,
+        .algorithm = parsed.value.algorithm,
+    });
+    if (!valid) return error.SignatureVerificationFailed;
+    std.debug.print("✅ Ed25519 signature is valid for {s}\n", .{package_path});
 }
 
 /// Trust a signer
 fn handleTrust(allocator: Allocator, args: []const [:0]const u8) !void {
-    if (args.len == 0) {
-        std.debug.print("Error: No signer ID specified\n", .{});
-        std.debug.print("Usage: zion security trust <signer_id>\n", .{});
-        return;
-    }
-
-    const signer_id = args[0];
-
-    std.debug.print("🤝 Adding '{s}' to trust store...\n", .{signer_id});
-
-    var security_manager = sec.SecurityManager.init(allocator, ".zion/keys");
-    defer security_manager.deinit();
-
-    // Create a basic signer info (in real implementation, would fetch from registry)
-    const signer_info = sec.SignerInfo{
-        .public_key = @splat(0),
-        .signer_id = signer_id,
-        .trust_level = .medium,
-        .verified_packages = 0,
-        .reputation_score = 5.0,
-        .first_seen = zion_root.timestamp(),
-        .last_seen = zion_root.timestamp(),
-    };
-
-    try security_manager.addTrustedSigner(signer_info);
-
-    std.debug.print("✅ Signer '{s}' added to trust store\n", .{signer_id});
-    std.debug.print("🔒 Trust level: Medium\n", .{});
+    _ = allocator;
+    _ = args;
+    std.debug.print("Signer trust mutation is unavailable until a verified public-key input format is defined.\n", .{});
 }
 
 /// Show security status

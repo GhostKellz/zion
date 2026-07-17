@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_cache = @import("../build_cache.zig");
 const zion_root = @import("../root.zig");
+const paths = @import("../paths.zig");
 const Allocator = std.mem.Allocator;
 
 pub fn cache(allocator: Allocator, args: []const [:0]const u8) !void {
@@ -14,11 +15,13 @@ pub fn cache(allocator: Allocator, args: []const [:0]const u8) !void {
         return;
     }
 
-    const home_dir = zion_root.getEnv("HOME") orelse "/tmp";
-    const cache_dir = zion_root.getEnv("ZION_CACHE_DIR") orelse
-        try std.fmt.allocPrint(allocator, "{s}/.zion/cache", .{home_dir});
-    const should_free = zion_root.getEnv("ZION_CACHE_DIR") == null;
-    defer if (should_free) allocator.free(cache_dir);
+    const cache_dir = paths.cacheDir(allocator) catch |err| {
+        std.debug.print("❌ Unable to determine a safe cache directory: {s}\n", .{@errorName(err)});
+        return;
+    };
+    defer allocator.free(cache_dir);
+    const io = try zion_root.getIo();
+    try paths.ensurePrivateDir(io, cache_dir);
 
     var cache_system = build_cache.BuildCache.init(allocator, cache_dir) catch |err| {
         std.debug.print("❌ Failed to initialize build cache: {}\n", .{err});

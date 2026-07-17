@@ -320,7 +320,7 @@ test " Memory management verification" {
 
 pub fn main() !void {
     std.debug.print("\n🧪 Zion Integration Tests\n", .{});
-    std.debug.print("=" ** 40 ++ "\n\n", .{});
+    std.debug.print("========================================\n\n", .{});
 
     // Run all tests
     testing.refAllDecls(@This());

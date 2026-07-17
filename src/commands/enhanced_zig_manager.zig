@@ -58,7 +58,7 @@ fn printEnhancedZigHelp() !void {
         \\
         \\EXAMPLES:
         \\  zion zig install 0.11.0              # Install stable release
-        \\  zion zig install 0.12.0-dev.3180+83e578a18  # Install dev build
+        \\  zion zig install <development-version>      # Install exact dev build
         \\  zion zig use system                  # Use system Zig (pacman/brew installed)
         \\  zion zig use 0.11.0                  # Switch to specific version
         \\  zion zig current --json              # JSON output for IDE integration
@@ -111,7 +111,7 @@ fn installVersionEnhanced(allocator: Allocator, args: [][]const u8) !void {
         print("❌ Usage: zion zig install <version>\n", .{});
         print("Examples:\n", .{});
         print("  zion zig install 0.11.0                    # Stable release\n", .{});
-        print("  zion zig install 0.12.0-dev.3180+83e578a18 # Development build\n", .{});
+        print("  zion zig install <development-version>     # Development build\n", .{});
         print("  zion zig install master                     # Latest master\n", .{});
         return;
     }
@@ -430,10 +430,7 @@ fn listRemoteVersionsEnhanced(allocator: Allocator, show_dev: bool) !void {
     print("  • 0.10.1 (stable)\n", .{});
     print("  • 0.9.1 (stable)\n", .{});
 
-    if (show_dev) {
-        print("  • 0.12.0-dev.3180+83e578a18 (development)\n", .{});
-        print("  • 0.12.0-dev.3179+8d92bb7e0 (development)\n", .{});
-    }
+    if (show_dev) print("  • Development versions: see ziglang.org/download/\n", .{});
 
     print("\n💡 Use 'zion zig install <version>' to install\n", .{});
 }

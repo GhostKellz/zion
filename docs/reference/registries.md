@@ -1,5 +1,9 @@
 # Registry Reference
 
+> Registry-backed network operations are experimental. The current client still
+> contains placeholder response paths, so these commands are for development and
+> configuration inspection rather than release automation.
+
 ## Commands
 
 ```bash
@@ -19,5 +23,6 @@ zion registry health
 ## Notes
 
 - use `zion registry list` to inspect configured registries
-- use `zion registry test` or `zion registry health` to validate connectivity
+- `zion registry test` and `zion registry health` do not yet provide a
+  release-grade connectivity guarantee
 - use `zion config` and environment variables to control registry defaults

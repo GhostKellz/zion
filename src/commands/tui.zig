@@ -158,7 +158,7 @@ fn performSearchCommand(allocator: Allocator, query: []const u8) !void {
     std.debug.print("\n🔍 Searching for '{s}'...\n", .{query});
     std.debug.print("══════════════════════════════\n\n", .{});
 
-    const search_args = [_][:0]u8{ try allocator.dupeZ(u8, "zion"), try allocator.dupeZ(u8, "search"), try allocator.dupeZ(u8, query) };
+    const search_args = [_][:0]u8{ try allocator.dupeSentinel(u8, "zion", 0), try allocator.dupeSentinel(u8, "search", 0), try allocator.dupeSentinel(u8, query, 0) };
     defer {
         for (search_args) |arg| allocator.free(arg);
     }

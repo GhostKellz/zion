@@ -126,35 +126,8 @@ pub const NvimIntegration = struct {
 
     /// Search packages for Neovim
     fn searchPackagesRpc(self: *NvimIntegration, params: json.Value) !json.Value {
-        const query = params.object.get("query") orelse return self.errorResponse("Missing query parameter");
-
-        // For now, return mock search results
-        // In a full implementation, this would search GitHub or a package registry
-        var results = json.Array.init(self.allocator);
-
-        // Mock some results based on common Zig packages
-        const mock_packages = [_]struct { name: []const u8, description: []const u8 }{
-            .{ .name = "mitchellh/libxev", .description = "Cross-platform async I/O library" },
-            .{ .name = "ziglang/zig", .description = "Zig programming language" },
-            .{ .name = "ghostkellz/zcrypto", .description = "Cryptography library for Zig" },
-        };
-
-        for (mock_packages) |pkg| {
-            if (std.mem.indexOf(u8, pkg.name, query.string) != null or
-                std.mem.indexOf(u8, pkg.description, query.string) != null)
-            {
-                var pkg_obj = json.ObjectMap.init(self.allocator);
-                try pkg_obj.put("name", json.Value{ .string = pkg.name });
-                try pkg_obj.put("description", json.Value{ .string = pkg.description });
-                try results.append(json.Value{ .object = pkg_obj });
-            }
-        }
-
-        var response = json.ObjectMap.init(self.allocator);
-        try response.put("results", json.Value{ .array = results });
-        try response.put("count", json.Value{ .integer = @intCast(results.items.len) });
-
-        return json.Value{ .object = response };
+        _ = params.object.get("query") orelse return self.errorResponse("Missing query parameter");
+        return self.errorResponse("Neovim package search is unavailable; use `zion search` directly");
     }
 
     /// Get zion configuration for Neovim

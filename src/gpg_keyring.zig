@@ -1,6 +1,7 @@
 const std = @import("std");
 const signature_verification = @import("signature_verification.zig");
 const zion_root = @import("root.zig");
+const paths = @import("paths.zig");
 const Allocator = std.mem.Allocator;
 const Dir = std.Io.Dir;
 const Io = std.Io;
@@ -217,33 +218,39 @@ pub const GPGKeyring = struct {
         const io = try zion_root.getIo();
         const cwd = Dir.cwd();
 
-        // Generate random temp file names to prevent race conditions and symlink attacks
-        var random_bytes: [8]u8 = undefined;
-        io.random(&random_bytes);
-        const suffix = std.fmt.bytesToHex(random_bytes, .lower);
-        const pid = std.c.getpid();
+        try paths.ensurePrivateDir(io, paths.project_staging_dir);
+        defer cwd.deleteDir(io, paths.project_staging_dir) catch {};
+        const operation_dir = try paths.uniqueProjectStagingPath(self.allocator, io, "verify");
+        defer self.allocator.free(operation_dir);
+        try paths.ensurePrivateDir(io, operation_dir);
+        defer cwd.deleteTree(io, operation_dir) catch {};
 
-        const temp_data_path = try std.fmt.allocPrint(self.allocator, "/tmp/zion_verify_data_{d}_{s}", .{ pid, suffix });
+        const temp_data_path = try std.fs.path.join(self.allocator, &.{ operation_dir, "data" });
         defer self.allocator.free(temp_data_path);
 
-        const temp_sig_path = try std.fmt.allocPrint(self.allocator, "/tmp/zion_verify_sig_{d}_{s}", .{ pid, suffix });
+        const temp_sig_path = try std.fs.path.join(self.allocator, &.{ operation_dir, "signature" });
         defer self.allocator.free(temp_sig_path);
 
-        // Ensure cleanup on all exit paths
-        errdefer {
-            cwd.deleteFile(io, temp_data_path) catch {};
-            cwd.deleteFile(io, temp_sig_path) catch {};
+        // Ensure cleanup on every exit path.
+        // Write data file
+        {
+            const data_file = try cwd.createFile(io, temp_data_path, .{
+                .exclusive = true,
+                .permissions = paths.privateFilePermissions(),
+            });
+            defer data_file.close(io);
+            try data_file.writeStreamingAll(io, signed_data);
         }
 
-        // Write data file
-        const data_file = try cwd.createFile(io, temp_data_path, .{});
-        defer data_file.close(io);
-        try data_file.writeStreamingAll(io, signed_data);
-
         // Write signature file
-        const sig_file = try cwd.createFile(io, temp_sig_path, .{});
-        defer sig_file.close(io);
-        try sig_file.writeStreamingAll(io, signature_data);
+        {
+            const sig_file = try cwd.createFile(io, temp_sig_path, .{
+                .exclusive = true,
+                .permissions = paths.privateFilePermissions(),
+            });
+            defer sig_file.close(io);
+            try sig_file.writeStreamingAll(io, signature_data);
+        }
 
         // Run GPG verification
         const argv = [_][]const u8{
@@ -259,9 +266,6 @@ pub const GPGKeyring = struct {
             .stderr = .pipe,
         }) catch |err| {
             std.debug.print("⚠️  GPG verify command failed: {}\n", .{err});
-            // Cleanup temp files
-            cwd.deleteFile(io, temp_data_path) catch {};
-            cwd.deleteFile(io, temp_sig_path) catch {};
             return false;
         };
 
@@ -278,10 +282,6 @@ pub const GPGKeyring = struct {
         }
 
         const term = try child.wait(io);
-
-        // Cleanup temp files
-        cwd.deleteFile(io, temp_data_path) catch {};
-        cwd.deleteFile(io, temp_sig_path) catch {};
 
         switch (term) {
             .exited => |code| {

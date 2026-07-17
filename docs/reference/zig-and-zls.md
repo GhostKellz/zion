@@ -1,5 +1,11 @@
 # Zig And ZLS Reference
 
+## Toolchain Compatibility
+
+`build.zig.zon` is the only source of truth for Zion's minimum supported Zig
+toolchain. Read `.minimum_zig_version` from that manifest instead of relying on
+a version copied into documentation or package notes.
+
 ## Zig Version Management
 
 ```bash

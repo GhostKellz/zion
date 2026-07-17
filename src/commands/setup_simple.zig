@@ -3,7 +3,7 @@ const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("../root.zig");
 
-/// Simplified setup command for the current v1.1.0 shipped surface.
+/// Simplified setup command for the current shipped surface.
 pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
     if (args.len < 3) {
         printSetupHelp();
@@ -25,7 +25,7 @@ pub fn setup(allocator: Allocator, args: []const [:0]const u8) !void {
 fn setupAll(allocator: Allocator) !void {
     _ = allocator;
     std.debug.print("Zion setup currently ships a lightweight onboarding flow.\n", .{});
-    std.debug.print("\nWhat it covers in v1.1.0:\n", .{});
+    std.debug.print("\nWhat it covers in v{s}:\n", .{zion_root.ZION_VERSION});
     std.debug.print("  1. Verify the core tools you need are installed\n", .{});
     std.debug.print("  2. Point you at the follow-up commands for Zig and ZLS\n", .{});
     std.debug.print("\nRecommended next steps:\n", .{});

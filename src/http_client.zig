@@ -12,7 +12,7 @@ pub const HttpClient = struct {
     timeout_ms: u64,
 
     /// Initialize HTTP client with allocator and std.Io for network operations
-    /// The std.Io is required by Zig 0.16's std.http.Client for I/O operations
+    /// Shared I/O context used by the standard HTTP client.
     pub fn init(allocator: Allocator, io: std.Io) !*HttpClient {
         const client = try allocator.create(HttpClient);
 
@@ -88,7 +88,7 @@ pub const HttpClient = struct {
             return error.InvalidUrl;
         };
 
-        // Use the new fetch API for Zig 0.16
+        // Use the standard client's fetch API.
         const fetch_result = self.persistent_client.fetch(.{
             .location = .{ .uri = uri },
             .method = method,

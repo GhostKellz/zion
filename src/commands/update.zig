@@ -9,6 +9,9 @@ const LockFile = @import("../lockfile.zig").LockFile;
 const downloader = @import("../downloader.zig");
 const zion_root = @import("../root.zig");
 const tar_extract = @import("../tar_extract.zig");
+const version_resolver = @import("../version_resolver.zig");
+const DependencyTransaction = @import("../dependency_transaction.zig").DependencyTransaction;
+const semver = @import("../semver.zig");
 
 /// Print help information for the update command
 fn printUpdateHelp() void {
@@ -107,9 +110,6 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
         unchanged_packages.deinit(allocator);
     }
 
-    var zon_updated = false;
-    var lock_updated = false;
-
     // Process each dependency
     var it = zon_file.dependencies.iterator();
     while (it.next()) |entry| {
@@ -130,65 +130,78 @@ pub fn update(allocator: Allocator, args: []const [:0]const u8) !void {
 
         std.debug.print("\n📦 Checking {s}...\n", .{pkg_name});
 
-        // Re-download using the exact artifact URL stored in the manifest.
-        const download_result = try downloader.downloadFromUrl(allocator, current_dep.url, pkg_name);
+        const locked = lock_file.getPackage(pkg_name) orelse return error.LockfileEntryMissing;
+        if (locked.pinned) {
+            std.debug.print("  ✓ Pinned at {s}; skipping\n", .{locked.version orelse "recorded artifact"});
+            try unchanged_packages.append(allocator, try allocator.dupe(u8, pkg_name));
+            continue;
+        }
+
+        const package_ref = try allocator.dupe(u8, locked.resolved_from orelse return error.UpdateProvenanceMissing);
+        defer allocator.free(package_ref);
+        const constraint = try allocator.dupe(u8, locked.version_constraint orelse "*");
+        defer allocator.free(constraint);
+        const previous_version = try allocator.dupe(u8, locked.version orelse "unknown");
+        defer allocator.free(previous_version);
+        const registry = if (locked.registry) |value| try allocator.dupe(u8, value) else null;
+        defer if (registry) |value| allocator.free(value);
+        var resolver = version_resolver.VersionResolver.init(allocator);
+        var resolution = try resolver.resolve(package_ref, constraint);
+        defer resolution.deinit(allocator);
+
+        if (locked.version) |current_version| {
+            if (std.mem.eql(u8, current_version, resolution.version_string)) {
+                std.debug.print("  ✓ Up to date at {s}\n", .{current_version});
+                try unchanged_packages.append(allocator, try allocator.dupe(u8, pkg_name));
+                continue;
+            }
+            if (semver.Version.parse(current_version)) |parsed_current| {
+                if (resolution.resolved_version.compare(parsed_current) != .gt) {
+                    std.debug.print("  ✓ No newer version satisfies {s}\n", .{constraint});
+                    try unchanged_packages.append(allocator, try allocator.dupe(u8, pkg_name));
+                    continue;
+                }
+            } else |_| {}
+        }
+
+        if (dry_run) {
+            std.debug.print("  📋 Would update {s} -> {s}\n", .{ previous_version, resolution.version_string });
+            try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
+            continue;
+        }
+
+        const download_result = try downloader.downloadFromUrl(allocator, resolution.url, pkg_name);
         defer {
             allocator.free(download_result.url);
             allocator.free(download_result.hash);
             allocator.free(download_result.cache_path);
         }
 
-        // Compare hashes
-        if (std.mem.eql(u8, current_dep.hash, download_result.hash)) {
-            // No change
-            std.debug.print("  ✓ Up to date (hash: {s})\n", .{download_result.hash[0..16]});
-            try unchanged_packages.append(allocator, try allocator.dupe(u8, pkg_name));
-        } else {
-            // Hash changed - need to update
-            if (dry_run) {
-                std.debug.print("  📋 Would update! (dry run)\n", .{});
-                std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
-                std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
-                try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
-            } else {
-                std.debug.print("  🔄 Hash changed! Updating...\n", .{});
-                std.debug.print("    Old: {s}\n", .{current_dep.hash[0..16]});
-                std.debug.print("    New: {s}\n", .{download_result.hash[0..16]});
+        var transaction = try DependencyTransaction.init(allocator, io, pkg_name, locked.dev_only);
+        defer transaction.deinit();
+        try tar_extract.extractPackage(allocator, download_result.cache_path, transaction.staged_path);
 
-                // Update dependency in ZON file
-                allocator.free(current_dep.url);
-                allocator.free(current_dep.hash);
-                entry.value_ptr.url = try allocator.dupe(u8, download_result.url);
-                entry.value_ptr.hash = try allocator.dupe(u8, download_result.hash);
-                zon_updated = true;
-
-                // Update lock file
-                try lock_file.addPackage(pkg_name, download_result.url, download_result.hash, null);
-                lock_updated = true;
-
-                // Extract updated package
-                const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{pkg_name});
-                defer allocator.free(deps_path);
-
-                std.debug.print("  📁 Extracting to {s}...\n", .{deps_path});
-                try tar_extract.extractPackage(allocator, download_result.cache_path, deps_path);
-
-                try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
-            }
-        }
-    }
-
-    // Save updated files if needed (skip in dry-run mode)
-    if (!dry_run) {
-        if (zon_updated) {
-            try zon_file.saveToFile(zon_path);
-            std.debug.print("\n✅ Updated build.zig.zon\n", .{});
-        }
-
-        if (lock_updated) {
-            try lock_file.saveToFile();
-            std.debug.print("✅ Updated zion.lock\n", .{});
-        }
+        allocator.free(current_dep.url);
+        allocator.free(current_dep.hash);
+        entry.value_ptr.url = try allocator.dupe(u8, download_result.url);
+        entry.value_ptr.hash = try allocator.dupe(u8, download_result.hash);
+        try lock_file.addPackageWithMetadata(pkg_name, download_result.url, download_result.hash, .{
+            .version = resolution.version_string,
+            .registry = registry,
+            .resolved_from = package_ref,
+            .integrity = download_result.hash,
+            .dev_only = locked.dev_only,
+            .version_constraint = constraint,
+            .origin_url = resolution.url,
+            .checksum_sha256 = download_result.hash,
+            .checksum_verified = true,
+        });
+        try zon_file.saveToFile(zon_path);
+        try lock_file.saveToFile();
+        try transaction.installStaged();
+        try transaction.commit();
+        std.debug.print("  🔄 Updated {s} -> {s}\n", .{ previous_version, resolution.version_string });
+        try updated_packages.append(allocator, try allocator.dupe(u8, pkg_name));
     }
 
     // Print summary

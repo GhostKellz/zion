@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
+const paths = @import("paths.zig");
 
 /// Registry configuration for multi-registry support
 pub const RegistryConfig = struct {
@@ -44,7 +45,7 @@ pub const ZionConfig = struct {
         return ZionConfig{
             .allocator = allocator,
             .registries = .empty,
-            .cache_dir = "/tmp/zion-cache", // Default
+            .cache_dir = "",
         };
     }
 
@@ -113,7 +114,10 @@ pub const ZionConfig = struct {
         }
 
         if (zion_root.getEnv("ZION_CACHE_DIR")) |cache_dir| {
+            if (self.cache_dir.len > 0) self.allocator.free(self.cache_dir);
             self.cache_dir = try self.allocator.dupe(u8, cache_dir);
+        } else if (self.cache_dir.len == 0) {
+            self.cache_dir = try paths.cacheDir(self.allocator);
         }
     }
 
@@ -127,7 +131,7 @@ pub const ZionConfig = struct {
             self.allocator.free(username);
         }
 
-        if (!std.mem.eql(u8, self.cache_dir, "/tmp/zion-cache")) {
+        if (self.cache_dir.len > 0) {
             self.allocator.free(self.cache_dir);
         }
     }
@@ -143,6 +147,7 @@ pub const ZionConfig = struct {
 
     pub fn createDefault(allocator: Allocator) !ZionConfig {
         var config = ZionConfig.init(allocator);
+        config.cache_dir = try paths.cacheDir(allocator);
 
         // Add default registries
         try config.registries.append(RegistryConfig{

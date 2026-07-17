@@ -10,6 +10,13 @@ NC='\033[0m'
 
 echo -e "${BLUE}Building RPM package for Zion...${NC}"
 
+# Single source of truth: pull version from build.zig.zon
+VERSION="$(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' ../../build.zig.zon | head -1)"
+if [ -z "$VERSION" ]; then
+    echo -e "${RED}Error: could not read version from build.zig.zon${NC}"
+    exit 1
+fi
+
 # Check dependencies
 if ! command -v rpmbuild &> /dev/null; then
     echo -e "${RED}Error: rpmbuild is not installed${NC}"
@@ -22,11 +29,11 @@ RPMBUILD_DIR="$HOME/rpmbuild"
 mkdir -p "$RPMBUILD_DIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
 # Create spec file
-cat > "$RPMBUILD_DIR/SPECS/zion.spec" << 'EOF'
+cat > "$RPMBUILD_DIR/SPECS/zion.spec" << EOF
 Name: zion
-Version: 1.1.1
+Version: ${VERSION}
 Release: dev%{?dist}
-Summary: A modern, cargo-inspired package manager for Zig
+Summary: A development tool for Zig projects
 License: MIT
 URL: https://github.com/ghostkellz/zion
 Source0: %{name}-%{version}.tar.gz
@@ -36,10 +43,8 @@ Requires: zig curl tar git
 BuildRequires: zig git
 
 %description
-Zion is a modern package manager for the Zig programming language that
-provides seamless dependency management with automatic build integration.
-It supports GitHub repositories and provides reproducible builds through
-lock files.
+Zion provides project scaffolding, dependency metadata, toolchain helpers,
+and a built-in test workflow for Zig projects.
 
 %prep
 %setup -q
@@ -60,7 +65,8 @@ install -Dm644 docs/getting-started/installation.md %{buildroot}%{_docdir}/zion/
 install -Dm644 docs/reference/commands.md %{buildroot}%{_docdir}/zion/commands.md
 
 # Install man page
-install -Dm644 release/man/zion.1 %{buildroot}%{_mandir}/man1/zion.1
+sed "s/@VERSION@/%{version}/g" release/man/zion.1 > zion.1.rendered
+install -Dm644 zion.1.rendered %{buildroot}%{_mandir}/man1/zion.1
 
 # Install shell completions
 install -Dm644 release/completions/zion.bash %{buildroot}%{_datadir}/bash-completion/completions/zion
@@ -76,7 +82,7 @@ install -Dm644 release/completions/zion.fish %{buildroot}%{_datadir}/fish/vendor
 %{_datadir}/fish/vendor_completions.d/zion.fish
 
 %changelog
-* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - 1.1.1-1
+* $(date "+%a %b %d %Y") Zion Team <maintainer@example.com> - ${VERSION}-1
 - Zion-native runtime, testing, docs, and packaging refresh
 EOF
 
@@ -84,10 +90,10 @@ EOF
 cd ../..
 PKG_DIR="packages"
 mkdir -p "$PKG_DIR"
-TARBALL="$PKG_DIR/zion-1.1.1.tar.gz"
+TARBALL="$PKG_DIR/zion-${VERSION}.tar.gz"
 
 echo -e "${BLUE}Creating source tarball...${NC}"
-git archive --format=tar.gz --prefix=zion-1.1.1/ HEAD > "$TARBALL"
+git archive --format=tar.gz --prefix=zion-${VERSION}/ HEAD > "$TARBALL"
 cp "$TARBALL" "$RPMBUILD_DIR/SOURCES/"
 
 # Build RPM

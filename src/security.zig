@@ -357,7 +357,7 @@ fn loadTrustedFingerprints(allocator: Allocator) !std.StringHashMap(void) {
         // Simple JSON parsing for {"fingerprint": "...", "trusted": true}
         if (std.mem.indexOf(u8, line, "\"fingerprint\"")) |fp_start| {
             const after_colon = std.mem.indexOf(u8, line[fp_start..], ":") orelse continue;
-            const quote_start = std.mem.indexOf(u8, line[fp_start + after_colon..], "\"") orelse continue;
+            const quote_start = std.mem.indexOf(u8, line[fp_start + after_colon ..], "\"") orelse continue;
             const start_pos = fp_start + after_colon + quote_start + 1;
             const rest = line[start_pos..];
             const end_quote = std.mem.indexOf(u8, rest, "\"") orelse continue;

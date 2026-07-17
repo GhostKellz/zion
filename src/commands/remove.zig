@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 const ZonFile = @import("../manifest.zig").ZonFile;
 const LockFile = @import("../lockfile.zig").LockFile;
 const zion_root = @import("../root.zig");
+const DependencyTransaction = @import("../dependency_transaction.zig").DependencyTransaction;
 
 /// Remove a dependency from the project
 pub fn remove(allocator: Allocator, package_name: []const u8) !void {
@@ -31,48 +32,17 @@ pub fn remove(allocator: Allocator, package_name: []const u8) !void {
     defer zon_file.deinit();
 
     // Check if the dependency exists
-    if (!zon_file.dependencies.contains(package_name)) {
-        std.debug.print("Error: Package '{s}' not found in build.zig.zon dependencies.\n", .{package_name});
-        std.debug.print("Available packages:\n", .{});
-
-        var it = zon_file.dependencies.iterator();
-        var count: usize = 0;
-        while (it.next()) |entry| {
-            std.debug.print("  - {s}\n", .{entry.key_ptr.*});
-            count += 1;
-        }
-
-        if (count == 0) {
-            std.debug.print("  (no dependencies found)\n", .{});
-        }
-
-        return error.PackageNotFound;
+    const dev_only = !zon_file.dependencies.contains(package_name) and zon_file.dev_dependencies.contains(package_name);
+    if (!zon_file.dependencies.contains(package_name) and !dev_only) {
+        std.debug.print("Package '{s}' is already absent; no changes needed.\n", .{package_name});
+        return;
     }
 
     // Step 2: Remove from build.zig.zon
     std.debug.print("Removing {s} from build.zig.zon...\n", .{package_name});
-    const removed_dep = zon_file.dependencies.get(package_name).?;
-
-    // Free the dependency memory and remove from map
-    allocator.free(removed_dep.url);
-    allocator.free(removed_dep.hash);
-
-    // Get the key that we need to free after removal
-    var it = zon_file.dependencies.iterator();
-    var key_to_free: ?[]const u8 = null;
-    while (it.next()) |entry| {
-        if (std.mem.eql(u8, entry.key_ptr.*, package_name)) {
-            key_to_free = entry.key_ptr.*;
-            break;
-        }
-    }
-
-    _ = zon_file.dependencies.remove(package_name);
-
-    // Free the key if we found it
-    if (key_to_free) |key| {
-        allocator.free(key);
-    }
+    var transaction = try DependencyTransaction.init(allocator, io, package_name, dev_only);
+    defer transaction.deinit();
+    if (!zon_file.removeDependency(package_name, dev_only)) return error.PackageNotFound;
 
     // Save the updated ZON file
     try zon_file.saveToFile(zon_path);
@@ -85,33 +55,19 @@ pub fn remove(allocator: Allocator, package_name: []const u8) !void {
     try removeFromLockFile(&lock_file, package_name);
     try lock_file.saveToFile();
 
-    // Step 4: Remove from build.zig
-    std.debug.print("Removing from build.zig...\n", .{});
-    removeFromBuildZig(allocator, package_name) catch |err| {
-        std.debug.print("Warning: Could not automatically remove from build.zig: {}\n", .{err});
-        std.debug.print("You may need to manually remove the dependency from your build.zig file.\n", .{});
-    };
-
-    // Step 5: Remove the package directory
-    const deps_path = try std.fmt.allocPrint(allocator, ".zion/deps/{s}", .{package_name});
+    // Step 4: Stage removal of the installed package directory.
+    const deps_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ if (dev_only) ".zion/dev-deps" else ".zion/deps", package_name });
     defer allocator.free(deps_path);
-
-    std.debug.print("Removing package directory {s}...\n", .{deps_path});
-    cwd.deleteTree(io, deps_path) catch |err| {
-        if (err == error.FileNotFound) {
-            std.debug.print("  (directory not found, skipping)\n", .{});
-        } else {
-            std.debug.print("Warning: Could not remove package directory: {}\n", .{err});
-        }
-    };
+    try transaction.removeInstalled();
+    try transaction.commit();
 
     // Step 6: Print summary
     std.debug.print("✅ Successfully removed {s}\n", .{package_name});
     std.debug.print("Actions taken:\n", .{});
     std.debug.print("  ✓ Removed from build.zig.zon\n", .{});
     std.debug.print("  ✓ Updated zion.lock\n", .{});
-    std.debug.print("  ✓ Removed from build.zig (if found)\n", .{});
     std.debug.print("  ✓ Deleted .zion/deps/{s}/ (if found)\n", .{package_name});
+    std.debug.print("  ℹ️  Remove any manual build.zig imports separately\n", .{});
     std.debug.print("Run 'zig build' to verify the removal.\n", .{});
 }
 

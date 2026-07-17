@@ -2,6 +2,7 @@ const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 const zion_root = @import("root.zig");
+const paths = @import("paths.zig");
 
 pub const LintResult = struct {
     file_path: []const u8,
@@ -380,8 +381,10 @@ pub const ZigFormatter = struct {
     }
 
     fn runZigFmt(self: *ZigFormatter, content: []const u8) ![]const u8 {
-        // Create temporary file
-        const tmp_path = try std.fmt.allocPrint(self.allocator, "/tmp/zion_fmt_{d}.zig", .{zion_root.timestamp()});
+        const io = try zion_root.getIo();
+        try paths.ensurePrivateDir(io, paths.project_staging_dir);
+        defer std.Io.Dir.cwd().deleteDir(io, paths.project_staging_dir) catch {};
+        const tmp_path = try paths.uniqueProjectStagingPath(self.allocator, io, "format.zig");
         defer self.allocator.free(tmp_path);
 
         try fs.cwd().writeFile(tmp_path, content);

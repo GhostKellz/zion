@@ -1,32 +1,25 @@
+# Version is sourced from build.zig.zon (run rpmbuild from the repo root).
+%global zion_version %(sed -n 's/.*\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' build.zig.zon 2>/dev/null | head -1)
+%global zion_zig_version %(sed -n 's/.*\.minimum_zig_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' build.zig.zon 2>/dev/null | head -1)
 Name:           zion
-Version:        1.1.1
+Version:        %{zion_version}
 Release:        1%{?dist}
-Summary:        A modern package manager for Zig
+Summary:        A development tool for Zig projects
 
 License:        MIT
 URL:            https://github.com/ghostkellz/zion
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
-BuildRequires:  zig >= 0.17.0
+BuildRequires:  zig >= %{zion_zig_version}
 BuildRequires:  git
-Requires:       zig >= 0.17.0
+Requires:       zig >= %{zion_zig_version}
 Requires:       curl
 Requires:       tar
 
 %description
-Zion is a modern, cargo-inspired package manager for the Zig programming language.
-It provides seamless dependency management with automatic build integration,
-making Zig project development as smooth as possible.
+Zion provides project scaffolding, dependency metadata, toolchain helpers, and
+a built-in test workflow for Zig projects.
 
-Features:
-- Automatic dependency management
-- Smart build integration
-- Package extraction
-- Reproducible builds with lock files
-- GitHub integration
-- Project scaffolding
-- Zig version management
-- ZLS integration
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -53,10 +46,3 @@ install -Dm644 LICENSE %{buildroot}%{_docdir}/%{name}/LICENSE
 %files
 %{_bindir}/zion
 %{_docdir}/%{name}
-
-%changelog
-* Sun Apr 20 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.1.1-1
-- Updated for Zig 0.17.0 compatibility
-
-* Sat Apr 04 2026 Christopher Kelley <ckelley@ghostkellz.sh> - 1.1.0-1
-- Zion-native runtime, testing, docs, and release surface refresh
